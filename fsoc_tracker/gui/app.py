@@ -413,6 +413,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker: Worker | None = None
         self.sim: Simulation | None = None
         self.video_path: str | None = None
+        self.video_info: dict | None = None
         self.out_dir: Path | None = None
         self.headless = False
         self._last_draw = 0.0
@@ -780,6 +781,10 @@ class MainWindow(QtWidgets.QMainWindow):
                f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
                f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99\n\n"
                f"Log: {self.out_dir / 'frames.csv'}\nReport: {report}")
+        sat = v.get("slew_saturation_pct", 0.0)
+        if sat > 20:
+            msg += (f"\n\nNote: the gimbal was at its rate limit in {sat:.0f}% of frames, so the target moved faster than the camera can turn. "
+                    f"Raise Max pan / Max tilt (the PS allows 5 to 10 deg/s) or widen the FOV and run again.")
         self.lbl_status.setText(f"Finished. Report written to {self.out_dir}")
         self.last_summary_text = msg
         if self.headless:
@@ -815,7 +820,50 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_video(self):
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open video for Benchmark 2", "", "Video (*.mp4 *.avi *.mov *.mkv)")
         if p:
-            self.video_path = p; self.ed_name.setText(Path(p).stem); self._video_label()
+            self.video_path = p; self.ed_name.setText(Path(p).stem)
+            self._preview_video(p)
+            self._video_label()
+
+    def _preview_video(self, path: str):
+        """Show the first frame and the file's facts as soon as a video is chosen."""
+        import cv2
+        cap = cv2.VideoCapture(path)
+        ok, bgr = cap.read()
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0
+        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+        if not ok:
+            QtWidgets.QMessageBox.warning(self, "Video", "Could not read the first frame of this file."); return
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+        self.video_info = {"w": w, "h": h, "fps": fps, "frames": n, "seconds": n / fps if fps else 0}
+        side = min(self.scene_view.width(), self.scene_view.height()) - 8
+        s = side / max(h, w)
+        pm = QtGui.QPixmap.fromImage(to_qimage(gray).scaled(int(w * s), int(h * s), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation))
+        pnt = QtGui.QPainter(pm)
+        pnt.fillRect(0, 0, pm.width(), 22, QtGui.QColor(0, 0, 0, 170))
+        pnt.setPen(QtGui.QColor(C["good"])); pnt.setFont(QtGui.QFont("Menlo", 10, QtGui.QFont.Weight.Bold))
+        pnt.drawText(8, 16, "VIDEO LOADED")
+        pnt.setPen(QtGui.QColor(C["ink"])); pnt.setFont(QtGui.QFont("Menlo", 9))
+        pnt.drawText(130, 16, f"{w} x {h} px   {fps:.1f} fps   {n} frames   {self.video_info['seconds']:.1f} s   first frame shown")
+        # the camera window at its start position, for scale
+        cw, ch = min(self.cfg.camera.width, w), min(self.cfg.camera.height, h)
+        pnt.setPen(_pen(C["accent"], 2)); pnt.drawRect(int((w - cw) / 2 * s), int((h - ch) / 2 * s), int(cw * s), int(ch * s))
+        pnt.end()
+        self.scene_view.setPixmap(pm)
+        self.cam_view.setPixmap(QtGui.QPixmap())
+        self.cam_view.setText("Press Start to run the tracker on this video")
+        for t in self.tiles.values():
+            t.set("-")
+        self.tiles["state"].set("video ready", None)
+        self.tele.setPlainText("\n".join([
+            "VIDEO LOADED", "", f"file     {Path(path).name}", f"size     {w} x {h} px", f"rate     {fps:.2f} fps",
+            f"frames   {n}", f"length   {self.video_info['seconds']:.1f} s", "",
+            "The simulator is bypassed. Each video", "frame becomes the scene picture and", "the camera window moves over it.", "",
+            "No ground truth exists in a video,", "so tracking and centroiding error", "read n/a; lock, acquisition,", "re-acquisition and FPS are measured.", "",
+            "If the spot moves faster than the", "gimbal limit allows, raise Max pan", "and Max tilt (PS allows 5 to 10 deg/s)", "or widen the FOV.", "",
+            "Press Start (Space) to run.",
+        ]))
 
     def clear_video(self):
         self.video_path = None; self._video_label()
