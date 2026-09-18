@@ -196,6 +196,8 @@ of measurements; on a real phone video it supplied half of them. It is the inten
 
 | Document | Status |
 |---|---|
+| `COMPLIANCE.md`, point-by-point check of every PS row, shall item, deliverable and evaluation stage, backed by `tests/test_ps_compliance.py` | 🟩 |
+| Progress website (`web/`, served at sih26169.blankpoint.club once the DNS record exists) | 🟩 |
 | `docs/USER_MANUAL.md` | 🟩 |
 | `docs/TECHNICAL_REPORT.md` | 🟨 structure and methods written; performance table to fill from the batch envelope |
 | `ARCHITECTURE.md` | 🟩 |

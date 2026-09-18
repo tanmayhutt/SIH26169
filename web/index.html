@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIH26169 Progress</title>
+<meta name="description" content="Progress pipeline of the FSOC Tracker for SIH26169: what is done, what is in progress, what is blocked, with the full plan and compliance checks.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root { --ground:#0A1117; --surface:#111C24; --raised:#16242D; --ink:#E3ECF1; --ink-2:#BCCCD5; --muted:#8DA1AD; --faint:#6A7F8B; --line:#22323D; --accent:#52C4DE; --signal:#E08D4C; --good:#5CBE93;
+          --f-display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif; --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+  .shell { max-width: 1100px; margin: 0 auto; padding: 0 20px 72px; }
+  header { border-bottom: 1px solid var(--line); padding: 36px 0 26px; display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: baseline; }
+  header h1 { font-family: var(--f-display); font-size: clamp(26px, 4vw, 40px); margin: 0; letter-spacing: -.01em; }
+  header .eyebrow { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); width: 100%; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  nav a { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-decoration: none; padding: 6px 11px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+  nav a:hover, nav a.active { color: var(--accent); border-color: var(--accent); }
+  .meta { font-family: var(--f-mono); font-size: 12px; color: var(--faint); margin-top: 10px; }
+  article { margin-top: 30px; }
+  article h1 { display: none; }
+  article h2 { font-family: var(--f-display); font-size: 26px; margin: 46px 0 8px; letter-spacing: -.01em; padding-top: 30px; border-top: 1px solid var(--line); }
+  article h3 { font-family: var(--f-display); font-size: 17px; margin: 30px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  article p, article li { color: var(--ink-2); max-width: 72ch; }
+  article code { font-family: var(--f-mono); font-size: 12.5px; background: var(--raised); padding: 1px 5px; border-radius: 2px; color: var(--ink); }
+  article table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 14px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; display: block; overflow-x: auto; }
+  article th { font-family: var(--f-mono); font-weight: 500; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 14px; background: var(--raised); border-bottom: 1px solid var(--line); }
+  article td { padding: 9px 14px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+  article tr:last-child td { border-bottom: 0; }
+  article hr { border: 0; border-top: 1px solid var(--line); margin: 30px 0; }
+  .mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 18px; margin: 16px 0; overflow-x: auto; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  .note { border-left: 2px solid var(--accent); background: #0E2F3A; padding: 12px 16px; border-radius: 0 4px 4px 0; margin: 18px 0; font-size: 14px; color: var(--ink-2); }
+  footer { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 24px; font-family: var(--f-mono); font-size: 12px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 8px 28px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="eyebrow">SIH26169 / Dept. of Space, ISRO SAC / FSOC Tracker</div>
+    <h1>Progress pipeline</h1>
+    <nav>
+      <a href="#" data-doc="PROGRESS.md" class="active">Progress</a>
+      <a href="#" data-doc="COMPLIANCE.md">Point-by-point PS compliance</a>
+      <a href="#" data-doc="ARCHITECTURE.md">Architecture</a>
+      <a href="#" data-doc="docs/USER_MANUAL.md">User manual</a>
+      <a href="#" data-doc="docs/TECHNICAL_REPORT.md">Technical report</a>
+      <a href="plan.html">Plain-English plan</a>
+    </nav>
+    <div class="meta" id="meta">Loading...</div>
+  </header>
+  <div class="note">Green = done and verified, amber = in progress, red = blocked, grey = not started. This page renders the same Markdown files that live in the repository, so it is always the current state.</div>
+  <article id="doc"></article>
+  <footer><span>SIH26169</span><span>Static page; content from the repository's Markdown</span></footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: false, theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
+  const renderer = new marked.Renderer();
+  const origCode = renderer.code.bind(renderer);
+  renderer.code = (code, lang) => lang === "mermaid" ? `<pre class="mermaid">${code}</pre>` : origCode(code, lang);
+  async function load(doc) {
+    const el = document.getElementById("doc");
+    el.innerHTML = "<p>Loading " + doc + "...</p>";
+    try {
+      const r = await fetch("content/" + doc, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const md = await r.text();
+      el.innerHTML = marked.parse(md, { renderer });
+      await mermaid.run({ nodes: el.querySelectorAll(".mermaid") });
+      document.getElementById("meta").textContent = doc + "  |  " + (r.headers.get("last-modified") || "");
+    } catch (e) { el.innerHTML = "<p>Could not load " + doc + " (" + e.message + ").</p>"; }
+    document.querySelectorAll("nav a[data-doc]").forEach(a => a.classList.toggle("active", a.dataset.doc === doc));
+  }
+  document.querySelectorAll("nav a[data-doc]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); history.replaceState(null, "", "#" + a.dataset.doc); load(a.dataset.doc); }));
+  load(location.hash ? location.hash.slice(1) : "PROGRESS.md");
+</script>
+</body>
+</html>
