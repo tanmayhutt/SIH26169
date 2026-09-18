@@ -4,70 +4,132 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SIH26169 Progress</title>
-<meta name="description" content="Progress pipeline of the FSOC Tracker for SIH26169: what is done, what is in progress, what is blocked, with the full plan and compliance checks.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<meta name="description" content="Progress board of the FSOC Tracker for SIH26169: every stage of the pipeline with each item marked done, in progress, blocked or backlog.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-  :root { --ground:#0A1117; --surface:#111C24; --raised:#16242D; --ink:#E3ECF1; --ink-2:#BCCCD5; --muted:#8DA1AD; --faint:#6A7F8B; --line:#22323D; --accent:#52C4DE; --signal:#E08D4C; --good:#5CBE93;
-          --f-display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif; --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
+  :root { --ground:#0b0f12; --surface:#111619; --raised:#161d21; --ink:#e6ecef; --ink-2:#b9c4ca; --muted:#8a979e; --faint:#5f6b71; --line:#232c31;
+          --done:#3ddc84; --done-bg:#0f2a1c; --wip:#f0b429; --wip-bg:#2b230b; --blocked:#f0603f; --blocked-bg:#2c1510; --backlog:#5f6b71;
+          --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
   * { box-sizing: border-box; }
   html { color-scheme: dark; }
-  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
-  .shell { max-width: 1100px; margin: 0 auto; padding: 0 20px 72px; }
-  header { border-bottom: 1px solid var(--line); padding: 36px 0 26px; display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: baseline; }
-  header h1 { font-family: var(--f-display); font-size: clamp(26px, 4vw, 40px); margin: 0; letter-spacing: -.01em; }
-  header .eyebrow { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); width: 100%; }
-  nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-  nav a { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-decoration: none; padding: 6px 11px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
-  nav a:hover, nav a.active { color: var(--accent); border-color: var(--accent); }
-  .meta { font-family: var(--f-mono); font-size: 12px; color: var(--faint); margin-top: 10px; }
-  article { margin-top: 30px; }
-  article h1 { display: none; }
-  article h2 { font-family: var(--f-display); font-size: 26px; margin: 46px 0 8px; letter-spacing: -.01em; padding-top: 30px; border-top: 1px solid var(--line); }
-  article h3 { font-family: var(--f-display); font-size: 17px; margin: 30px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-  article p, article li { color: var(--ink-2); max-width: 72ch; }
-  article code { font-family: var(--f-mono); font-size: 12.5px; background: var(--raised); padding: 1px 5px; border-radius: 2px; color: var(--ink); }
-  article table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 14px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; display: block; overflow-x: auto; }
-  article th { font-family: var(--f-mono); font-weight: 500; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 14px; background: var(--raised); border-bottom: 1px solid var(--line); }
-  article td { padding: 9px 14px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
-  article tr:last-child td { border-bottom: 0; }
-  article hr { border: 0; border-top: 1px solid var(--line); margin: 30px 0; }
-  .mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 18px; margin: 16px 0; overflow-x: auto; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45; }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--ground); border-bottom: 1px solid var(--line); padding: 14px 24px 12px; }
+  .top .row { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
+  .brand { font-weight: 600; letter-spacing: .02em; margin-right: 6px; }
+  .brand span { color: var(--muted); font-weight: 400; margin-left: 8px; font-family: var(--f-mono); font-size: 12px; }
+  .count { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .count i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--faint); display: inline-block; }
+  .count.done i { border-color: var(--done); background: var(--done-bg); }
+  .count.wip i { border-color: var(--wip); background: var(--wip-bg); }
+  .count.blocked i { border-color: var(--blocked); background: var(--blocked-bg); }
+  .count b { font-weight: 600; color: var(--ink); }
+  .legend { font-size: 12px; color: var(--muted); font-family: var(--f-mono); }
+  .pct { margin-left: auto; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+  .bar { height: 5px; background: var(--raised); border-radius: 3px; margin-top: 10px; overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  nav a { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); text-decoration: none; padding: 4px 9px; border: 1px solid var(--line); border-radius: 4px; }
+  nav a:hover, nav a.active { color: var(--ink); border-color: var(--muted); }
+  .board { display: flex; gap: 28px; align-items: flex-start; padding: 26px 24px 60px; overflow-x: auto; }
+  .col { position: relative; flex: 0 0 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 16px 10px; }
+  .col + .col::before { content: ""; position: absolute; left: -28px; top: 34px; width: 28px; height: 0; border-top: 1px solid var(--faint); }
+  .col + .col::after { content: ""; position: absolute; left: -8px; top: 30px; border: 4px solid transparent; border-left-color: var(--faint); }
+  .col h2 { margin: 0; font-size: 15px; font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; }
+  .col h2 small { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-weight: 400; }
+  .col .blurb { margin: 6px 0 4px; color: var(--muted); font-size: 12.5px; }
+  .cap { font-family: var(--f-mono); font-size: 11px; color: var(--faint); margin: 16px 0 6px; }
+  .item { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; margin: 6px 0; font-size: 13px; color: var(--ink-2); background: var(--raised); }
+  .item .n { flex: 1; min-width: 0; }
+  .item .tag { font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); }
+  .item .st { font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+  .item.done { border-color: #1f6a3f; background: var(--done-bg); color: #cdeedb; }
+  .item.done .st, .item.done .tag { color: var(--done); }
+  .item.wip { border-color: #6b520f; background: var(--wip-bg); color: #f3e2b3; }
+  .item.wip .st, .item.wip .tag { color: var(--wip); }
+  .item.blocked { border-color: #7a3220; background: var(--blocked-bg); color: #f5c9bb; }
+  .item.blocked .st, .item.blocked .tag { color: var(--blocked); }
+  .item.backlog { color: var(--faint); }
+  .docs { display: none; max-width: 980px; margin: 0 auto; padding: 26px 24px 70px; }
+  .docs h1 { display: none; }
+  .docs h2 { font-size: 22px; margin: 40px 0 8px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .docs h3 { font-size: 16px; margin: 26px 0 8px; }
+  .docs p, .docs li { color: var(--ink-2); max-width: 74ch; }
+  .docs code { font-family: var(--f-mono); font-size: 12px; background: var(--raised); padding: 1px 5px; border-radius: 3px; color: var(--ink); }
+  .docs table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 12px 0; display: block; overflow-x: auto; }
+  .docs th { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--raised); }
+  .docs td { padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+  .mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; margin: 14px 0; overflow-x: auto; }
   .mermaid svg { max-width: 100%; height: auto; }
-  .note { border-left: 2px solid var(--accent); background: #0E2F3A; padding: 12px 16px; border-radius: 0 4px 4px 0; margin: 18px 0; font-size: 14px; color: var(--ink-2); }
-  footer { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 24px; font-family: var(--f-mono); font-size: 12px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 8px 28px; }
+  footer { font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); padding: 0 24px 30px; }
 </style>
 </head>
 <body>
-<div class="shell">
-  <header>
-    <div class="eyebrow">SIH26169 / Dept. of Space, ISRO SAC / FSOC Tracker</div>
-    <h1>Progress pipeline</h1>
-    <nav>
-      <a href="#" data-doc="PROGRESS.md" class="active">Progress</a>
-      <a href="#" data-doc="COMPLIANCE.md">Point-by-point PS compliance</a>
-      <a href="#" data-doc="ARCHITECTURE.md">Architecture</a>
-      <a href="#" data-doc="docs/USER_MANUAL.md">User manual</a>
-      <a href="#" data-doc="docs/TECHNICAL_REPORT.md">Technical report</a>
-      <a href="plan.html">Plain-English plan</a>
-    </nav>
-    <div class="meta" id="meta">Loading...</div>
-  </header>
-  <div class="note">Green = done and verified, amber = in progress, red = blocked, grey = not started. This page renders the same Markdown files that live in the repository, so it is always the current state.</div>
-  <article id="doc"></article>
-  <footer><span>SIH26169</span><span>Static page; content from the repository's Markdown</span></footer>
+<div class="top">
+  <div class="row">
+    <div class="brand">SIH26169 <span>FSOC Tracker progress</span></div>
+    <div class="count done"><i></i> done <b id="c-done">0</b></div>
+    <div class="count wip"><i></i> in progress <b id="c-wip">0</b></div>
+    <div class="count blocked"><i></i> blocked <b id="c-blocked">0</b></div>
+    <div class="count"><i></i> backlog <b id="c-backlog">0</b></div>
+    <div class="legend">items tagged with a PS row implement that row of the problem statement</div>
+    <div class="pct" id="pct"></div>
+  </div>
+  <div class="bar"><i id="b-done" style="background:var(--done)"></i><i id="b-wip" style="background:var(--wip)"></i><i id="b-blocked" style="background:var(--blocked)"></i></div>
+  <nav>
+    <a href="#board" data-view="board" class="active">Board</a>
+    <a href="#COMPLIANCE.md" data-doc="COMPLIANCE.md">Point-by-point PS compliance</a>
+    <a href="#PROGRESS.md" data-doc="PROGRESS.md">Progress notes</a>
+    <a href="#ARCHITECTURE.md" data-doc="ARCHITECTURE.md">Architecture</a>
+    <a href="#docs/USER_MANUAL.md" data-doc="docs/USER_MANUAL.md">User manual</a>
+    <a href="#docs/TECHNICAL_REPORT.md" data-doc="docs/TECHNICAL_REPORT.md">Technical report</a>
+    <a href="plan.html">Plain-English plan</a>
+  </nav>
 </div>
+<div class="board" id="board"></div>
+<article class="docs" id="docs"></article>
+<footer id="foot"></footer>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
-  mermaid.initialize({ startOnLoad: false, securityLevel: "loose", flowchart: { htmlLabels: false, useMaxWidth: true }, theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
-  async function load(doc) {
-    const el = document.getElementById("doc");
-    el.innerHTML = "<p>Loading " + doc + "...</p>";
+  const ST = { "done": ["done", "done"], "in progress": ["wip", "in progress"], "blocked": ["blocked", "blocked"], "backlog": ["backlog", "backlog"] };
+  const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function board() {
+    const r = await fetch("progress.json", { cache: "no-store" });
+    const data = await r.json();
+    const root = document.getElementById("board");
+    const tot = { done: 0, "in progress": 0, blocked: 0, backlog: 0 };
+    root.innerHTML = data.stages.map(stage => {
+      let n = 0, d = 0;
+      const groups = stage.groups.map(g => {
+        const items = g.items.map(it => {
+          n++; tot[it.status]++; if (it.status === "done") d++;
+          const [cls, label] = ST[it.status];
+          return `<div class="item ${cls}"><span class="n">${esc(it.name)}</span>${it.tag ? `<span class="tag">${esc(it.tag)}</span>` : ""}<span class="st">${label}</span></div>`;
+        }).join("");
+        return `<div class="cap">${esc(g.caption)}</div>${items}`;
+      }).join("");
+      return `<section class="col"><h2>${esc(stage.name)}<small>${d}/${n}</small></h2><p class="blurb">${esc(stage.blurb)}</p>${groups}</section>`;
+    }).join("");
+    const all = Object.values(tot).reduce((a, b) => a + b, 0);
+    for (const [k, id] of [["done", "c-done"], ["in progress", "c-wip"], ["blocked", "c-blocked"], ["backlog", "c-backlog"]]) document.getElementById(id).textContent = tot[k];
+    document.getElementById("b-done").style.width = (100 * tot.done / all) + "%";
+    document.getElementById("b-wip").style.width = (100 * tot["in progress"] / all) + "%";
+    document.getElementById("b-blocked").style.width = (100 * tot.blocked / all) + "%";
+    document.getElementById("pct").textContent = `${tot.done} of ${all} done  ·  ${Math.round(100 * tot.done / all)}%  ·  updated ${data.updated}`;
+    document.getElementById("foot").textContent = "Board data: web/progress.json in the repository. Documents render from the same Markdown files that are committed.";
+  }
+
+  mermaid.initialize({ startOnLoad: false, securityLevel: "loose", flowchart: { htmlLabels: false, useMaxWidth: true }, theme: "dark",
+                       themeVariables: { background: "#111619", primaryTextColor: "#e6ecef", lineColor: "#8a979e", fontFamily: "IBM Plex Sans, sans-serif" } });
+  async function doc(name) {
+    const el = document.getElementById("docs");
+    el.innerHTML = "<p>Loading " + name + "...</p>";
     try {
-      const r = await fetch("content/" + doc, { cache: "no-store" });
+      const r = await fetch("content/" + name, { cache: "no-store" });
       if (!r.ok) throw new Error(r.status);
       let md = await r.text();
-      // Lift Mermaid blocks out before Markdown parsing so their arrows are not HTML-escaped.
       const diagrams = [];
       md = md.replace(/```mermaid\n([\s\S]*?)```/g, (m, code) => { diagrams.push(code); return `<div class="mermaid-slot" data-i="${diagrams.length - 1}"></div>`; });
       el.innerHTML = marked.parse(md);
@@ -77,18 +139,25 @@
         try {
           const { svg } = await mermaid.render("dg" + Date.now() + "_" + (k++), diagrams[+slot.dataset.i]);
           box.innerHTML = svg;
-          // wide diagrams keep a readable size and scroll sideways instead of shrinking
           const sv = box.querySelector("svg"); const vb = sv && sv.viewBox && sv.viewBox.baseVal;
-          if (vb && vb.width > 1000) { sv.style.minWidth = Math.round(vb.width * 0.85) + "px"; }
+          if (vb && vb.width > 1000) sv.style.minWidth = Math.round(vb.width * 0.85) + "px";
         } catch (err) { box.textContent = "diagram could not be rendered: " + err.message; }
         slot.replaceWith(box);
       }
-      document.getElementById("meta").textContent = doc + "  |  " + (r.headers.get("last-modified") || "");
-    } catch (e) { el.innerHTML = "<p>Could not load " + doc + " (" + e.message + ").</p>"; }
-    document.querySelectorAll("nav a[data-doc]").forEach(a => a.classList.toggle("active", a.dataset.doc === doc));
+    } catch (e) { el.innerHTML = "<p>Could not load " + name + " (" + e.message + ").</p>"; }
   }
-  document.querySelectorAll("nav a[data-doc]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); history.replaceState(null, "", "#" + a.dataset.doc); load(a.dataset.doc); }));
-  load(location.hash ? location.hash.slice(1) : "PROGRESS.md");
+
+  function show(view, name) {
+    document.getElementById("board").style.display = view === "board" ? "flex" : "none";
+    document.getElementById("docs").style.display = view === "board" ? "none" : "block";
+    document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", view === "board" ? a.dataset.view === "board" : a.dataset.doc === name));
+    if (view !== "board") doc(name);
+  }
+  document.querySelectorAll("nav a[data-doc]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); location.hash = a.dataset.doc; show("doc", a.dataset.doc); }));
+  document.querySelector("nav a[data-view]").addEventListener("click", ev => { ev.preventDefault(); location.hash = "board"; show("board"); });
+  board();
+  const h = location.hash.slice(1);
+  if (h && h !== "board") show("doc", h); else show("board");
 </script>
 </body>
 </html>

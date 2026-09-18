@@ -174,8 +174,8 @@ flowchart LR
     classDef todo fill:#5a6b77,stroke:#3c4850,color:#fff
     a[Training data from the simulator, exact labels]:::done --> b[Network: 84k parameter U-Net, 128 to 64 heat map]:::done
     b --> c[Train v1: 4000 samples, 6 epochs, 12 px localisation]:::done
-    c --> d[Train v2: 16000 samples, 16 epochs]:::wip
-    d --> e[Promote if localisation is a few px; else keep as fallback]:::todo
+    c --> d[Train v2: 8000 samples, 10 epochs, 8 px localisation]:::done
+    d --> e[Decision: kept as a fallback; faint beacon still open]:::done
     a --> f[Hybrid policy: CNN fills gaps, never overrides a classical hit]:::done
     f --> g[Fine-tune on a user video: tracker-confident frames become labels]:::done
 ```
