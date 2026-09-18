@@ -1,0 +1,40 @@
+# Rebuilds the progress site from the repository's Markdown on every push to main and
+# publishes it to the gh-pages branch, so the website always shows the current state.
+name: Publish progress site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "PROGRESS.md"
+      - "COMPLIANCE.md"
+      - "ARCHITECTURE.md"
+      - "README.md"
+      - "docs/*.md"
+      - "docs/plan.html"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site
+        run: |
+          mkdir -p site/content/docs
+          cp web/index.html site/
+          cp docs/plan.html site/plan.html
+          cp PROGRESS.md COMPLIANCE.md ARCHITECTURE.md README.md site/content/
+          cp docs/USER_MANUAL.md docs/TECHNICAL_REPORT.md site/content/docs/
+          touch site/.nojekyll
+      - name: Push to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          force_orphan: true
