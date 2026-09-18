@@ -26,7 +26,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p site/content/docs
-          cp web/index.html site/
+          cp web/index.html web/progress.json site/
           cp docs/plan.html site/plan.html
           cp PROGRESS.md COMPLIANCE.md ARCHITECTURE.md README.md site/content/
           cp docs/USER_MANUAL.md docs/TECHNICAL_REPORT.md site/content/docs/

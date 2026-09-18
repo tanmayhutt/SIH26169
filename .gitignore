@@ -9,3 +9,4 @@ results/
 .pytest_cache/
 models/*.pt
 context.md
+models/*_v2.*
