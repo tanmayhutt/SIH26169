@@ -1,546 +1,196 @@
 {
-  "title": "SIH26169 progress",
+  "title": "System design and build progress",
+  "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
+  "stats": "PS rows 25 · shall items 8 · deliverables 6 · scenarios 12 · tests 21 · 1 executable built",
   "updated": "2026-09-19",
+  "verification": {
+    "title": "Build verification: September 19, 2026",
+    "summary": "21 of 21 automated checks passed, 11 scenarios ran end to end at 15 s each, the packaged executable ran a scenario headless, and a video went through the Benchmark 2 path. This is a local source verification on one machine, not an evaluator run.",
+    "note": "Statuses below are from runs in the repository's own results folder. Numbers quoted are measured, not estimated. Windows and Linux builds and the exported report are not yet produced and are marked unverified.",
+    "checks": [
+      {"name": "Automated tests", "status": "pass", "text": "21 of 21 pytest checks in about 20 s: geometry, gimbal limits, every path on screen and deterministic, centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point."},
+      {"name": "Scenario pack", "status": "pass", "text": "11 scenarios, 15 s each. Clear line, circle and figure of 8: 6.7 to 7.3 px mean tracking error at 100% lock. Heavy noise 7.3 px, fog 6.6 px, low light 7.0 px, all 100%. Acquisition 0.6 to 1.4 s everywhere. Hard mode 6.5 to 8.9 px after a 3 to 12 s sweep."},
+      {"name": "Multi-seed envelope", "status": "partial", "text": "5 seeds per scenario. Clear, noise, fog and low light pass every seed. One of five multi-target stress seeds swapped to a decoy. Platform sway at the PS maximum held 79 to 88% lock."},
+      {"name": "Truth independence", "status": "pass", "text": "The same random-motion run twice, the second time with ground truth deleted before the tracker: 0.000000 px difference in estimates and 0 px in the camera path over 240 frames. The tracker sees only the picture."},
+      {"name": "Benchmark 2 path", "status": "pass", "text": "A synthetic 1200 x 1200 mp4 through the video input: 180 frames, lock 100%, CSV and PDF written. A 60 fps phone video tracked 669 of 754 frames with the 5 deg/s gimbal saturated 60% of the time."},
+      {"name": "Standalone executable", "status": "partial", "text": "macOS arm64 build runs a scenario headless and writes the report. Windows and Linux builds need a machine or CI runner of that type."},
+      {"name": "AI detector", "status": "partial", "text": "v2 reaches 8 px validation localisation, supplied 51% of measurements on the phone video, does not acquire the faint SNR 3 beacon. Kept as a gap-filling fallback; classical carries the load."},
+      {"name": "Platform at PS maximum", "status": "blocked", "text": "20 px per frame sway plus 20 px per frame vibration: 83% lock. The gimbal is at 90% of its slew budget. A physical limit of the mandated 5 deg/s motor, documented rather than tuned away."},
+      {"name": "Report export and demo video", "status": "unverified", "text": "Technical report and user manual exist as Markdown; PDF export, the 3 to 5 minute video and the rehearsed demo script are not produced yet."}
+    ]
+  },
+  "flow": [
+    {"name": "Scene maker", "sub": "screen, beacons, paths", "status": "done"},
+    {"name": "Disturbances", "sub": "atmosphere, sway, vibration, noise", "status": "done"},
+    {"name": "Scene picture", "sub": "what the tracker sees", "status": "done"},
+    {"name": "Detector", "sub": "classical first, CNN fills gaps", "status": "in progress"},
+    {"name": "Centroid", "sub": "sub-pixel, 0.01 px", "status": "done"},
+    {"name": "Estimator", "sub": "IMM: CV, CA, CT", "status": "done"},
+    {"name": "State machine", "sub": "search, verify, track, coast, reacquire", "status": "done"},
+    {"name": "Controller", "sub": "feedforward + PID", "status": "done"},
+    {"name": "Gimbal", "sub": "5 deg/s, acceleration, latency", "status": "done"},
+    {"name": "Log and report", "sub": "CSV, JSON, PDF", "status": "done"}
+  ],
+  "domains": [
+    {"name": "Problem understanding", "layer": "Analysis", "text": "Read the problem statement literally and settle every ambiguity in writing before building.", "gates": [
+      {"name": "PS 26169 read verbatim", "status": "done"}, {"name": "Input model: tracker sees the scene, controls the window", "status": "done"},
+      {"name": "Benchmark 2 reading settled", "status": "done"}, {"name": "Tracking and centroiding error both defined", "status": "done"},
+      {"name": "Pointing budget derived", "status": "done"}, {"name": "Unspecified points listed with our choice", "status": "done"}]},
+    {"name": "Simulator", "layer": "World", "text": "Generate the scene, beacons, camera and every disturbance the problem statement lists, with exact ground truth.", "gates": [
+      {"name": "Scene and backgrounds", "status": "done"}, {"name": "All six beacon paths", "status": "done"}, {"name": "Camera window and rate-limited gimbal", "status": "done"},
+      {"name": "Disturbance chain in physical order", "status": "done"}, {"name": "Deterministic from scenario and seed", "status": "done"}, {"name": "Colour option", "status": "done"}]},
+    {"name": "Perception", "layer": "Tracker", "text": "Find the beacon, measure it to a fraction of a pixel, predict it, and keep the right one among decoys.", "gates": [
+      {"name": "Classical detector with matched filter", "status": "done"}, {"name": "Sub-pixel centroid", "status": "done"}, {"name": "IMM estimator", "status": "done"},
+      {"name": "Vibration as measurement noise", "status": "done"}, {"name": "Identity among decoys", "status": "in progress"}, {"name": "CNN detector", "status": "in progress"}, {"name": "Faint beacon at SNR 3", "status": "backlog"}]},
+    {"name": "Control", "layer": "Controller", "text": "Steer the window onto the beacon without ever exceeding the motor limit, and say so when the limit binds.", "gates": [
+      {"name": "Feedforward plus PID", "status": "done"}, {"name": "Latency lead", "status": "done"}, {"name": "Saturation reported", "status": "done"}, {"name": "Hard mode square-spiral search", "status": "done"}]},
+    {"name": "Instrumentation", "layer": "Evidence", "text": "Every run writes its own evidence; every metric prints its definition and its pass or fail against the PS.", "gates": [
+      {"name": "frames.csv per frame", "status": "done"}, {"name": "summary.json with definitions", "status": "done"}, {"name": "report.pdf", "status": "done"},
+      {"name": "Batch envelope", "status": "done"}, {"name": "Performance table in the technical report", "status": "in progress"}]},
+    {"name": "Desktop application", "layer": "Presentation", "text": "The standalone application the problem statement asks for, usable by an evaluator in ten minutes.", "gates": [
+      {"name": "One control per PS row with tooltips", "status": "done"}, {"name": "Scene and camera views with HUD", "status": "done"}, {"name": "Live specification tiles", "status": "done"},
+      {"name": "Plots", "status": "done"}, {"name": "Video input with preview", "status": "done"}, {"name": "Report dialog", "status": "done"}]},
+    {"name": "Verification", "layer": "Quality", "text": "Tests that fail if the system drifts from the problem statement, and evidence that the tracker does not cheat.", "gates": [
+      {"name": "Unit tests", "status": "done"}, {"name": "Closed-loop tests", "status": "done"}, {"name": "PS compliance tests", "status": "done"},
+      {"name": "Truth-independence check", "status": "done"}, {"name": "Multi-seed envelope", "status": "done"}, {"name": "Run on evaluator-supplied files", "status": "backlog"}]},
+    {"name": "Packaging and delivery", "layer": "Release", "text": "Executables, documents and the submission bundle.", "gates": [
+      {"name": "macOS build", "status": "done"}, {"name": "Windows build", "status": "backlog"}, {"name": "Linux build", "status": "backlog"},
+      {"name": "User manual", "status": "done"}, {"name": "Technical report", "status": "in progress"}, {"name": "Demo video", "status": "backlog"}, {"name": "Rehearsed demo script", "status": "backlog"}]},
+    {"name": "Repository and website", "layer": "Communication", "text": "Private repository, this progress page, and the point-by-point compliance record.", "gates": [
+      {"name": "Private GitHub repository", "status": "done"}, {"name": "Progress site on GitHub Pages", "status": "done"}, {"name": "Compliance document", "status": "done"}, {"name": "Plain-English plan", "status": "done"}]}
+  ],
+  "phases": [
+    {"name": "M0", "title": "Skeleton, settings, logging, video input", "gate": "Runs, reads an .mp4, writes a log", "status": "done"},
+    {"name": "M1", "title": "Scene, beacon, camera window, motor", "gate": "30 pictures a second with ground truth", "status": "done"},
+    {"name": "M2", "title": "Simple detector, centre measurement, basic control", "gate": "Follows a straight beacon within 10 px", "status": "done"},
+    {"name": "M3", "title": "Five states, timing measurements", "gate": "Locks under 2 s, re-locks under 1 s", "status": "done"},
+    {"name": "M4", "title": "All disturbances", "gate": "Every effect in the rules can be switched on", "status": "done"},
+    {"name": "M5", "title": "Prediction, vibration handling, smarter control", "gate": "Lock above 95% under vibration", "status": "done"},
+    {"name": "M6", "title": "Train the AI, several targets", "gate": "Identity holds through crossings; CNN fills gaps", "status": "done"},
+    {"name": "M7", "title": "Automatic report, batch testing", "gate": "Every run ends with a PDF; 50 runs unattended", "status": "done"},
+    {"name": "M8", "title": "Full interface and installer", "gate": "Above 20 FPS on a fresh laptop", "status": "done"},
+    {"name": "M9", "title": "Report, manual, demo video", "gate": "Everything on the deliverables list", "status": "in progress"}
+  ],
   "stages": [
-    {
-      "name": "understand",
-      "blurb": "Read the problem statement word by word and settle what goes in and what comes out.",
-      "groups": [
-        {
-          "caption": "reading",
-          "items": [
-            {
-              "name": "PS 26169 read verbatim, tables extracted",
-              "status": "done"
-            },
-            {
-              "name": "Input model: tracker sees the scene, controls the window",
-              "status": "done",
-              "tag": "decision"
-            },
-            {
-              "name": "Benchmark 2: video replaces the simulated scene",
-              "status": "done",
-              "tag": "decision"
-            },
-            {
-              "name": "Two error terms: tracking and centroiding",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "numbers",
-          "items": [
-            {
-              "name": "Pointing budget: 22.5 arcsec per px",
-              "status": "done"
-            },
-            {
-              "name": "Slew 26.7 px per frame at 5 deg/s",
-              "status": "done"
-            },
-            {
-              "name": "Centre to corner 0.95 s with target known",
-              "status": "done"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "simulator",
-      "blurb": "The scene, the beacon, the camera window, the motor and everything that dirties the picture.",
-      "groups": [
-        {
-          "caption": "scene and beacon",
-          "items": [
-            {
-              "name": "Screen 2000 x 2000, four backgrounds",
-              "status": "done",
-              "tag": "rows 1-2"
-            },
-            {
-              "name": "Beacon shapes square, circle, gaussian",
-              "status": "done",
-              "tag": "rows 7-10"
-            },
-            {
-              "name": "Paths line, circular, figure of 8, random",
-              "status": "done",
-              "tag": "row 12"
-            },
-            {
-              "name": "Paths spiral, sinusoidal",
-              "status": "done",
-              "tag": "row 12"
-            },
-            {
-              "name": "Several targets with a designated one",
-              "status": "done",
-              "tag": "row 8"
-            }
-          ]
-        },
-        {
-          "caption": "camera and motor",
-          "items": [
-            {
-              "name": "640 x 480 window, 4 x 3 deg, 30 Hz",
-              "status": "done",
-              "tag": "rows 3-5"
-            },
-            {
-              "name": "Rate limit 5 to 10 deg/s, acceleration, latency",
-              "status": "done",
-              "tag": "rows 13-15"
-            },
-            {
-              "name": "Window centre reaches any screen pixel",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "disturbances, in physical order",
-          "items": [
-            {
-              "name": "Clear, haze, fog, rain, low light presets",
-              "status": "done",
-              "tag": "row 24"
-            },
-            {
-              "name": "Turbulence: wander and flicker",
-              "status": "done"
-            },
-            {
-              "name": "Platform sway, five patterns",
-              "status": "done",
-              "tag": "row 25"
-            },
-            {
-              "name": "Vibration up to 20 px per frame",
-              "status": "done",
-              "tag": "row 23"
-            },
-            {
-              "name": "Salt and pepper, Gaussian, Poisson noise",
-              "status": "done",
-              "tag": "rows 21-22"
-            }
-          ]
-        },
-        {
-          "caption": "bookkeeping",
-          "items": [
-            {
-              "name": "Ground truth every frame",
-              "status": "done"
-            },
-            {
-              "name": "Same scenario and seed gives the same run",
-              "status": "done"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "tracker",
-      "blurb": "Find the beacon in the picture, measure its centre, work out where it is going, keep the right one.",
-      "groups": [
-        {
-          "caption": "detection",
-          "items": [
-            {
-              "name": "Classical detector with matched filter",
-              "status": "done"
-            },
-            {
-              "name": "Sub-pixel centroid, CoG plus Gaussian fit",
-              "status": "done",
-              "tag": "0.01 px"
-            },
-            {
-              "name": "Confidence from SNR, brightness, size match",
-              "status": "done"
-            },
-            {
-              "name": "CNN heat-map detector fills gaps",
-              "status": "in progress",
-              "tag": "ai"
-            }
-          ]
-        },
-        {
-          "caption": "estimation",
-          "items": [
-            {
-              "name": "IMM: constant velocity, acceleration, turn",
-              "status": "done"
-            },
-            {
-              "name": "Vibration treated as noise, not motion",
-              "status": "done"
-            },
-            {
-              "name": "Acceleration from smoothed velocity",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "state machine",
-          "items": [
-            {
-              "name": "SEARCH, VERIFY, TRACK, COAST, REACQUIRE",
-              "status": "done"
-            },
-            {
-              "name": "Verify 3 frames of 4 before lock",
-              "status": "done"
-            },
-            {
-              "name": "Re-seed after a long gap",
-              "status": "done"
-            },
-            {
-              "name": "Hard mode square-spiral search",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "identity among decoys",
-          "items": [
-            {
-              "name": "Appearance signature gate",
-              "status": "done"
-            },
-            {
-              "name": "Designation audit every 15 frames",
-              "status": "done"
-            },
-            {
-              "name": "One stress seed in five still swaps",
-              "status": "in progress"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "controller",
-      "blurb": "Turn 'the beacon is there' into a motor command that never exceeds the limit.",
-      "groups": [
-        {
-          "caption": "control law",
-          "items": [
-            {
-              "name": "Velocity and acceleration feedforward",
-              "status": "done"
-            },
-            {
-              "name": "PID with clamping and deadband",
-              "status": "done"
-            },
-            {
-              "name": "Latency lead for target and window",
-              "status": "done"
-            },
-            {
-              "name": "Saturation reported every frame",
-              "status": "done"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "measure",
-      "blurb": "Every run writes its own evidence; every metric prints its definition.",
-      "groups": [
-        {
-          "caption": "outputs",
-          "items": [
-            {
-              "name": "frames.csv, one row per frame",
-              "status": "done"
-            },
-            {
-              "name": "summary.json with pass or fail per PS row",
-              "status": "done"
-            },
-            {
-              "name": "report.pdf, three pages",
-              "status": "done"
-            },
-            {
-              "name": "Vibration-removed tracking error",
-              "status": "done"
-            },
-            {
-              "name": "Batch runner with multi-seed envelope",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "results, 15 s runs",
-          "items": [
-            {
-              "name": "Clear paths 6.7 to 7.3 px, 100% lock",
-              "status": "done"
-            },
-            {
-              "name": "Heavy noise 7.3 px, 100% lock",
-              "status": "done"
-            },
-            {
-              "name": "Fog 6.6 px, low light 7.0 px",
-              "status": "done"
-            },
-            {
-              "name": "Acquisition 0.6 to 1.4 s everywhere",
-              "status": "done"
-            },
-            {
-              "name": "Sway 12 px/f plus vibration: 99% lock",
-              "status": "in progress",
-              "tag": "20 px raw"
-            },
-            {
-              "name": "PS maximum sway: 83% lock",
-              "status": "in progress",
-              "tag": "limit"
-            },
-            {
-              "name": "Multi-target stress: 93% lock",
-              "status": "in progress"
-            },
-            {
-              "name": "Faint beacon at SNR 3",
-              "status": "blocked",
-              "tag": "needs cnn"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "desktop app",
-      "blurb": "The standalone application the problem statement asks for.",
-      "groups": [
-        {
-          "caption": "controls",
-          "items": [
-            {
-              "name": "One control per PS row, tooltips name the row",
-              "status": "done"
-            },
-            {
-              "name": "Scenario picker, speed, shortcuts",
-              "status": "done"
-            },
-            {
-              "name": "New random seed each run, pin option",
-              "status": "done"
-            },
-            {
-              "name": "Open video for Benchmark 2, with preview",
-              "status": "done"
-            }
-          ]
-        },
-        {
-          "caption": "visualisation",
-          "items": [
-            {
-              "name": "Live specification tiles",
-              "status": "done"
-            },
-            {
-              "name": "Scene view: window, trails, grid, legend",
-              "status": "done"
-            },
-            {
-              "name": "Camera view: ring, error vector, prediction",
-              "status": "done"
-            },
-            {
-              "name": "Four plots with legends",
-              "status": "done"
-            },
-            {
-              "name": "Report dialog with advice",
-              "status": "done"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "verify",
-      "blurb": "Tests that fail if the system drifts from the problem statement.",
-      "groups": [
-        {
-          "caption": "tests, 21 passing",
-          "items": [
-            {
-              "name": "Geometry and gimbal limits",
-              "status": "done"
-            },
-            {
-              "name": "Every path on screen and deterministic",
-              "status": "done"
-            },
-            {
-              "name": "Centroid accuracy",
-              "status": "done"
-            },
-            {
-              "name": "Closed loop meets the spec",
-              "status": "done"
-            },
-            {
-              "name": "Identity under decoys",
-              "status": "done"
-            },
-            {
-              "name": "Video path end to end",
-              "status": "done"
-            },
-            {
-              "name": "PS rows 1 to 25 point by point",
-              "status": "done",
-              "tag": "compliance"
-            },
-            {
-              "name": "Truth-removed run is identical",
-              "status": "done",
-              "tag": "no cheating"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ai",
-      "blurb": "A small network for the cases the classical detector cannot see. Trained, integrated, not yet good enough to carry the load.",
-      "groups": [
-        {
-          "caption": "training",
-          "items": [
-            {
-              "name": "Exact labels from the simulator",
-              "status": "done"
-            },
-            {
-              "name": "84k parameter U-Net, ONNX on CPU",
-              "status": "done"
-            },
-            {
-              "name": "Train v1: 12 px localisation",
-              "status": "done"
-            },
-            {
-              "name": "Train v2: 8 px localisation, still coarse",
-              "status": "done"
-            },
-            {
-              "name": "Decision: kept as fallback, not promoted",
-              "status": "done",
-              "tag": "honest"
-            }
-          ]
-        },
-        {
-          "caption": "on real footage",
-          "items": [
-            {
-              "name": "Fills gaps, never overrides classical",
-              "status": "done"
-            },
-            {
-              "name": "Fine-tune on a video you provide",
-              "status": "done"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "package",
-      "blurb": "Builds, documents and the submission bundle.",
-      "groups": [
-        {
-          "caption": "executables",
-          "items": [
-            {
-              "name": "macOS build, self-tested",
-              "status": "done"
-            },
-            {
-              "name": "Windows build",
-              "status": "backlog"
-            },
-            {
-              "name": "Linux build",
-              "status": "backlog"
-            }
-          ]
-        },
-        {
-          "caption": "documents",
-          "items": [
-            {
-              "name": "User manual",
-              "status": "done"
-            },
-            {
-              "name": "Point-by-point compliance",
-              "status": "done"
-            },
-            {
-              "name": "Architecture",
-              "status": "done"
-            },
-            {
-              "name": "Technical report, performance table",
-              "status": "in progress"
-            },
-            {
-              "name": "Progress website",
-              "status": "done"
-            },
-            {
-              "name": "Demo video, 3 to 5 min",
-              "status": "backlog"
-            }
-          ]
-        },
-        {
-          "caption": "submission",
-          "items": [
-            {
-              "name": "Source with documentation",
-              "status": "done"
-            },
-            {
-              "name": "Executable for the evaluators",
-              "status": "backlog"
-            },
-            {
-              "name": "Report and manual exported to PDF",
-              "status": "backlog"
-            },
-            {
-              "name": "Rehearsed 10 to 15 minute demo",
-              "status": "backlog"
-            }
-          ]
-        }
-      ]
-    }
+    {"name": "understand", "blurb": "Read the problem statement word by word and settle what goes in and what comes out.", "groups": [
+      {"caption": "reading", "items": [
+        {"name": "PS 26169 read verbatim, tables extracted", "status": "done"},
+        {"name": "Input model: tracker sees the scene, controls the window", "status": "done", "tag": "decision"},
+        {"name": "Benchmark 2: video replaces the simulated scene", "status": "done", "tag": "decision"},
+        {"name": "Two error terms: tracking and centroiding", "status": "done"}]},
+      {"caption": "numbers", "items": [
+        {"name": "Pointing budget: 22.5 arcsec per px", "status": "done"},
+        {"name": "Slew 26.7 px per frame at 5 deg/s", "status": "done"},
+        {"name": "Centre to corner 0.95 s with target known", "status": "done"}]}]},
+    {"name": "simulator", "blurb": "The scene, the beacon, the camera window, the motor and everything that dirties the picture.", "groups": [
+      {"caption": "scene and beacon", "items": [
+        {"name": "Screen 2000 x 2000, four backgrounds", "status": "done", "tag": "rows 1-2"},
+        {"name": "Beacon shapes square, circle, gaussian", "status": "done", "tag": "rows 7-10"},
+        {"name": "Paths line, circular, figure of 8, random", "status": "done", "tag": "row 12"},
+        {"name": "Paths spiral, sinusoidal", "status": "done", "tag": "row 12"},
+        {"name": "Several targets with a designated one", "status": "done", "tag": "row 8"}]},
+      {"caption": "camera and motor", "items": [
+        {"name": "640 x 480 window, 4 x 3 deg, 30 Hz", "status": "done", "tag": "rows 3-5"},
+        {"name": "Rate limit 5 to 10 deg/s, acceleration, latency", "status": "done", "tag": "rows 13-15"},
+        {"name": "Window centre reaches any screen pixel", "status": "done"}]},
+      {"caption": "disturbances, in physical order", "items": [
+        {"name": "Clear, haze, fog, rain, low light presets", "status": "done", "tag": "row 24"},
+        {"name": "Turbulence: wander and flicker", "status": "done"},
+        {"name": "Platform sway, five patterns", "status": "done", "tag": "row 25"},
+        {"name": "Vibration up to 20 px per frame", "status": "done", "tag": "row 23"},
+        {"name": "Salt and pepper, Gaussian, Poisson noise", "status": "done", "tag": "rows 21-22"}]},
+      {"caption": "bookkeeping", "items": [
+        {"name": "Ground truth every frame", "status": "done"},
+        {"name": "Same scenario and seed gives the same run", "status": "done"}]}]},
+    {"name": "tracker", "blurb": "Find the beacon in the picture, measure its centre, work out where it is going, keep the right one.", "groups": [
+      {"caption": "detection", "items": [
+        {"name": "Classical detector with matched filter", "status": "done"},
+        {"name": "Sub-pixel centroid, CoG plus Gaussian fit", "status": "done", "tag": "0.01 px"},
+        {"name": "Confidence from SNR, brightness, size match", "status": "done"},
+        {"name": "CNN heat-map detector fills gaps", "status": "in progress", "tag": "ai"}]},
+      {"caption": "estimation", "items": [
+        {"name": "IMM: constant velocity, acceleration, turn", "status": "done"},
+        {"name": "Vibration treated as noise, not motion", "status": "done"},
+        {"name": "Acceleration from smoothed velocity", "status": "done"}]},
+      {"caption": "state machine", "items": [
+        {"name": "SEARCH, VERIFY, TRACK, COAST, REACQUIRE", "status": "done"},
+        {"name": "Verify 3 frames of 4 before lock", "status": "done"},
+        {"name": "Re-seed after a long gap", "status": "done"},
+        {"name": "Hard mode square-spiral search", "status": "done"}]},
+      {"caption": "identity among decoys", "items": [
+        {"name": "Appearance signature gate", "status": "done"},
+        {"name": "Designation audit every 15 frames", "status": "done"},
+        {"name": "One stress seed in five still swaps", "status": "in progress"}]}]},
+    {"name": "controller", "blurb": "Turn 'the beacon is there' into a motor command that never exceeds the limit.", "groups": [
+      {"caption": "control law", "items": [
+        {"name": "Velocity and acceleration feedforward", "status": "done"},
+        {"name": "PID with clamping and deadband", "status": "done"},
+        {"name": "Latency lead for target and window", "status": "done"},
+        {"name": "Saturation reported every frame", "status": "done"}]}]},
+    {"name": "measure", "blurb": "Every run writes its own evidence; every metric prints its definition.", "groups": [
+      {"caption": "outputs", "items": [
+        {"name": "frames.csv, one row per frame", "status": "done"},
+        {"name": "summary.json with pass or fail per PS row", "status": "done"},
+        {"name": "report.pdf, three pages", "status": "done"},
+        {"name": "Vibration-removed tracking error", "status": "done"},
+        {"name": "Batch runner with multi-seed envelope", "status": "done"}]},
+      {"caption": "results, 15 s runs", "items": [
+        {"name": "Clear paths 6.7 to 7.3 px, 100% lock", "status": "done"},
+        {"name": "Heavy noise 7.3 px, 100% lock", "status": "done"},
+        {"name": "Fog 6.6 px, low light 7.0 px", "status": "done"},
+        {"name": "Acquisition 0.6 to 1.4 s everywhere", "status": "done"},
+        {"name": "Sway 12 px/f plus vibration: 99% lock", "status": "in progress", "tag": "20 px raw"},
+        {"name": "PS maximum sway: 83% lock", "status": "in progress", "tag": "limit"},
+        {"name": "Multi-target stress: 93% lock", "status": "in progress"},
+        {"name": "Faint beacon at SNR 3", "status": "blocked", "tag": "needs cnn"}]}]},
+    {"name": "desktop app", "blurb": "The standalone application the problem statement asks for.", "groups": [
+      {"caption": "controls", "items": [
+        {"name": "One control per PS row, tooltips name the row", "status": "done"},
+        {"name": "Scenario picker, speed, shortcuts", "status": "done"},
+        {"name": "New random seed each run, pin option", "status": "done"},
+        {"name": "Open video for Benchmark 2, with preview", "status": "done"}]},
+      {"caption": "visualisation", "items": [
+        {"name": "Live specification tiles", "status": "done"},
+        {"name": "Scene view: window, trails, grid, legend", "status": "done"},
+        {"name": "Camera view: ring, error vector, prediction", "status": "done"},
+        {"name": "Four plots with legends", "status": "done"},
+        {"name": "Report dialog with advice", "status": "done"}]}]},
+    {"name": "verify", "blurb": "Tests that fail if the system drifts from the problem statement.", "groups": [
+      {"caption": "tests, 21 passing", "items": [
+        {"name": "Geometry and gimbal limits", "status": "done"},
+        {"name": "Every path on screen and deterministic", "status": "done"},
+        {"name": "Centroid accuracy", "status": "done"},
+        {"name": "Closed loop meets the spec", "status": "done"},
+        {"name": "Identity under decoys", "status": "done"},
+        {"name": "Video path end to end", "status": "done"},
+        {"name": "PS rows 1 to 25 point by point", "status": "done", "tag": "compliance"},
+        {"name": "Truth-removed run is identical", "status": "done", "tag": "no cheating"}]}]},
+    {"name": "ai", "blurb": "A small network for the cases the classical detector cannot see. Trained, integrated, not yet good enough to carry the load.", "groups": [
+      {"caption": "training", "items": [
+        {"name": "Exact labels from the simulator", "status": "done"},
+        {"name": "84k parameter U-Net, ONNX on CPU", "status": "done"},
+        {"name": "Train v1: 12 px localisation", "status": "done"},
+        {"name": "Train v2: 8 px localisation, still coarse", "status": "done"},
+        {"name": "Decision: kept as fallback, not promoted", "status": "done", "tag": "honest"}]},
+      {"caption": "on real footage", "items": [
+        {"name": "Fills gaps, never overrides classical", "status": "done"},
+        {"name": "Fine-tune on a video you provide", "status": "done"}]}]},
+    {"name": "package", "blurb": "Builds, documents and the submission bundle.", "groups": [
+      {"caption": "executables", "items": [
+        {"name": "macOS build, self-tested", "status": "done"},
+        {"name": "Windows build", "status": "backlog"},
+        {"name": "Linux build", "status": "backlog"}]},
+      {"caption": "documents", "items": [
+        {"name": "User manual", "status": "done"},
+        {"name": "Point-by-point compliance", "status": "done"},
+        {"name": "Architecture", "status": "done"},
+        {"name": "Technical report, performance table", "status": "in progress"},
+        {"name": "Progress website", "status": "done"},
+        {"name": "Demo video, 3 to 5 min", "status": "backlog"}]},
+      {"caption": "submission", "items": [
+        {"name": "Source with documentation", "status": "done"},
+        {"name": "Executable for the evaluators", "status": "backlog"},
+        {"name": "Report and manual exported to PDF", "status": "backlog"},
+        {"name": "Rehearsed 10 to 15 minute demo", "status": "backlog"}]}]}
   ]
 }
