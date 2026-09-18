@@ -59,7 +59,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
-  mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
+  mermaid.initialize({ startOnLoad: false, securityLevel: "loose", flowchart: { htmlLabels: false, useMaxWidth: true }, theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
   async function load(doc) {
     const el = document.getElementById("doc");
     el.innerHTML = "<p>Loading " + doc + "...</p>";
@@ -71,10 +71,18 @@
       const diagrams = [];
       md = md.replace(/```mermaid\n([\s\S]*?)```/g, (m, code) => { diagrams.push(code); return `<div class="mermaid-slot" data-i="${diagrams.length - 1}"></div>`; });
       el.innerHTML = marked.parse(md);
-      el.querySelectorAll(".mermaid-slot").forEach(slot => {
-        const pre = document.createElement("pre"); pre.className = "mermaid"; pre.textContent = diagrams[+slot.dataset.i]; slot.replaceWith(pre);
-      });
-      await mermaid.run({ nodes: el.querySelectorAll(".mermaid") });
+      let k = 0;
+      for (const slot of Array.from(el.querySelectorAll(".mermaid-slot"))) {
+        const box = document.createElement("div"); box.className = "mermaid";
+        try {
+          const { svg } = await mermaid.render("dg" + Date.now() + "_" + (k++), diagrams[+slot.dataset.i]);
+          box.innerHTML = svg;
+          // wide diagrams keep a readable size and scroll sideways instead of shrinking
+          const sv = box.querySelector("svg"); const vb = sv && sv.viewBox && sv.viewBox.baseVal;
+          if (vb && vb.width > 1000) { sv.style.minWidth = Math.round(vb.width * 0.85) + "px"; }
+        } catch (err) { box.textContent = "diagram could not be rendered: " + err.message; }
+        slot.replaceWith(box);
+      }
       document.getElementById("meta").textContent = doc + "  |  " + (r.headers.get("last-modified") || "");
     } catch (e) { el.innerHTML = "<p>Could not load " + doc + " (" + e.message + ").</p>"; }
     document.querySelectorAll("nav a[data-doc]").forEach(a => a.classList.toggle("active", a.dataset.doc === doc));
