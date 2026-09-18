@@ -1,0 +1,6 @@
+name: clear_random
+seed: 4
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: random, speed_px_s: 140, start: random}
+disturbance: {atmosphere: clear}

@@ -1,0 +1,9 @@
+name: lowlight_figure8
+seed: 7
+duration_s: 30
+targets:
+  - {shape: gaussian, size_px: 10, motion: figure8, radius_px: 450, period_s: 14, start: random, intensity: 235}
+disturbance:
+  atmosphere: lowlight
+  gaussian_sigma: 12
+  poisson: true

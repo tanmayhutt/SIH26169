@@ -1,0 +1,6 @@
+name: clear_line
+seed: 1
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: line, speed_px_s: 150, heading_deg: 25, start: random}
+disturbance: {atmosphere: clear}

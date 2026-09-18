@@ -1,0 +1,7 @@
+name: hardmode_line
+seed: 10
+duration_s: 40
+camera: {window_only: true}
+targets:
+  - {shape: square, size_px: 10, motion: line, speed_px_s: 100, heading_deg: 20, start: random}
+disturbance: {atmosphere: clear}
