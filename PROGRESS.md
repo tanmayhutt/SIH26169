@@ -155,9 +155,9 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | Scene view with 2 degree grid, trails, legend | 🟩 |
 | Camera view with capture ring, error vector, prediction, scale bar | 🟩 |
 | Four live plots with legends | 🟩 |
-| Benchmark 2 video ingest | 🟩 |
+| Benchmark 2 video ingest, with first-frame preview and file facts on load | 🟩 |
 | New random seed and heading each run, with a pin option | 🟩 |
-| Automatic report on finish, open report / folder | 🟩 |
+| Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
 
 ### 2.8 Tests  🟩
 
@@ -177,10 +177,12 @@ flowchart LR
     c --> d[Train v2: 16000 samples, 16 epochs]:::wip
     d --> e[Promote if localisation is a few px; else keep as fallback]:::todo
     a --> f[Hybrid policy: CNN fills gaps, never overrides a classical hit]:::done
+    f --> g[Fine-tune on a user video: tracker-confident frames become labels]:::done
 ```
 
-Honest state: the classical pipeline carries the load; the CNN currently contributes about 0%
-of measurements. It is the intended answer for the faint-beacon case.
+Honest state: on simulated scenes the classical pipeline carries the load and the CNN contributes about 0%
+of measurements; on a real phone video it supplied half of them. It is the intended answer for the faint-beacon case.
+`training/finetune_from_video.py` adapts it to footage you provide (self-training from the tracker's confident frames).
 
 ### 2.10 Executable builds  🟨
 

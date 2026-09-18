@@ -157,6 +157,7 @@ def main():
             loc = (dx ** 2 + dy ** 2).sqrt().mean().item() * 2   # in patch px
         print(f"epoch {ep + 1}/{a.epochs}  train {tot / len(X):.4f}  val {vl:.4f}  val loc err {loc:.2f} px")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    torch.save(net.state_dict(), str(Path(a.out).with_suffix(".pt")))   # for fine-tuning on video later
     dummy = torch.zeros(1, 1, PATCH, PATCH)
     torch.onnx.export(net, dummy, a.out, input_names=["patch"], output_names=["heat"], opset_version=17, dynamo=False)
     print(f"exported {a.out}  ({Path(a.out).stat().st_size / 1024:.0f} kB)")

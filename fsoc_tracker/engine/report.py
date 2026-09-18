@@ -60,9 +60,18 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             fig.text(0.62, y, _fmt(v), fontsize=9, color=INK)
             fig.text(0.80, y, label, fontsize=9, weight="bold", color=col)
             y -= 0.02
+        notes = []
         if not summary.truth_available:
-            fig.text(0.07, y, "Ground truth unavailable (video input): tracking and centroiding error are not computed; "
-                     "lock is judged from the tracker state.", fontsize=8, color=SIGNAL); y -= 0.02
+            notes.append("Ground truth unavailable (video input): tracking and centroiding error are not computed; lock is judged from the tracker's own estimate.")
+        sat = summary.values.get("slew_saturation_pct", 0.0)
+        if sat > 20:
+            notes.append(f"Gimbal at its rate limit in {sat:.0f}% of frames: the target moved faster than the camera can turn at {cfg.camera.max_pan_rate_deg_s:g} deg/s "
+                         f"({cfg.camera.max_pan_rate_deg_s / cfg.camera.ifov_deg / cfg.camera.update_rate_hz:.0f} px per frame). Raise the rate limit (PS allows 5 to 10 deg/s) or widen the FOV.")
+        cnn = summary.values.get("cnn_frames_pct", 0.0)
+        if cnn > 0:
+            notes.append(f"The AI detector supplied the measurement in {cnn:.0f}% of frames (used when the classical detector found nothing near the prediction).")
+        for n_ in notes:
+            fig.text(0.07, y, n_, fontsize=7.5, color=SIGNAL, wrap=True); y -= 0.026
         y -= 0.012
         fig.text(0.07, y, "All metrics, with definitions", fontsize=11, weight="bold", color=INK); y -= 0.022
         for k, v in summary.values.items():
