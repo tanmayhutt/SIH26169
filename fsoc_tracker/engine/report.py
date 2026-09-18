@@ -1,0 +1,138 @@
+"""Automatic performance report (PDF) from the telemetry of one run."""
+from __future__ import annotations
+
+import math
+import platform
+from datetime import datetime
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
+
+from .. import __version__
+from .config import RunConfig
+from .metrics import DEFINITIONS, SPEC, Summary
+from .telemetry import Record
+
+INK, MUTED, ACCENT, SIGNAL, GOOD, LINE = "#101B23", "#61747F", "#0B6E87", "#A8460F", "#2B6B50", "#D3DCE1"
+
+
+def _fmt(v):
+    if v is None:
+        return "n/a"
+    if isinstance(v, float):
+        return "n/a" if math.isnan(v) else (f"{v:.3f}" if abs(v) < 100 else f"{v:.1f}")
+    return str(v)
+
+
+def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    t = np.array([r.t_sim for r in records]) if records else np.zeros(0)
+    with PdfPages(path) as pdf:
+        # ---------------------------------------------------------- page 1
+        fig = plt.figure(figsize=(8.27, 11.69))
+        fig.patch.set_facecolor("white")
+        fig.text(0.07, 0.955, "FSOC Tracker performance report", fontsize=17, weight="bold", color=INK)
+        sub = f"Run '{cfg.name}'   seed {cfg.seed}   {datetime.now():%Y-%m-%d %H:%M}   v{__version__}   {platform.system()} {platform.machine()}"
+        fig.text(0.07, 0.932, sub, fontsize=8.5, color=MUTED)
+        src = f"Source: video {cfg.video}" if cfg.video else (
+            f"Source: simulator, screen {cfg.screen.width}x{cfg.screen.height}, targets {len(cfg.targets)}, "
+            f"motion {cfg.targets[0].motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
+            f"platform {cfg.disturbance.platform_motion} {cfg.disturbance.platform_px_frame:g} px/f, jitter {cfg.disturbance.jitter_px:g} px, "
+            f"S&P {cfg.disturbance.salt_pepper_frac:g}, gauss {cfg.disturbance.gaussian_sigma:g}")
+        fig.text(0.07, 0.905, src, fontsize=7.5, color=MUTED, wrap=True)
+        fig.text(0.07, 0.878, f"Camera {cfg.camera.width}x{cfg.camera.height}, FOV {cfg.camera.fov_w_deg:g}x{cfg.camera.fov_h_deg:g} deg, "
+                 f"IFOV {cfg.camera.ifov_deg*3600:.1f} arcsec/px, max rate {cfg.camera.max_pan_rate_deg_s:g}/{cfg.camera.max_tilt_rate_deg_s:g} deg/s, "
+                 f"{cfg.camera.update_rate_hz:g} Hz", fontsize=8, color=MUTED)
+        # spec table
+        y = 0.85
+        fig.text(0.07, y, "Specification check", fontsize=11, weight="bold", color=INK); y -= 0.022
+        for k, (op, lim) in SPEC.items():
+            v = summary.values.get(k)
+            p = summary.passed.get(k)
+            col = GOOD if p else (SIGNAL if p is False else MUTED)
+            label = "PASS" if p else ("FAIL" if p is False else "n/a")
+            fig.text(0.07, y, k.replace("_", " "), fontsize=9, color=INK)
+            fig.text(0.47, y, f"{op} {lim:g}", fontsize=9, color=MUTED)
+            fig.text(0.62, y, _fmt(v), fontsize=9, color=INK)
+            fig.text(0.80, y, label, fontsize=9, weight="bold", color=col)
+            y -= 0.02
+        if not summary.truth_available:
+            fig.text(0.07, y, "Ground truth unavailable (video input): tracking and centroiding error are not computed; "
+                     "lock is judged from the tracker state.", fontsize=8, color=SIGNAL); y -= 0.02
+        y -= 0.012
+        fig.text(0.07, y, "All metrics, with definitions", fontsize=11, weight="bold", color=INK); y -= 0.022
+        for k, v in summary.values.items():
+            fig.text(0.07, y, k.replace("_", " "), fontsize=8.5, color=INK)
+            fig.text(0.40, y, _fmt(v), fontsize=8.5, color=INK, weight="bold")
+            d = DEFINITIONS.get(k, "")
+            fig.text(0.50, y, d, fontsize=6.6, color=MUTED, wrap=True)
+            y -= 0.0195 if len(d) < 95 else 0.028
+            if y < 0.06:
+                break
+        pdf.savefig(fig); plt.close(fig)
+
+        # ---------------------------------------------------------- page 2
+        if records:
+            fig, axes = plt.subplots(4, 1, figsize=(8.27, 11.69), sharex=True)
+            fig.subplots_adjust(hspace=0.35, left=0.1, right=0.97, top=0.95, bottom=0.06)
+            te = np.array([r.tracking_err_px for r in records])
+            ce = np.array([r.centroid_err_px for r in records])
+            ax = axes[0]
+            if np.isfinite(te).any():
+                ax.plot(t, te, color=ACCENT, lw=0.9, label="tracking error (true beacon to window centre)")
+            if np.isfinite(ce).any():
+                ax.plot(t, ce, color=SIGNAL, lw=0.9, label="centroiding error (measured to true)")
+            ax.axhline(10, color=LINE, ls="--", lw=0.8)
+            ax.set_ylabel("pixels"); ax.legend(fontsize=7, loc="upper right"); ax.set_title("Errors", fontsize=10, loc="left")
+            ax = axes[1]
+            modes = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
+            mv = np.array([modes.index(r.mode) for r in records])
+            ax.step(t, mv, where="post", color=INK, lw=0.9)
+            ax.set_yticks(range(len(modes))); ax.set_yticklabels(modes, fontsize=7)
+            ax.set_title("Tracker state", fontsize=10, loc="left")
+            ax = axes[2]
+            ax.plot(t, [r.cmd_pan_rate for r in records], color=ACCENT, lw=0.8, label="pan rate")
+            ax.plot(t, [r.cmd_tilt_rate for r in records], color=SIGNAL, lw=0.8, label="tilt rate")
+            for lim in (cfg.camera.max_pan_rate_deg_s, -cfg.camera.max_pan_rate_deg_s):
+                ax.axhline(lim, color=LINE, ls="--", lw=0.8)
+            ax.set_ylabel("deg/s"); ax.legend(fontsize=7, loc="upper right"); ax.set_title("Gimbal command (dashed: limit)", fontsize=10, loc="left")
+            ax = axes[3]
+            ax.plot(t, [r.proc_ms for r in records], color=INK, lw=0.8)
+            ax.axhline(50, color=LINE, ls="--", lw=0.8)
+            ax.set_ylabel("ms / frame"); ax.set_xlabel("time (s)"); ax.set_title("Processing time (dashed: 20 FPS)", fontsize=10, loc="left")
+            for ax in axes:
+                ax.grid(alpha=0.25); ax.spines[["top", "right"]].set_visible(False)
+            pdf.savefig(fig); plt.close(fig)
+
+            # ------------------------------------------------------ page 3
+            fig, axes = plt.subplots(2, 2, figsize=(8.27, 11.69))
+            fig.subplots_adjust(hspace=0.35, wspace=0.3, left=0.1, right=0.97, top=0.95, bottom=0.06)
+            ax = axes[0, 0]
+            tx = np.array([r.true_x for r in records]); ty = np.array([r.true_y for r in records])
+            if np.isfinite(tx).any():
+                ax.plot(tx, ty, color=SIGNAL, lw=0.8, label="true beacon")
+            ax.plot([r.win_cx for r in records], [r.win_cy for r in records], color=ACCENT, lw=0.8, label="window centre")
+            ax.invert_yaxis(); ax.set_aspect("equal"); ax.legend(fontsize=7); ax.set_title("Paths on the screen", fontsize=10, loc="left")
+            ax = axes[0, 1]
+            fin = te[np.isfinite(te)]
+            if len(fin):
+                ax.hist(fin, bins=40, color=ACCENT); ax.axvline(10, color=SIGNAL, ls="--")
+            ax.set_title("Tracking error histogram", fontsize=10, loc="left"); ax.set_xlabel("px")
+            ax = axes[1, 0]
+            ax.plot(t, [r.p_cv for r in records], lw=0.8, label="constant velocity")
+            ax.plot(t, [r.p_ca for r in records], lw=0.8, label="constant acceleration")
+            ax.plot(t, [r.p_ct for r in records], lw=0.8, label="coordinated turn")
+            ax.set_ylim(0, 1); ax.legend(fontsize=7); ax.set_title("Motion model probabilities", fontsize=10, loc="left"); ax.set_xlabel("time (s)")
+            ax = axes[1, 1]
+            tiers = [r.tier for r in records]
+            counts = [tiers.count(k) for k in ("classical", "cnn", "none")]
+            ax.bar(["classical", "AI (cnn)", "no detection"], counts, color=[ACCENT, SIGNAL, LINE])
+            ax.set_title("Which detector provided the measurement", fontsize=10, loc="left")
+            for ax in axes.ravel():
+                ax.grid(alpha=0.25); ax.spines[["top", "right"]].set_visible(False)
+            pdf.savefig(fig); plt.close(fig)
+    return path

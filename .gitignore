@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+results/
+*.egg-info/
+.pytest_cache/
+models/*.pt
+context.md

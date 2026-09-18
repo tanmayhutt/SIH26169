@@ -1,0 +1,113 @@
+"""Draws the scene picture the tracker observes and records the ground truth for it."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import cv2
+import numpy as np
+
+from ..engine.config import RunConfig, apply_atmosphere_preset
+from .camera import Gimbal
+from .disturbance import DisturbanceModel, FrameDisturbance
+from .scene import make_background
+from .targets import Target, TargetState
+
+
+@dataclass
+class Truth:
+    """Where things really are this frame, in observed-picture pixels."""
+    beacons: list[tuple[float, float]] = field(default_factory=list)   # designated first
+    visible: list[bool] = field(default_factory=list)
+    disturbance: FrameDisturbance = field(default_factory=FrameDisturbance)
+    window: tuple[int, int, int, int] = (0, 0, 0, 0)                   # x0, y0, w, h
+
+
+class World:
+    """Scene, beacons, camera and disturbances. `render()` produces one frame plus truth."""
+
+    def __init__(self, cfg: RunConfig):
+        self.cfg = cfg
+        self.rng = np.random.default_rng(cfg.seed)
+        self.dt = 1.0 / cfg.camera.update_rate_hz
+        self.t = 0.0
+        self.frame_idx = 0
+        apply_atmosphere_preset(cfg.disturbance)
+        self.background = make_background(cfg.screen, self.rng)
+        self.h, self.w = self.background.shape
+        self.targets = [Target(tc, self.w, self.h, self.rng, i) for i, tc in enumerate(cfg.targets)]
+        self.gimbal = Gimbal(cfg.camera, self.w, self.h)
+        self.disturbance = DisturbanceModel(cfg.disturbance, (self.h, self.w), self.rng, self.dt)
+        self._sprites: dict[tuple, np.ndarray] = {}
+
+    # ---------------------------------------------------------------- sprite
+    def _sprite(self, shape: str, size: int) -> np.ndarray:
+        key = (shape, size)
+        if key not in self._sprites:
+            s = max(size, 2)
+            pad = 3
+            n = s + 2 * pad
+            sp = np.zeros((n, n), np.float32)
+            if shape == "square":
+                sp[pad:pad + s, pad:pad + s] = 1.0
+                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)          # optics soften the edge
+            elif shape == "circle":
+                cv2.circle(sp, (n // 2, n // 2), s // 2, 1.0, -1, lineType=cv2.LINE_AA)
+                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
+            else:  # gaussian
+                yy, xx = np.mgrid[0:n, 0:n]
+                sig = s / 3.0
+                sp = np.exp(-((xx - n / 2 + 0.5) ** 2 + (yy - n / 2 + 0.5) ** 2) / (2 * sig * sig))
+            sp /= sp.max()
+            self._sprites[key] = sp
+        return self._sprites[key]
+
+    # ---------------------------------------------------------------- render
+    def render(self) -> tuple[np.ndarray, Truth]:
+        cfg = self.cfg
+        img = self.background.copy()
+        d = self.disturbance.step()
+        truth = Truth(disturbance=d)
+        boxes = []
+        for tgt in self.targets:
+            st: TargetState = tgt.state(self.t)
+            x = st.x + d.wander_dx
+            y = st.y + d.wander_dy
+            inten = float(np.clip(st.intensity * d.scint, 0, 255))
+            sp = self._sprite(tgt.cfg.shape, tgt.cfg.size_px)
+            n = sp.shape[0]
+            # sub-pixel placement by shifting the sprite
+            ix, iy = int(np.floor(x)), int(np.floor(y))
+            fx, fy = x - ix, y - iy
+            # Pixel-centre convention: the sprite's centre index is (n-1)/2, it is placed at
+            # ix - n//2, so shift by the difference to land exactly on (x, y).
+            off = n // 2 - (n - 1) / 2.0
+            M = np.array([[1, 0, fx + off], [0, 1, fy + off]], np.float32)
+            sps = cv2.warpAffine(sp, M, (n, n), flags=cv2.INTER_LINEAR)
+            x0, y0 = ix - n // 2, iy - n // 2
+            xa, ya = max(x0, 0), max(y0, 0)
+            xb, yb = min(x0 + n, self.w), min(y0 + n, self.h)
+            if xb > xa and yb > ya:
+                region = img[ya:yb, xa:xb].astype(np.float32)
+                patch = sps[ya - y0:yb - y0, xa - x0:xb - x0] * inten
+                img[ya:yb, xa:xb] = np.clip(np.maximum(region, patch), 0, 255).astype(np.uint8)
+                boxes.append((xa, ya, xb - xa, yb - ya))
+            # truth in observed-picture pixels includes the picture shift
+            truth.beacons.append((x + d.shift[0], y + d.shift[1]))
+            truth.visible.append(st.visible)
+        img = self.disturbance.apply_image(img, boxes, d)
+        truth.window = self.gimbal.window_rect()
+        self.t += self.dt
+        self.frame_idx += 1
+        return img, truth
+
+    def observed(self, img: np.ndarray) -> np.ndarray:
+        """What the tracker is allowed to see. Full picture by default; in hard mode only
+        the window, with everything else blacked out."""
+        if not self.cfg.camera.window_only:
+            return img
+        x0, y0, w, h = self.gimbal.window_rect()
+        out = np.zeros_like(img)
+        xa, ya = max(x0, 0), max(y0, 0)
+        xb, yb = min(x0 + w, self.w), min(y0 + h, self.h)
+        out[ya:yb, xa:xb] = img[ya:yb, xa:xb]
+        return out

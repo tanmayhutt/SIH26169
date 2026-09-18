@@ -1,0 +1,8 @@
+name: fog_circular
+seed: 6
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: circular, radius_px: 400, period_s: 15, start: random}
+disturbance:
+  atmosphere: fog
+  gaussian_sigma: 8

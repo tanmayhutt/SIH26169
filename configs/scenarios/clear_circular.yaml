@@ -1,0 +1,6 @@
+name: clear_circular
+seed: 2
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: circular, radius_px: 450, period_s: 14, start: random}
+disturbance: {atmosphere: clear}

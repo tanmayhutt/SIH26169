@@ -1,0 +1,10 @@
+name: noisy_line
+seed: 5
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: line, speed_px_s: 150, heading_deg: -40, start: random}
+disturbance:
+  salt_pepper_frac: 0.10
+  gaussian_sigma: 20
+  poisson: true
+  atmosphere: clear
