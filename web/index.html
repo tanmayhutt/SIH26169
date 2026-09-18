@@ -59,18 +59,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
-  mermaid.initialize({ startOnLoad: false, theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
-  const renderer = new marked.Renderer();
-  const origCode = renderer.code.bind(renderer);
-  renderer.code = (code, lang) => lang === "mermaid" ? `<pre class="mermaid">${code}</pre>` : origCode(code, lang);
+  mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "dark", themeVariables: { background: "#111C24", primaryTextColor: "#E3ECF1", lineColor: "#8DA1AD", fontFamily: "IBM Plex Sans, sans-serif" } });
   async function load(doc) {
     const el = document.getElementById("doc");
     el.innerHTML = "<p>Loading " + doc + "...</p>";
     try {
       const r = await fetch("content/" + doc, { cache: "no-store" });
       if (!r.ok) throw new Error(r.status);
-      const md = await r.text();
-      el.innerHTML = marked.parse(md, { renderer });
+      let md = await r.text();
+      // Lift Mermaid blocks out before Markdown parsing so their arrows are not HTML-escaped.
+      const diagrams = [];
+      md = md.replace(/```mermaid\n([\s\S]*?)```/g, (m, code) => { diagrams.push(code); return `<div class="mermaid-slot" data-i="${diagrams.length - 1}"></div>`; });
+      el.innerHTML = marked.parse(md);
+      el.querySelectorAll(".mermaid-slot").forEach(slot => {
+        const pre = document.createElement("pre"); pre.className = "mermaid"; pre.textContent = diagrams[+slot.dataset.i]; slot.replaceWith(pre);
+      });
       await mermaid.run({ nodes: el.querySelectorAll(".mermaid") });
       document.getElementById("meta").textContent = doc + "  |  " + (r.headers.get("last-modified") || "");
     } catch (e) { el.innerHTML = "<p>Could not load " + doc + " (" + e.message + ").</p>"; }
