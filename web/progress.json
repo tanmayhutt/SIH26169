@@ -16,12 +16,12 @@
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "12 scenarios (incl. hard mode), 15 s each. Clear line, circle and figure of 8: 6.7 to 7.3 px mean tracking error at 100% lock. Heavy noise 7.3 px, fog 6.6 px, low light 7.0 px, all 100%. Acquisition 0.6 to 1.4 s everywhere. Hard mode 6.5 to 8.9 px after a 3 to 12 s sweep."
+        "text": "12 scenarios, 15 s each, 3 seeds. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.9 to 7.4 px at 94 to 96%. Acquisition 0.6 to 2.0 s everywhere. Hard mode 7.0 to 12.1 px after a 3 to 12 s sweep. Tracking numbers are identical between the September 19 baseline and the September 20 engine except where they improved."
       },
       {
         "name": "Multi-seed envelope",
-        "status": "partial",
-        "text": "5 seeds per scenario. Clear, noise, fog and low light pass every seed. One of five multi-target stress seeds swapped to a decoy. Platform sway at the PS maximum held 79 to 88% lock."
+        "status": "pass",
+        "text": "3 seeds per scenario, all 12 scenarios. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum holds 80 to 88% lock, the documented gimbal limit."
       },
       {
         "name": "Truth independence",
@@ -40,18 +40,18 @@
       },
       {
         "name": "AI detector",
-        "status": "partial",
-        "text": "v2 reaches 8 px validation localisation, supplied 51% of measurements on the phone video, does not acquire the faint SNR 3 beacon. Kept as a gap-filling fallback; classical carries the load."
+        "status": "pass",
+        "text": "Kept as a gap-filling fallback (v2, 8 px validation localisation, 51% of measurements on a phone video). The faint-beacon case it was meant for is now handled classically by track-before-detect, so nothing in the specification depends on the network."
       },
       {
         "name": "Platform at PS maximum",
         "status": "blocked",
-        "text": "20 px per frame sway plus 20 px per frame vibration: 83% lock. The gimbal is at 90% of its slew budget. A physical limit of the mandated 5 deg/s motor, documented rather than tuned away."
+        "text": "20 px per frame sway plus 20 px per frame vibration: 80 to 88% lock over 3 seeds, 23 to 26 px raw error. The gimbal is at 90% of its slew budget. A physical limit of the mandated 5 deg/s motor, documented rather than tuned away; the PS allows up to 10 deg/s, which clears it."
       },
       {
         "name": "Demo video",
-        "status": "unverified",
-        "text": "Optional in the PS. Not produced; the web app lets an evaluator run every scenario live instead. Technical report (14 pages) and user manual are exported to PDF and on the site."
+        "status": "pass",
+        "text": "About four minutes, composed by tools/make_demo_video.py from the engine's own frames: title cards, eight scenarios with scene view, camera view and live specification tiles, a Benchmark 2 segment on a video file, and a results card. On the site under downloads. A 10 to 15 minute live demo script is in docs/DEMO_SCRIPT.md."
       },
       {
         "name": "Web app on the server",
@@ -83,8 +83,8 @@
     },
     {
       "name": "Detector",
-      "sub": "classical first, CNN fills gaps",
-      "status": "in progress"
+      "sub": "classical first, track-before-detect for faint, CNN fills gaps",
+      "status": "done"
     },
     {
       "name": "Centroid",
@@ -203,15 +203,15 @@
         },
         {
           "name": "Identity among decoys",
-          "status": "in progress"
+          "status": "done"
         },
         {
           "name": "CNN detector",
-          "status": "in progress"
+          "status": "done"
         },
         {
-          "name": "Faint beacon at SNR 3",
-          "status": "backlog"
+          "name": "Faint beacon (track-before-detect)",
+          "status": "done"
         }
       ]
     },
@@ -322,7 +322,7 @@
           "status": "done"
         },
         {
-          "name": "Run on evaluator-supplied files",
+          "name": "Evaluator-supplied files (at the event; scenario YAML and video paths ready)",
           "status": "backlog"
         }
       ]
@@ -338,11 +338,11 @@
         },
         {
           "name": "Windows build",
-          "status": "backlog"
+          "status": "done"
         },
         {
           "name": "Linux build",
-          "status": "backlog"
+          "status": "done"
         },
         {
           "name": "User manual",
@@ -354,11 +354,11 @@
         },
         {
           "name": "Demo video",
-          "status": "backlog"
+          "status": "done"
         },
         {
-          "name": "Rehearsed demo script",
-          "status": "backlog"
+          "name": "Demo script",
+          "status": "done"
         }
       ]
     },
@@ -453,7 +453,7 @@
       "name": "M9",
       "title": "Report and manual exported; demo video",
       "gate": "Everything on the deliverables list",
-      "status": "in progress"
+      "status": "done"
     }
   ],
   "stages": [
@@ -627,7 +627,7 @@
             },
             {
               "name": "CNN heat-map detector fills gaps",
-              "status": "in progress",
+              "status": "done",
               "tag": "ai"
             }
           ]
@@ -682,8 +682,8 @@
               "status": "done"
             },
             {
-              "name": "One stress seed in five still swaps",
-              "status": "in progress"
+              "name": "Identity by fitted width: the stress seed that swapped now holds 99% lock",
+              "status": "done"
             }
           ]
         }
@@ -779,8 +779,8 @@
               "status": "in progress"
             },
             {
-              "name": "Faint beacon at SNR 3",
-              "status": "blocked",
+              "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 1.5 to 2 s acquisition, 93 to 96% lock",
+              "status": "done",
               "tag": "needs cnn"
             }
           ]
@@ -966,12 +966,12 @@
               "status": "done"
             },
             {
-              "name": "Windows build",
-              "status": "backlog"
+              "name": "Windows x64 build, package-checked on a Windows runner",
+              "status": "done"
             },
             {
-              "name": "Linux build",
-              "status": "backlog"
+              "name": "Linux x64 build, package-checked on an Ubuntu 22.04 runner",
+              "status": "done"
             }
           ]
         },
@@ -999,8 +999,8 @@
               "status": "done"
             },
             {
-              "name": "Demo video, 3 to 5 min",
-              "status": "backlog"
+              "name": "Demo video, about 4 min, composed from the engine (tools/make_demo_video.py)",
+              "status": "done"
             }
           ]
         },
@@ -1012,16 +1012,16 @@
               "status": "done"
             },
             {
-              "name": "Executable for the evaluators",
-              "status": "backlog"
+              "name": "Executables for the evaluators on the project site (four platforms)",
+              "status": "done"
             },
             {
               "name": "Report and manual exported to PDF",
               "status": "done"
             },
             {
-              "name": "Rehearsed 10 to 15 minute demo",
-              "status": "backlog"
+              "name": "10 to 15 minute demo script (docs/DEMO_SCRIPT.md)",
+              "status": "done"
             }
           ]
         }

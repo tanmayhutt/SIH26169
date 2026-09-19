@@ -10,3 +10,6 @@ results/
 models/*.pt
 context.md
 models/*_v2.*
+
+# demonstration video: built by tools/make_demo_video.py, delivered from the site
+docs/demo/
