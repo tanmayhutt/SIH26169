@@ -40,18 +40,28 @@ def extract(archive: Path, into: Path) -> Path:
     return into / "FSOC-Tracker"
 
 
-def make_video(path: Path) -> None:
+def make_video(folder: Path) -> Path | None:
+    """A small beacon video. The runner's own OpenCV may lack an encoder (some macOS wheels);
+    the packaged application only needs to read, so the step is skipped rather than failed."""
     rng = np.random.default_rng(0)
-    vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 30, (800, 800), isColor=True)
-    if not vw.isOpened():
-        raise SystemExit("cannot write mp4 with this OpenCV build")
-    for i in range(120):
-        img = rng.normal(12, 4, (800, 800)).clip(0, 255).astype(np.uint8)
-        a = 2 * np.pi * i / 120
-        x, y = int(400 + 150 * np.cos(a)), int(400 + 150 * np.sin(a))
-        img[y - 5:y + 5, x - 5:x + 5] = 235
-        vw.write(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
-    vw.release()
+    for name, fourcc in (("bench.mp4", "mp4v"), ("bench.mp4", "avc1"), ("bench.avi", "MJPG"), ("bench.mkv", "FFV1")):
+        path = folder / name
+        try:
+            vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), isColor=True)
+            if not vw.isOpened():
+                continue
+            for i in range(120):
+                img = rng.normal(12, 4, (800, 800)).clip(0, 255).astype(np.uint8)
+                a = 2 * np.pi * i / 120
+                x, y = int(400 + 150 * np.cos(a)), int(400 + 150 * np.sin(a))
+                img[y - 5:y + 5, x - 5:x + 5] = 235
+                vw.write(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
+            vw.release()
+        except cv2.error:
+            continue
+        if path.is_file() and path.stat().st_size > 1000:
+            return path
+    return None
 
 
 def run(cmd: list[str], cwd: Path, timeout: int = 300) -> str:
@@ -84,14 +94,16 @@ def main() -> int:
             for f in ("report.pdf", "frames.csv", "summary.json"):
                 if not (folder / "results" / name / f).is_file():
                     raise SystemExit(f"{scen}: {f} not written")
-        vid = tmp / "bench.mp4"
-        make_video(vid)
-        out = run(prefix + [str(exe), "video", str(vid), "--out", "results/t3"], folder)
-        line = [l for l in out.splitlines() if "fps" in l and "frames" in l]
-        print(f"video: {line[-1].strip() if line else 'no summary line'}")
-        for f in ("report.pdf", "frames.csv"):
-            if not (folder / "results" / "t3" / f).is_file():
-                raise SystemExit(f"video: {f} not written")
+        vid = make_video(tmp)
+        if vid is None:
+            print("video: SKIPPED, this machine's OpenCV has no video encoder to make the sample (the application's reader is unaffected)")
+        else:
+            out = run(prefix + [str(exe), "video", str(vid), "--out", "results/t3"], folder)
+            line = [l for l in out.splitlines() if "fps" in l and "frames" in l]
+            print(f"video: {line[-1].strip() if line else 'no summary line'}")
+            for f in ("report.pdf", "frames.csv"):
+                if not (folder / "results" / "t3" / f).is_file():
+                    raise SystemExit(f"video: {f} not written")
         for d in ("configs", "models", "docs"):
             if not (folder / d).exists():
                 raise SystemExit(f"{d} was not placed next to the executable on first start")
