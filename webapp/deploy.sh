@@ -6,8 +6,7 @@
 #   HOST=ubuntu@1.2.3.4 DOMAIN=x.example.com bash webapp/deploy.sh
 #
 # Caddy layout on $DOMAIN:
-#   /            landing page (web app or desktop application)
-#   /app/        the web app (reverse proxy to the service)
+#   /            the web app (reverse proxy to the service); /app/* redirects here for old links
 #   /progress/   progress record
 # The whole site is behind basic auth (credential set once on the server, see below).
 #   /downloads/  desktop builds and the PDF documents
@@ -25,10 +24,9 @@ rsync -az --delete \
   --exclude context.md --exclude '.pytest_cache' \
   "$HERE/" "$HOST:$REPO/"
 
-echo "== 2. static site (landing, progress, downloads) -> $SITE"
+echo "== 2. static site (progress, downloads) -> $SITE"
 STAGE=$(mktemp -d)
 mkdir -p "$STAGE/progress/content/docs" "$STAGE/downloads"
-cp "$HERE/web/landing.html" "$STAGE/index.html"
 cp "$HERE/web/index.html" "$HERE/web/progress.json" "$HERE/web/plan.html" "$STAGE/progress/"
 cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/progress/content/"
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/progress/content/docs/"
@@ -49,7 +47,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <li><a href="TECHNICAL_REPORT.pdf">TECHNICAL_REPORT.pdf</a> <small>problem understanding, architecture, methods, tests, measured performance, appendices</small></li>
 </ul>
 <p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
-</ul><p><a href="/">Back</a></p></body></html>
+</ul><p><a href="/">Back to the web app</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
 rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "$STAGE/" "$HOST:$SITE/site/"
@@ -74,9 +72,11 @@ After=network.target
 User=ubuntu
 WorkingDirectory=$REPO
 Environment=OMP_NUM_THREADS=2
-ExecStart=$REPO/.venv/bin/uvicorn webapp.server:app --host 127.0.0.1 --port 8095 --root-path /app
+ExecStart=$REPO/.venv/bin/uvicorn webapp.server:app --host 127.0.0.1 --port 8095 --proxy-headers --forwarded-allow-ips 127.0.0.1 --timeout-graceful-shutdown 5
 Restart=always
 RestartSec=3
+TimeoutStopSec=15
+LimitNOFILE=8192
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -89,7 +89,7 @@ if ! sudo test -s "$HASHFILE"; then echo "progress basic auth hash missing: crea
 HASH=$(sudo cat "$HASHFILE")
 USERNAME=$(sudo cat /etc/caddy/sih26169.progress.user 2>/dev/null || echo REDACTED)
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF
-# SIH26169: landing, web app, progress record, downloads. Managed by webapp/deploy.sh.
+# SIH26169: web app at the root, progress record, downloads. Managed by webapp/deploy.sh.
 $DOMAIN {
     encode zstd gzip
     header {
@@ -101,16 +101,10 @@ $DOMAIN {
     basic_auth {
         $USERNAME $HASH
     }
-    redir /app /app/ 308
     redir /progress /progress/ 308
     redir /downloads /downloads/ 308
-    handle_path /app/* {
-        reverse_proxy 127.0.0.1:8095 {
-            transport http {
-                read_timeout 600s
-            }
-        }
-    }
+    redir /app / 308
+    redir /app/ / 308
     handle /progress/* {
         root * $SITE/site
         file_server
@@ -120,8 +114,11 @@ $DOMAIN {
         file_server browse
     }
     handle {
-        root * $SITE/site
-        file_server
+        reverse_proxy 127.0.0.1:8095 {
+            transport http {
+                read_timeout 600s
+            }
+        }
     }
 }
 EOF
