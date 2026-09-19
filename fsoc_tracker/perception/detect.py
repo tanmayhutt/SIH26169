@@ -27,6 +27,10 @@ class Candidate:
     sigma: float           # fitted PSF width
     confidence: float      # 0..1
     source: str = "classical"
+    refined: bool = True   # sub-pixel fit done; False means a blob-based estimate (see ClassicalDetector.refine)
+    hm_area: int = 0       # pixels above half of the spot's height over the local background
+    bw: int = 0            # blob extent, for a later refinement
+    bh: int = 0
 
 
 def _roi_bounds(shape, cx, cy, half):
@@ -80,24 +84,47 @@ class ClassicalDetector:
         self.expected_size_px = expected_size_px   # designated beacon size from config, if known
         self.expected_shape = expected_shape
 
-    def expected_sigma(self) -> float | None:
-        """Second-moment width the designated beacon's spot should show in a Gaussian fit.
-        Unlike the thresholded blob area this does not change with the noise level."""
-        s = self.expected_size_px
-        if not s:
-            return None
-        if self.expected_shape == "gaussian":
-            return s / 3.0
-        if self.expected_shape == "circle":
-            return float(np.hypot(s / 4.0, 0.6))
-        return float(np.hypot(s / (2 * np.sqrt(3.0)), 0.6))     # uniform square plus the optics blur
-
     def expected_area(self) -> float | None:
         """Blob area the designated beacon produces after the matched filter, in px."""
         if not self.expected_size_px:
             return None
         mf = max(0.6, self.expected_size_px / 3.0)
         return (self.expected_size_px + 2.0 * mf) ** 2
+
+    def expected_sigma(self) -> float | None:
+        """Width the designated beacon's spot shows to `refine_centroid` (a second-moment
+        estimate), measured once on a noise-free rendering of the configured sprite so the
+        estimator's own bias is included. Unlike the thresholded blob area this does not
+        move with the noise level."""
+        s = self.expected_size_px
+        if not s:
+            return None
+        if getattr(self, "_exp_sigma", None) is None:
+            n = int(s) + 40
+            sp = np.zeros((n, n), np.float32)
+            c = n // 2
+            if self.expected_shape == "gaussian":
+                yy, xx = np.mgrid[0:n, 0:n]
+                sig = max(s, 2) / 3.0
+                sp = np.exp(-((xx - c) ** 2 + (yy - c) ** 2) / (2 * sig * sig)).astype(np.float32)
+            elif self.expected_shape == "circle":
+                cv2.circle(sp, (c, c), max(int(s) // 2, 1), 1.0, -1, lineType=cv2.LINE_AA)
+                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
+            else:
+                h = max(int(s), 2) // 2
+                sp[c - h:c - h + max(int(s), 2), c - h:c - h + max(int(s), 2)] = 1.0
+                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
+            patch = np.clip(20 + 200 * sp / sp.max(), 0, 255).astype(np.uint8)
+            _, _, self._exp_sigma = refine_centroid(patch, float(c), float(c), r=max(6, int(s) + 4))
+            self._exp_hm = int(np.count_nonzero(patch > 20 + 100))
+        return float(self._exp_sigma)
+
+    def expected_hm_area(self) -> float | None:
+        """Half-maximum footprint of the designated beacon's sprite, in px (see expected_sigma)."""
+        if not self.expected_size_px:
+            return None
+        self.expected_sigma()
+        return float(self._exp_hm)
 
     def detect(self, img: np.ndarray, roi: tuple[int, int, int, int] | None = None,
                k: float | None = None, mf_sigma: float | None = None, refine: int = 3, limit: int = 12) -> list[Candidate]:
@@ -157,6 +184,7 @@ class ClassicalDetector:
             cx, cy = cents[i]
             x0, y0 = int(stats[i, cv2.CC_STAT_LEFT]), int(stats[i, cv2.CC_STAT_TOP])
             peak = float(med[y0:y0 + bh, x0:x0 + bw].max())
+            hm_area = 0
             snr = (float(diff[y0:y0 + bh, x0:x0 + bw].max()) - level) / noise   # matched-filter SNR
             # confidence: SNR (saturating softly), peak brightness, and size match to the
             # designated beacon when its size is known. Bright stars are small and dim
@@ -170,16 +198,27 @@ class ClassicalDetector:
             # SNR alone is high for any bright point on a dark sky (a star), so size match
             # and peak brightness carry most of the weight
             conf = float(np.clip(0.30 * c_snr + 0.35 * c_peak + 0.35 * c_size, 0, 1))
-            out.append((conf, cx + xa, cy + ya, area, peak, snr, bw, bh))
+            out.append((conf, cx + xa, cy + ya, area, peak, snr, bw, bh, hm_area))
         out.sort(key=lambda r: -r[5] if k is not None else -r[0])   # faint path ranks by matched-filter SNR
         res: list[Candidate] = []
-        for j, (conf, cx, cy, area, peak, snr, bw, bh) in enumerate(out[:limit]):
-            if j < refine:      # sub-pixel refinement is the expensive step; only the leaders need it
+        for j, (conf, cx, cy, area, peak, snr, bw, bh, hm_area) in enumerate(out[:limit]):
+            # sub-pixel refinement (a Gaussian least-squares fit) is the expensive step, so
+            # only leading candidates that look like a beacon get it here; whichever
+            # candidate the tracker finally picks is refined by `refine()` before use
+            if j < refine and conf >= 0.35:
                 gx, gy, sig = refine_centroid(img, cx, cy, r=max(6, int(max(bw, bh))))
+                res.append(Candidate(gx, gy, area, peak, snr, sig, conf, "classical", True, int(bw), int(bh), hm_area))
             else:
-                gx, gy, sig = float(cx), float(cy), float(max(bw, bh)) / 3.0
-            res.append(Candidate(gx, gy, area, peak, snr, sig, conf, "classical"))
+                res.append(Candidate(float(cx), float(cy), area, peak, snr, float(max(bw, bh)) / 3.0, conf, "classical", False, int(bw), int(bh), hm_area))
         return res
+
+
+    def refine(self, img: np.ndarray, c: Candidate) -> Candidate:
+        """Sub-pixel fit for a candidate that was returned unrefined."""
+        if c.refined:
+            return c
+        gx, gy, sig = refine_centroid(img, c.x, c.y, r=max(6, int(max(c.bw, c.bh))))
+        return Candidate(gx, gy, c.area, c.peak, c.snr, sig, c.confidence, c.source, True, c.bw, c.bh, c.hm_area)
 
 
 class CNNDetector:
