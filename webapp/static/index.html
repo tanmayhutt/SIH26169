@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FSOC Tracker</title>
+<meta name="description" content="Web version of the FSOC Tracker for SIH26169: run the simulator and tracker in the browser, or upload a video for Benchmark 2.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root { --ground:#0A1117; --surface:#111C24; --raised:#16242D; --ink:#E3ECF1; --ink-2:#BCCCD5; --muted:#8DA1AD; --faint:#6A7F8B; --line:#22323D; --line-2:#1A2932;
+          --accent:#52C4DE; --accent-bg:#0E2F3A; --signal:#E08D4C; --signal-bg:#33220F; --good:#5CBE93; --good-bg:#122E24; --bad:#E0603F; --bad-bg:#34160F;
+          --f-display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif; --f-body:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 13.5px; line-height: 1.45; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 3; }
+  header .brand { font-family: var(--f-display); font-size: 18px; font-weight: 600; }
+  header .brand small { font-family: var(--f-mono); font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  select, input[type=number], input[type=text] { font: inherit; background: var(--ground); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 5px 8px; min-width: 0; }
+  select:focus, input:focus { outline: none; border-color: var(--accent); }
+  button { font: inherit; font-family: var(--f-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 7px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .grid { display: grid; grid-template-columns: 300px 1fr 280px; gap: 10px; padding: 10px 16px 30px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+  .params { padding: 12px 14px; max-height: calc(100vh - 80px); overflow-y: auto; }
+  .sec { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .sec:first-child { margin-top: 0; }
+  .row { display: grid; grid-template-columns: 1fr 120px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12.5px; color: var(--muted); }
+  .row input, .row select { width: 100%; }
+  .hint { color: var(--faint); font-size: 11.5px; margin: 2px 0 6px; }
+  .tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .tile { padding: 10px 12px; }
+  .tile .t { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .tile .v { font-family: var(--f-display); font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .tile .u { color: var(--faint); font-size: 10.5px; }
+  .v.pass { color: var(--good); } .v.fail { color: var(--signal); } .v.warn { color: var(--signal); }
+  .views { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .view { position: relative; aspect-ratio: 4 / 3; overflow: hidden; }
+  .view canvas { width: 100%; height: 100%; display: block; }
+  .view .cap { position: absolute; left: 0; right: 0; top: 0; padding: 4px 8px; font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); background: rgba(0,0,0,.55); }
+  .view .cap b { color: var(--accent); font-weight: 500; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .chart { padding: 8px 10px 4px; }
+  .chart .t { font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+  .chart canvas { width: 100%; height: 130px; display: block; }
+  .tele { padding: 12px 14px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); white-space: pre; overflow: auto; max-height: calc(100vh - 80px); }
+  .status { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  .finish { margin-top: 10px; padding: 12px 14px; display: none; }
+  .finish h3 { font-family: var(--f-display); font-size: 16px; margin: 0 0 6px; }
+  .finish table { border-collapse: collapse; font-size: 12.5px; }
+  .finish td { padding: 3px 12px 3px 0; color: var(--ink-2); }
+  .finish .links a { font-family: var(--f-mono); font-size: 12px; color: var(--accent); margin-right: 14px; }
+  .badge { font-family: var(--f-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px; }
+  .badge.pass { color: var(--good); border-color: rgba(92,190,147,.4); background: var(--good-bg); }
+  .badge.fail { color: var(--signal); border-color: rgba(224,141,76,.4); background: var(--signal-bg); }
+  .drop { border: 1px dashed var(--line); border-radius: 3px; padding: 10px; text-align: center; color: var(--muted); font-size: 12px; cursor: pointer; }
+  .drop:hover { border-color: var(--accent); color: var(--accent); }
+  .note { border-left: 2px solid var(--accent); background: var(--accent-bg); padding: 8px 10px; font-size: 12px; color: var(--ink-2); margin: 8px 0; border-radius: 0 3px 3px 0; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } .params, .tele { max-height: none; } .tiles { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">FSOC Tracker <small id="ver">web</small></div>
+  <label>Scenario <select id="scn"></select></label>
+  <button id="start" class="primary">Start</button>
+  <button id="stop" disabled>Stop</button>
+  <label>Speed <select id="speed"><option value="1">1x real time</option><option value="0.5">0.5x</option><option value="2">2x</option><option value="4">4x</option><option value="0">max</option></select></label>
+  <label class="status"><input type="checkbox" id="rnd" checked> new random seed each run</label>
+  <span class="status" id="status">ready</span>
+  <a href="/progress/" style="font-family:var(--f-mono);font-size:11.5px;color:var(--muted)">progress</a>
+  <a href="/" style="font-family:var(--f-mono);font-size:11.5px;color:var(--muted)">home</a>
+</header>
+
+<div class="grid">
+  <aside class="panel params" id="params">
+    <div class="sec">Run</div>
+    <div class="row"><span>Name</span><input type="text" id="name" value="web run"></div>
+    <div class="row"><span>Seed</span><input type="number" id="seed" value="0"></div>
+    <div class="row"><span>Duration (s, max 120)</span><input type="number" id="duration" value="20" min="1" max="120"></div>
+    <div class="row"><span>Extra targets (decoys)</span><input type="number" id="extra" value="0" min="0" max="8"></div>
+    <div class="sec">Benchmark 2: video</div>
+    <div class="drop" id="drop">Drop an .mp4 here or click to choose. The simulator is bypassed and the video becomes the scene.</div>
+    <input type="file" id="file" accept=".mp4,.avi,.mov,.mkv" style="display:none">
+    <div id="vinfo" class="hint"></div>
+    <button id="clearvid" style="display:none">Use simulator instead</button>
+    <div class="sec">Screen (PS rows 1-2)</div>
+    <div class="row"><span>Width (px)</span><input type="number" id="screen.width" min="64" max="8000"></div>
+    <div class="row"><span>Height (px)</span><input type="number" id="screen.height" min="64" max="8000"></div>
+    <div class="row"><span>Background</span><select id="screen.background"><option>starfield</option><option>terrain</option><option>gradient</option><option>flat</option></select></div>
+    <div class="row"><span>Colour camera</span><select id="screen.colour"><option value="false">no (monochrome)</option><option value="true">yes</option></select></div>
+    <div class="sec">Camera (PS rows 3-6, 13-15)</div>
+    <div class="row"><span>Window width (px)</span><input type="number" id="camera.width"></div>
+    <div class="row"><span>Window height (px)</span><input type="number" id="camera.height"></div>
+    <div class="row"><span>FOV width (deg)</span><input type="number" id="camera.fov_w_deg" step="0.1"></div>
+    <div class="row"><span>FOV height (deg)</span><input type="number" id="camera.fov_h_deg" step="0.1"></div>
+    <div class="row"><span>Update rate (Hz)</span><input type="number" id="camera.update_rate_hz"></div>
+    <div class="row"><span>Max pan (deg/s)</span><input type="number" id="camera.max_pan_rate_deg_s" step="0.5"></div>
+    <div class="row"><span>Max tilt (deg/s)</span><input type="number" id="camera.max_tilt_rate_deg_s" step="0.5"></div>
+    <div class="row"><span>Hard mode (window only)</span><select id="camera.window_only"><option value="false">no</option><option value="true">yes</option></select></div>
+    <div class="sec">Designated target (PS rows 7-12)</div>
+    <div class="row"><span>Shape</span><select id="target.shape"><option>square</option><option>circle</option><option>gaussian</option></select></div>
+    <div class="row"><span>Size (px)</span><input type="number" id="target.size_px" min="2" max="60"></div>
+    <div class="row"><span>Peak intensity</span><input type="number" id="target.intensity" min="20" max="255"></div>
+    <div class="row"><span>Motion</span><select id="target.motion"><option>line</option><option>circular</option><option>figure8</option><option>random</option><option>spiral</option><option>sinusoidal</option><option>static</option></select></div>
+    <div class="row"><span>Speed (px/s)</span><input type="number" id="target.speed_px_s"></div>
+    <div class="row"><span>Radius (px)</span><input type="number" id="target.radius_px"></div>
+    <div class="row"><span>Period (s)</span><input type="number" id="target.period_s" step="0.5"></div>
+    <div class="row"><span>Start</span><select id="target.start"><option>random</option><option>centre</option></select></div>
+    <div class="sec">Disturbances (PS rows 21-25)</div>
+    <div class="row"><span>Atmosphere</span><select id="disturbance.atmosphere"></select></div>
+    <div class="row"><span>Salt and pepper (0-0.5)</span><input type="number" id="disturbance.salt_pepper_frac" step="0.01" min="0" max="0.5"></div>
+    <div class="row"><span>Gaussian sigma</span><input type="number" id="disturbance.gaussian_sigma" min="0" max="60"></div>
+    <div class="row"><span>Poisson</span><select id="disturbance.poisson"><option value="false">off</option><option value="true">on</option></select></div>
+    <div class="row"><span>Camera jitter (px/frame)</span><input type="number" id="disturbance.jitter_px" min="0" max="60"></div>
+    <div class="row"><span>Platform motion</span><select id="disturbance.platform_motion"><option>none</option><option>linear</option><option>circular</option><option>random</option><option>spiral</option><option>figure8</option></select></div>
+    <div class="row"><span>Platform speed (px/frame)</span><input type="number" id="disturbance.platform_px_frame" min="0" max="60"></div>
+    <div class="sec">Tracker</div>
+    <div class="row"><span>Detector</span><select id="tracker.detector"><option>hybrid</option><option>classical</option><option>cnn</option></select></div>
+    <div class="hint">Defaults follow the problem statement. The desktop application exposes every parameter; this web version exposes the ones that matter for a review.</div>
+  </aside>
+
+  <main>
+    <div class="tiles">
+      <div class="panel tile"><div class="t">State</div><div class="v" id="t-state">-</div><div class="u">tracker</div></div>
+      <div class="panel tile"><div class="t">Acquisition</div><div class="v" id="t-acq">-</div><div class="u">spec 2 s or less</div></div>
+      <div class="panel tile"><div class="t">Tracking error</div><div class="v" id="t-terr">-</div><div class="u">spec 10 px or less</div></div>
+      <div class="panel tile"><div class="t">Centroiding error</div><div class="v" id="t-cerr">-</div><div class="u">measured to true</div></div>
+      <div class="panel tile"><div class="t">Lock retention</div><div class="v" id="t-lock">-</div><div class="u">spec loss under 5%</div></div>
+      <div class="panel tile"><div class="t">Processing</div><div class="v" id="t-fps">-</div><div class="u">spec 20 FPS or more</div></div>
+    </div>
+    <div class="views">
+      <div class="panel view"><canvas id="scene" width="640" height="480"></canvas><div class="cap" id="scene-cap"><b>Screen</b> whole scene, camera window in cyan, beacon truth in orange, estimate in green</div></div>
+      <div class="panel view"><canvas id="cam" width="640" height="480"></canvas><div class="cap" id="cam-cap"><b>Camera window</b> what the terminal points at; ring green when locked</div></div>
+    </div>
+    <div class="charts">
+      <div class="panel chart"><div class="t">Errors (px): tracking cyan, centroiding orange, dashed 10 px</div><canvas id="c-err"></canvas></div>
+      <div class="panel chart"><div class="t">Gimbal command (deg/s): pan cyan, tilt orange, dashed limit</div><canvas id="c-cmd"></canvas></div>
+    </div>
+    <div class="panel finish" id="finish"></div>
+  </main>
+
+  <aside class="panel tele" id="tele">HOW TO USE
+
+1. Pick a scenario, or set values
+   on the left.
+2. Press Start.
+3. Watch the tiles: green meets
+   the specification, amber does
+   not yet.
+4. When the run ends, download
+   the report, the per-frame CSV
+   and the summary.
+
+BENCHMARK 2
+Drop an .mp4 on the left; the
+simulator is bypassed and the
+video becomes the scene.
+
+This is the same engine as the
+desktop application. One run at
+a time per server.</aside>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let META = null, RUN_ID = null, WS = null, VIDEO = null;
+  const buf = { t: [], terr: [], cerr: [], pan: [], tilt: [], lock: [], proc: [] }; let acqT = null, lim = 5;
+
+  function fillForm(cfg) {
+    for (const sec of ["screen", "camera", "target", "disturbance", "tracker"]) {
+      const obj = sec === "target" ? cfg.targets[0] : cfg[sec];
+      for (const k in obj) { const el = $(sec + "." + k); if (!el) continue; el.value = typeof obj[k] === "boolean" ? String(obj[k]) : obj[k]; }
+    }
+    $("seed").value = cfg.seed; $("duration").value = Math.min(cfg.duration_s, 120); $("extra").value = Math.max(cfg.targets.length - 1, 0); $("name").value = cfg.name;
+  }
+  function readForm() {
+    const ov = { screen: {}, camera: {}, target: {}, disturbance: {}, tracker: {} };
+    document.querySelectorAll("#params [id*='.']").forEach(el => {
+      const [sec, k] = el.id.split("."); let v = el.value;
+      if (el.tagName === "SELECT" && (v === "true" || v === "false")) v = v === "true"; else if (el.type === "number") v = Number(v);
+      ov[sec][k] = v;
+    });
+    ov.seed = Number($("seed").value); ov.duration_s = Number($("duration").value); ov.extra_targets = Number($("extra").value); ov.name = $("name").value;
+    return ov;
+  }
+
+  async function init() {
+    META = await (await fetch("api/scenarios")).json();
+    $("ver").textContent = "v" + META.version + " web";
+    const s = $("scn"); s.innerHTML = '<option value="">Custom (edit the panel)</option>' + META.scenarios.map(x => `<option value="${x.name}">${x.label}</option>`).join("");
+    $("disturbance.atmosphere").innerHTML = META.atmospheres.map(a => `<option>${a}</option>`).join("");
+    fillForm(META.defaults);
+    s.addEventListener("change", () => { const x = META.scenarios.find(y => y.name === s.value); fillForm(x ? x.config : META.defaults); });
+    $("disturbance.atmosphere").addEventListener("change", () => {});
+  }
+
+  function setTile(id, text, cls) { const el = $(id); el.textContent = text; el.className = "v " + (cls || ""); }
+  function resetRun() { for (const k in buf) buf[k] = []; acqT = null; $("finish").style.display = "none"; ["t-state","t-acq","t-terr","t-cerr","t-lock","t-fps"].forEach(i => setTile(i, "-")); }
+
+  async function start() {
+    resetRun();
+    const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, speed: Number($("speed").value) };
+    const r = await fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) { $("status").textContent = (await r.json()).detail || "could not start"; return; }
+    const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; lim = j.config.camera.max_pan_rate_deg_s;
+    $("start").disabled = true; $("stop").disabled = false; $("status").textContent = "running " + RUN_ID + " seed " + j.seed;
+    const proto = location.protocol === "https:" ? "wss://" : "ws://";
+    WS = new WebSocket(proto + location.host + location.pathname.replace(/\/$/, "") + "/ws/" + RUN_ID);
+    WS.onmessage = ev => onMsg(JSON.parse(ev.data));
+    WS.onclose = () => finish();
+  }
+  async function stop() { if (RUN_ID) await fetch("api/stop/" + RUN_ID, { method: "POST" }); }
+
+  const sceneCtx = $("scene").getContext("2d"), camCtx = $("cam").getContext("2d");
+  const sceneImg = new Image(), camImg = new Image(); let lastMsg = null;
+  sceneImg.onload = () => drawScene(); camImg.onload = () => drawCam();
+
+  function onMsg(m) {
+    if (m.end) { finish(); return; }
+    lastMsg = m;
+    buf.t.push(m.t); buf.terr.push(m.terr); buf.cerr.push(m.cerr); buf.pan.push(m.cmd_pan); buf.tilt.push(m.cmd_tilt); buf.lock.push(m.locked); buf.proc.push(m.proc_ms);
+    if (acqT === null && m.locked) acqT = m.t;
+    if (m.scene) { sceneImg.src = "data:image/jpeg;base64," + m.scene; camImg.src = "data:image/jpeg;base64," + m.cam; }
+    tiles(m); telemetry(m); charts();
+  }
+  function tiles(m) {
+    setTile("t-state", m.mode + (m.locked ? " locked" : ""), m.locked ? "pass" : (m.mode === "COAST" || m.mode === "REACQUIRE" ? "warn" : ""));
+    if (acqT !== null) {
+      setTile("t-acq", acqT.toFixed(2) + " s", acqT <= 2 ? "pass" : "fail");
+      const after = buf.t.map((t, i) => [t, buf.terr[i], buf.lock[i]]).filter(x => x[0] >= acqT);
+      const te = after.map(x => x[1]).filter(v => v !== null);
+      if (te.length) { const mean = te.reduce((a, b) => a + b, 0) / te.length; setTile("t-terr", mean.toFixed(1) + " px", mean <= 10 ? "pass" : "fail"); } else setTile("t-terr", "n/a", "");
+      const lk = 100 * after.filter(x => x[2]).length / after.length; setTile("t-lock", lk.toFixed(1) + " %", 100 - lk < 5 ? "pass" : "fail");
+    } else setTile("t-acq", "searching", "warn");
+    const ce = buf.cerr.filter(v => v !== null); if (ce.length) { const mean = ce.reduce((a, b) => a + b, 0) / ce.length; setTile("t-cerr", mean.toFixed(3) + " px", mean < 2 ? "pass" : "warn"); } else setTile("t-cerr", "n/a", "");
+    const p = buf.proc.slice(-60); const fps = 1000 / (p.reduce((a, b) => a + b, 0) / p.length); setTile("t-fps", fps.toFixed(0) + " FPS", fps >= 20 ? "pass" : "fail");
+  }
+  const f = (v, d = 2) => v === null || v === undefined ? "n/a" : Number(v).toFixed(d);
+  function telemetry(m) {
+    $("tele").textContent = [
+      `frame      ${m.frame}`, `t          ${f(m.t)} s`, `state      ${m.mode}`, `locked     ${m.locked ? "yes" : "no"}`, `detector   ${m.tier}`, `candidates ${m.n_cand}`, `confidence ${f(m.conf)}`, "",
+      `pan        ${f(m.pan, 3)} deg`, `tilt       ${f(m.tilt, 3)} deg`, `cmd pan    ${f(m.cmd_pan, 3)} deg/s`, `cmd tilt   ${f(m.cmd_tilt, 3)} deg/s`, `saturated  ${m.sat ? "yes" : "no"}`, "",
+      `detection  ${f(m.det[0])} ${f(m.det[1])}`, `estimate   ${f(m.est[0])} ${f(m.est[1])}`, `velocity   ${f(m.vel[0], 0)} ${f(m.vel[1], 0)} px/s`, `uncert.    ${f(m.unc)} px`,
+      `models     cv ${f(m.probs[0])} ca ${f(m.probs[1])} ct ${f(m.probs[2])}`, "",
+      `truth      ${f(m.true[0])} ${f(m.true[1])}`, `track err  ${f(m.terr)} px`, `centroid   ${f(m.cerr, 3)} px`, "", `proc       ${f(m.proc_ms)} ms`,
+    ].join("\n");
+  }
+  function drawScene() {
+    const c = $("scene"); const m = lastMsg; if (!m) return;
+    c.width = sceneImg.width; c.height = sceneImg.height; sceneCtx.drawImage(sceneImg, 0, 0);
+    const s = sceneImg.width / (m.screen_w || sceneImg.width);
+    const [x0, y0, w, h] = m.win; const k = sceneImg.width / Math.max(1, Math.round(sceneImg.width / s));
+    // scale: the picture was downscaled to 640 on its longer side
+    const scale = sceneImg.width / (m.screen_w || (m.win[0] + m.win[2] > 640 ? 2000 : 640));
+    sceneCtx.strokeStyle = "#52C4DE"; sceneCtx.lineWidth = 2; sceneCtx.strokeRect(x0 * SC(m), y0 * SC(m), w * SC(m), h * SC(m));
+    if (m.true[0] !== null) { sceneCtx.strokeStyle = "#E08D4C"; sceneCtx.beginPath(); sceneCtx.arc(m.true[0] * SC(m), m.true[1] * SC(m), 6, 0, 7); sceneCtx.stroke(); }
+    if (m.est[0] !== null) { sceneCtx.strokeStyle = "#5CBE93"; sceneCtx.beginPath(); const ex = m.est[0] * SC(m), ey = m.est[1] * SC(m); sceneCtx.moveTo(ex - 7, ey); sceneCtx.lineTo(ex + 7, ey); sceneCtx.moveTo(ex, ey - 7); sceneCtx.lineTo(ex, ey + 7); sceneCtx.stroke(); }
+  }
+  function SC(m) { return SCALE; }
+  let SCALE = 0.32;
+  function drawCam() {
+    const c = $("cam"); const m = lastMsg; if (!m) return;
+    c.width = camImg.width; c.height = camImg.height; camCtx.drawImage(camImg, 0, 0);
+    const [x0, y0, w, h] = m.win; const cx = w / 2, cy = h / 2;
+    camCtx.strokeStyle = m.locked ? "#5CBE93" : "#E08D4C"; camCtx.setLineDash([4, 4]); camCtx.beginPath(); camCtx.arc(cx, cy, 30, 0, 7); camCtx.stroke(); camCtx.setLineDash([]);
+    camCtx.strokeStyle = "#52C4DE"; camCtx.beginPath(); camCtx.moveTo(cx - 18, cy); camCtx.lineTo(cx - 6, cy); camCtx.moveTo(cx + 6, cy); camCtx.lineTo(cx + 18, cy); camCtx.moveTo(cx, cy - 18); camCtx.lineTo(cx, cy - 6); camCtx.moveTo(cx, cy + 6); camCtx.lineTo(cx, cy + 18); camCtx.stroke();
+    if (m.det[0] !== null) { camCtx.strokeStyle = "#5CBE93"; camCtx.lineWidth = 2; camCtx.strokeRect(m.det[0] - x0 - 12, m.det[1] - y0 - 12, 24, 24); camCtx.lineWidth = 1; }
+    if (m.est[0] !== null) { camCtx.strokeStyle = m.locked ? "#5CBE93" : "#E08D4C"; camCtx.beginPath(); camCtx.moveTo(cx, cy); camCtx.lineTo(m.est[0] - x0, m.est[1] - y0); camCtx.stroke(); }
+    camCtx.fillStyle = "rgba(0,0,0,.6)"; camCtx.fillRect(0, h - 20, w, 20); camCtx.fillStyle = m.locked ? "#5CBE93" : "#E08D4C"; camCtx.font = "12px IBM Plex Mono, monospace";
+    camCtx.fillText(`${m.mode}${m.locked ? " LOCKED" : ""}   err ${f(m.terr, 1)} px   conf ${f(m.conf)}   ${m.tier}`, 8, h - 6);
+  }
+  function line(ctx, W, H, xs, ys, color, ymin, ymax) {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.beginPath(); let started = false;
+    for (let i = 0; i < xs.length; i++) { if (ys[i] === null) { started = false; continue; } const x = (i / Math.max(1, xs.length - 1)) * W, y = H - (ys[i] - ymin) / (ymax - ymin) * H; if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  function chart(id, series, dashed, ymin, ymax) {
+    const c = $(id); const W = c.width = c.clientWidth * 2, H = c.height = 260; const ctx = c.getContext("2d");
+    ctx.fillStyle = "#111C24"; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = "#22323D"; for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke(); }
+    for (const d of dashed) { ctx.setLineDash([6, 6]); ctx.strokeStyle = "#8DA1AD"; ctx.beginPath(); const y = H - (d - ymin) / (ymax - ymin) * H; ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.setLineDash([]); }
+    for (const [ys, col] of series) line(ctx, W, H, buf.t.slice(-600), ys.slice(-600), col, ymin, ymax);
+    ctx.fillStyle = "#8DA1AD"; ctx.font = "20px IBM Plex Mono, monospace"; ctx.fillText(ymax.toFixed(0), 6, 22); ctx.fillText(ymin.toFixed(0), 6, H - 6);
+  }
+  function charts() {
+    const te = buf.terr.filter(v => v !== null); const top = Math.max(20, ...te.slice(-600));
+    chart("c-err", [[buf.terr, "#52C4DE"], [buf.cerr, "#E08D4C"]], [10], 0, Math.min(top * 1.1, 400));
+    chart("c-cmd", [[buf.pan, "#52C4DE"], [buf.tilt, "#E08D4C"]], [lim, -lim], -lim * 1.6, lim * 1.6);
+  }
+  async function finish() {
+    if (!RUN_ID) return;
+    $("start").disabled = false; $("stop").disabled = true;
+    let st = null; for (let i = 0; i < 40; i++) { st = await (await fetch("api/run/" + RUN_ID)).json(); if (st.done) break; await new Promise(r => setTimeout(r, 250)); }
+    if (!st || !st.summary) { $("status").textContent = "run ended" + (st && st.error ? ": " + st.error.split("\n").slice(-1)[0] : ""); return; }
+    const v = st.summary.values, p = st.summary.passed; const g = k => v[k] === undefined || v[k] === null ? "n/a" : (typeof v[k] === "number" ? v[k].toFixed(2) : v[k]);
+    const b = k => p[k] === true ? '<span class="badge pass">pass</span>' : p[k] === false ? '<span class="badge fail">fail</span>' : '';
+    $("finish").innerHTML = `<h3>Run complete</h3><table>
+      <tr><td>Frames</td><td>${v.frames}</td><td>duration</td><td>${g("duration_s")} s</td></tr>
+      <tr><td>FPS mean</td><td>${g("fps_mean")} ${b("fps_mean")}</td><td>Acquisition</td><td>${g("acquisition_time_s")} s ${b("acquisition_time_s")}</td></tr>
+      <tr><td>Tracking error mean</td><td>${g("tracking_err_mean_px")} px ${b("tracking_err_mean_px")}</td><td>with vibration removed</td><td>${g("tracking_err_stab_mean_px")} px</td></tr>
+      <tr><td>Centroiding error mean</td><td>${g("centroid_err_mean_px")} px</td><td>RMSE</td><td>${g("centroid_err_rmse_px")} px</td></tr>
+      <tr><td>Lock retention</td><td>${g("lock_retention_pct")} % ${b("target_loss_pct")}</td><td>Re-acquisitions</td><td>${v.reacq_count ?? 0}, max ${g("reacq_time_max_s")} s ${b("reacq_time_max_s")}</td></tr>
+      </table>
+      ${v.slew_saturation_pct > 20 ? `<div class="note">The gimbal was at its rate limit in ${v.slew_saturation_pct.toFixed(0)}% of frames: the target moved faster than the camera can turn. Raise Max pan and Max tilt (PS allows 5 to 10 deg/s) or widen the FOV and run again.</div>` : ""}
+      <div class="links">${Object.entries(st.files || {}).map(([k, u]) => `<a href="${u}" target="_blank">${k}</a>`).join("")}</div>`;
+    $("finish").style.display = "block"; $("status").textContent = "finished " + RUN_ID; RUN_ID = null;
+  }
+
+  // video upload
+  $("drop").addEventListener("click", () => $("file").click());
+  $("drop").addEventListener("dragover", e => { e.preventDefault(); });
+  $("drop").addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
+  $("file").addEventListener("change", () => { if ($("file").files[0]) upload($("file").files[0]); });
+  async function upload(file) {
+    $("vinfo").textContent = "uploading " + file.name + " (" + (file.size / 1e6).toFixed(1) + " MB)...";
+    const fd = new FormData(); fd.append("file", file);
+    const r = await fetch("api/video", { method: "POST", body: fd });
+    if (!r.ok) { $("vinfo").textContent = (await r.json()).detail; return; }
+    VIDEO = await r.json();
+    $("vinfo").innerHTML = `<b>Video loaded, settings calibrated.</b> ${VIDEO.width} x ${VIDEO.height} px as displayed${VIDEO.rotation_deg ? " (rotation " + VIDEO.rotation_deg + " deg applied)" : ""}, ${VIDEO.fps.toFixed(2)} fps average${VIDEO.variable_rate ? " (variable-rate file)" : ""}, ${VIDEO.frames} frames, ${VIDEO.seconds.toFixed(2)} s. Target and disturbance settings do not apply; the camera window, FOV and rate limits do.`;
+    $("screen.width").value = VIDEO.width; $("screen.height").value = VIDEO.height; $("camera.update_rate_hz").value = VIDEO.fps.toFixed(2);
+    $("clearvid").style.display = "inline-block";
+    sceneImg.src = "data:image/jpeg;base64," + VIDEO.first_frame; lastMsg = { win: [(VIDEO.width - 640) / 2, (VIDEO.height - 480) / 2, 640, 480], true: [null], est: [null] }; SCALE = 640 / Math.max(VIDEO.width, VIDEO.height);
+    $("status").textContent = "video ready: press Start";
+  }
+  $("clearvid").addEventListener("click", () => { VIDEO = null; $("vinfo").textContent = ""; $("clearvid").style.display = "none"; fillForm(META.defaults); $("status").textContent = "simulator"; });
+
+  $("start").addEventListener("click", () => { const w = Number($("screen.width").value), h = Number($("screen.height").value); SCALE = 640 / Math.max(w, h); start(); });
+  $("stop").addEventListener("click", stop);
+  document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT") { e.preventDefault(); if ($("start").disabled) stop(); else $("start").click(); } });
+  init();
+</script>
+</body>
+</html>
