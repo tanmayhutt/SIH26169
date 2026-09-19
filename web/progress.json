@@ -11,12 +11,12 @@
       {
         "name": "Automated tests",
         "status": "pass",
-        "text": "21 of 21 pytest checks in about 20 s: geometry, gimbal limits, every path on screen and deterministic, centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point."
+        "text": "22 of 22 pytest checks in about 15 s: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point. The same suite passes on the Windows, Linux, Intel Mac and Apple silicon runners."
       },
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "11 scenarios, 15 s each. Clear line, circle and figure of 8: 6.7 to 7.3 px mean tracking error at 100% lock. Heavy noise 7.3 px, fog 6.6 px, low light 7.0 px, all 100%. Acquisition 0.6 to 1.4 s everywhere. Hard mode 6.5 to 8.9 px after a 3 to 12 s sweep."
+        "text": "12 scenarios (incl. hard mode), 15 s each. Clear line, circle and figure of 8: 6.7 to 7.3 px mean tracking error at 100% lock. Heavy noise 7.3 px, fog 6.6 px, low light 7.0 px, all 100%. Acquisition 0.6 to 1.4 s everywhere. Hard mode 6.5 to 8.9 px after a 3 to 12 s sweep."
       },
       {
         "name": "Multi-seed envelope",
