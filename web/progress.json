@@ -1,7 +1,7 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 21 \u00b7 2 PDFs \u00b7 1 executable built",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 21 \u00b7 2 PDFs \u00b7 1 executable \u00b7 web app",
   "updated": "2026-09-20",
   "verification": {
     "title": "Build verification: September 19, 2026",
@@ -362,7 +362,7 @@
           "status": "done"
         },
         {
-          "name": "Progress site on GitHub Pages",
+          "name": "Progress site on the project server",
           "status": "done"
         },
         {
@@ -371,6 +371,10 @@
         },
         {
           "name": "Plain-English plan",
+          "status": "done"
+        },
+        {
+          "name": "Web app on the project server",
           "status": "done"
         }
       ]
@@ -916,6 +920,23 @@
       "blurb": "Builds, documents and the submission bundle.",
       "groups": [
         {
+          "caption": "web app",
+          "items": [
+            {
+              "name": "Same engine served to a browser (FastAPI, live stream)",
+              "status": "done"
+            },
+            {
+              "name": "Scenario and parameter controls, video upload",
+              "status": "done"
+            },
+            {
+              "name": "Deployed on the server behind Caddy with landing, progress, downloads",
+              "status": "done"
+            }
+          ]
+        },
+        {
           "caption": "executables",
           "items": [
             {
@@ -952,7 +973,7 @@
               "status": "done"
             },
             {
-              "name": "Progress website",
+              "name": "Progress website, served from the project server",
               "status": "done"
             },
             {

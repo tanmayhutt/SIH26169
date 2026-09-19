@@ -76,7 +76,7 @@ sudo systemctl enable --now sih26169-web >/dev/null
 sudo systemctl restart sih26169-web
 # caddy: one site block, imported by the main Caddyfile; basic auth hash is created once and kept
 HASHFILE=/etc/caddy/sih26169.progress.hash
-if [ ! -s "$HASHFILE" ]; then echo "progress basic auth hash missing: create it with  sudo bash -c 'caddy hash-password --plaintext <password> > $HASHFILE'"; exit 2; fi
+if ! sudo test -s "$HASHFILE"; then echo "progress basic auth hash missing: create it with  sudo bash -c 'caddy hash-password --plaintext <password> > $HASHFILE'"; exit 2; fi
 HASH=$(sudo cat "$HASHFILE")
 USERNAME=$(sudo cat /etc/caddy/sih26169.progress.user 2>/dev/null || echo tanmay123)
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF

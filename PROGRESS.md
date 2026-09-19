@@ -197,7 +197,8 @@ of measurements; on a real phone video it supplied half of them. It is the inten
 | Document | Status |
 |---|---|
 | `COMPLIANCE.md`, point-by-point check of every PS row, shall item, deliverable and evaluation stage, backed by `tests/test_ps_compliance.py` | 🟩 |
-| Progress website (`web/`, published by GitHub Pages at https://tanmaytiwari.me/SIH26169/ on every push) | 🟩 |
+| Progress website (`web/`), served from the project server under /progress/ | 🟩 |
+| Web app (`webapp/`), same engine in the browser, deployed under /app/ | 🟩 |
 | `docs/USER_MANUAL.md` and `.pdf` | 🟩 |
 | `docs/TECHNICAL_REPORT.md` and `.pdf` | 🟩 performance table filled from the measured envelope |
 | `ARCHITECTURE.md` | 🟩 |
