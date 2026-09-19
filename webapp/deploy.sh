@@ -8,7 +8,8 @@
 # Caddy layout on $DOMAIN:
 #   /            landing page (web app or desktop application)
 #   /app/        the web app (reverse proxy to the service)
-#   /progress/   progress record, basic auth (credential set once on the server, see below)
+#   /progress/   progress record
+# The whole site is behind basic auth (credential set once on the server, see below).
 #   /downloads/  desktop builds and the PDF documents
 set -euo pipefail
 HOST=${HOST:-ubuntu@15.206.247.203}
@@ -89,6 +90,9 @@ $DOMAIN {
         Referrer-Policy "no-referrer"
         X-Robots-Tag "noindex, nofollow"
     }
+    basic_auth {
+        $USERNAME $HASH
+    }
     redir /app /app/ 308
     redir /progress /progress/ 308
     redir /downloads /downloads/ 308
@@ -100,9 +104,6 @@ $DOMAIN {
         }
     }
     handle /progress/* {
-        basic_auth {
-            $USERNAME $HASH
-        }
         root * $SITE/site
         file_server
     }
