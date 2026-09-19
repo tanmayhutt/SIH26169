@@ -46,6 +46,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
 rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "$STAGE/" "$HOST:$SITE/site/"
+ssh "$HOST" "chmod -R u=rwX,go=rX $SITE"   # caddy runs as its own user and must read the site
 rm -rf "$STAGE"
 
 echo "== 3. venv, service, caddy"
