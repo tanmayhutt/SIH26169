@@ -295,6 +295,17 @@ async def upload_video(file: UploadFile = File(...)):
     return info
 
 
+def _json_safe(v):
+    """NaN and infinity are not JSON; a metric with no value becomes null."""
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return None
+    if isinstance(v, dict):
+        return {k: _json_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe(x) for x in v]
+    return v
+
+
 @app.get("/api/run/{run_id}")
 def run_status(run_id: str):
     r = RUN.get(run_id)
@@ -302,7 +313,7 @@ def run_status(run_id: str):
         raise HTTPException(404, "unknown run")
     out = {"run_id": run_id, "done": r.done.is_set(), "error": r.error}
     if r.summary is not None:
-        out["summary"] = r.summary.to_dict()
+        out["summary"] = _json_safe(r.summary.to_dict())
         out["files"] = {k: f"/runs/{run_id}/{k}" for k in ("report.pdf", "frames.csv", "summary.json", "scenario.yaml") if (r.out / k).exists()}
     return out
 
