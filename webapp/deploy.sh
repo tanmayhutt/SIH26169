@@ -33,15 +33,22 @@ cp "$HERE/web/index.html" "$HERE/web/progress.json" "$HERE/web/plan.html" "$STAG
 cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/progress/content/"
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/progress/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
-for z in "$HERE"/dist/*.zip; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
+for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title>
-<style>body{margin:0;background:#0A1117;color:#E3ECF1;font-family:"IBM Plex Sans",-apple-system,sans-serif;padding:40px 22px;max-width:760px;margin:0 auto}h1{font-family:"IBM Plex Sans Condensed",sans-serif}a{color:#52C4DE}li{margin:8px 0}small{color:#8DA1AD}</style></head>
-<body><h1>Downloads and documents</h1><ul>
-<li><a href="FSOC-Tracker-macos-arm64.zip">FSOC-Tracker-macos-arm64.zip</a> <small>desktop application, Apple silicon. Unzip and run FSOC-Tracker. macOS may ask you to allow it in System Settings, Privacy and Security.</small></li>
-<li><a href="USER_MANUAL.pdf">USER_MANUAL.pdf</a> <small>installation, operation, every parameter, Benchmark 2, metric definitions</small></li>
+<style>body{margin:0;background:#0A1117;color:#E3ECF1;font-family:"IBM Plex Sans",-apple-system,sans-serif;padding:40px 22px;max-width:760px;margin:0 auto}h1,h2{font-family:"IBM Plex Sans Condensed",sans-serif}h2{margin-top:28px;font-size:20px}a{color:#52C4DE}li{margin:8px 0}small{color:#8DA1AD}</style></head>
+<body><h1>Downloads and documents</h1>
+<h2>Desktop application</h2><p><small>Download the archive for your platform, extract it to a folder you can write to, run the executable. No installation and no Python needed. Results are written to a <code>results</code> folder next to it.</small></p><ul>
+<li><a href="FSOC-Tracker-windows-x64.zip">FSOC-Tracker-windows-x64.zip</a> <small>Windows 10 or 11, 64-bit. Run <code>FSOC-Tracker.exe</code>; <code>FSOC-Tracker-cli.exe</code> is the same program for the command line. SmartScreen: More info, Run anyway (the build is not code-signed).</small></li>
+<li><a href="FSOC-Tracker-linux-x64.tar.gz">FSOC-Tracker-linux-x64.tar.gz</a> <small>Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora. <code>tar xzf</code>, then <code>./FSOC-Tracker/FSOC-Tracker</code>.</small></li>
+<li><a href="FSOC-Tracker-macos-intel.zip">FSOC-Tracker-macos-intel.zip</a> <small>macOS 13 or newer on Intel. If Gatekeeper objects: System Settings, Privacy and Security, Open Anyway.</small></li>
+<li><a href="FSOC-Tracker-macos-arm64.zip">FSOC-Tracker-macos-arm64.zip</a> <small>macOS 13 or newer on Apple silicon (M1 and later).</small></li>
+</ul>
+<h2>Documents</h2><ul>
+<li><a href="USER_MANUAL.pdf">USER_MANUAL.pdf</a> <small>installation on each platform, operation, every parameter, Benchmark 2, metric definitions</small></li>
 <li><a href="TECHNICAL_REPORT.pdf">TECHNICAL_REPORT.pdf</a> <small>problem understanding, architecture, methods, tests, measured performance, appendices</small></li>
-<li>Windows and Linux <small>build from source: clone the repository, then <code>pip install -e ".[dev]"</code> and <code>pyinstaller fsoc_tracker.spec</code>. Prebuilt archives will appear here when built.</small></li>
+</ul>
+<p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
 </ul><p><a href="/">Back</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"

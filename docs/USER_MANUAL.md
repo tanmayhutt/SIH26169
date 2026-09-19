@@ -23,12 +23,44 @@ The application simulates the coarse alignment stage of an FSOC link entirely in
 
 ### 2.1 Standalone executable (no Python needed)
 
-1. Download the archive for your operating system from the release folder
-   (`FSOC-Tracker-windows.zip`, `FSOC-Tracker-linux.tar.gz`, `FSOC-Tracker-macos.zip`).
-2. Extract it anywhere.
-3. Run `FSOC-Tracker` (Windows: `FSOC-Tracker.exe`). The first start takes a few seconds.
+Archives are built for every desktop platform in use:
 
-Results are written to a `results` folder next to the executable.
+| Platform | Archive | Run |
+|---|---|---|
+| Windows 10 or 11, 64-bit | `FSOC-Tracker-windows-x64.zip` | `FSOC-Tracker.exe` (window); `FSOC-Tracker-cli.exe` for the command line |
+| Linux, 64-bit (Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora) | `FSOC-Tracker-linux-x64.tar.gz` | `./FSOC-Tracker` |
+| macOS 13 or newer, Intel | `FSOC-Tracker-macos-intel.zip` | `FSOC-Tracker` |
+| macOS 13 or newer, Apple silicon | `FSOC-Tracker-macos-arm64.zip` | `FSOC-Tracker` |
+
+1. Download the archive for your platform from the downloads page.
+2. Extract it anywhere the user can write to (Desktop, Documents, home folder). Do not run it from
+   inside the archive.
+3. Run the executable named above. The first start takes a few seconds.
+
+Platform notes:
+
+- Windows: SmartScreen may show "Windows protected your PC" because the executable is not
+  code-signed. Choose More info, then Run anyway. No administrator rights are needed.
+- Linux: the archive carries Qt and all Python libraries. The system needs the usual X11 or
+  Wayland client libraries, present on every desktop install. On a minimal server image
+  install `libxcb-cursor0 libxkbcommon-x11-0 libegl1` (Debian and Ubuntu names). If the file
+  is not executable after extraction, run `chmod +x FSOC-Tracker`.
+- macOS: Gatekeeper may say the application cannot be verified. Open System Settings, Privacy
+  and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine FSOC-Tracker`
+  on the extracted folder once.
+
+Results are written to a `results` folder next to the executable. Every archive is produced by
+the same build workflow, which also runs the test suite and a smoke test of the packaged
+executable on that platform before publishing it.
+
+### 2.3 Web application
+
+The same engine is also served as a web application, so no installation at all is needed on
+any platform: open the project site in a current browser (Chrome, Edge, Firefox or Safari, on
+Windows, Linux, macOS, or a tablet). Pick a scenario or set the parameters, press Start, and
+watch the scene, the camera window and the live specification tiles. Benchmark 2 videos can be
+uploaded from the page. The report, per-frame CSV and summary are downloadable when the run
+ends. One run is executed at a time per server.
 
 ### 2.2 From source
 

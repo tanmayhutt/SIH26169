@@ -59,6 +59,7 @@
   .drop:hover { border-color: var(--accent); color: var(--accent); }
   .note { border-left: 2px solid var(--accent); background: var(--accent-bg); padding: 8px 10px; font-size: 12px; color: var(--ink-2); margin: 8px 0; border-radius: 0 3px 3px 0; }
   @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } .params, .tele { max-height: none; } .tiles { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px) { .tiles { grid-template-columns: repeat(2, 1fr); } .views, .charts { grid-template-columns: 1fr; } header { flex-wrap: wrap; row-gap: 8px; } }
 </style>
 </head>
 <body>
