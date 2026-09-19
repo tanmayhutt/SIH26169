@@ -205,7 +205,7 @@ a time per server.</aside>
     const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, speed: Number($("speed").value) };
     const r = await fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) { $("status").textContent = (await r.json()).detail || "could not start"; return; }
-    const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; lim = j.config.camera.max_pan_rate_deg_s;
+    const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; lim = j.config.camera.max_pan_rate_deg_s; history.replaceState(null, "", "#run=" + RUN_ID);
     $("start").disabled = true; $("stop").disabled = false; $("status").textContent = "running " + RUN_ID + " seed " + j.seed;
     const proto = location.protocol === "https:" ? "wss://" : "ws://";
     WS = new WebSocket(proto + location.host + location.pathname.replace(/\/$/, "") + "/ws/" + RUN_ID);
@@ -329,6 +329,14 @@ a time per server.</aside>
 
   $("start").addEventListener("click", () => { const w = Number($("screen.width").value), h = Number($("screen.height").value); SCALE = 640 / Math.max(w, h); start(); });
   $("stop").addEventListener("click", stop);
+  // reconnect to a run already in progress on this server (shareable link: #run=<id>)
+  function attach(id) {
+    resetRun(); RUN_ID = id; $("start").disabled = true; $("stop").disabled = false; $("status").textContent = "watching " + id;
+    const proto = location.protocol === "https:" ? "wss://" : "ws://";
+    WS = new WebSocket(proto + location.host + location.pathname.replace(/\/$/, "") + "/ws/" + id);
+    WS.onmessage = ev => onMsg(JSON.parse(ev.data)); WS.onclose = () => finish();
+  }
+  const mh = location.hash.match(/run=([\w-]+)/); if (mh) setTimeout(() => attach(mh[1]), 300);
   document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT") { e.preventDefault(); if ($("start").disabled) stop(); else $("start").click(); } });
   init();
 </script>
