@@ -125,7 +125,6 @@
   @media (max-width: 900px) { .tiles, .domains { grid-template-columns: 1fr; } .check, .phase { grid-template-columns: 1fr; } }
 
   /* sign-in gate */
-  html:not(.gate-open) main, html:not(.gate-open) .shell { visibility: hidden; }
   #gate { position: fixed; inset: 0; background: var(--ground, #0A1117); display: grid; place-items: center; z-index: 50; padding: 20px; }
   .gate-card { width: min(380px, 100%); background: var(--surface, #111C24); border: 1px solid var(--line, #22323D); border-radius: 4px; padding: 26px 26px 22px; display: grid; gap: 12px; }
   .gate-eyebrow { font-family: var(--f-mono, monospace); font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent, #52C4DE); }
@@ -137,7 +136,6 @@
   .gate-card button { font: inherit; font-family: var(--f-mono, monospace); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 10px; border: 1px solid var(--accent, #52C4DE); background: var(--accent-bg, #0E2F3A); color: var(--accent, #52C4DE); border-radius: 3px; cursor: pointer; }
   .gate-err { color: var(--signal, #E08D4C); font-size: 13px; min-height: 1.2em; }
 </style>
-<script src="gate.js"></script>
 </head>
 <body>
 <main>
