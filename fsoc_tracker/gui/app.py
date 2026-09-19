@@ -45,6 +45,7 @@ LABELS = {
     "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
     "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Min confidence to acquire",
+    "faint_snr_min": "Faint path: min chain SNR", "faint_threshold_k": "Faint path: threshold (sigma)",
 }
 TIPS = {
     "width": "PS row 1 (screen) or row 3 (camera). The screen is the whole scene the tracker observes; the camera window is what the terminal points at.",
@@ -81,6 +82,8 @@ TIPS = {
     "deadband_px": "No command inside this radius, so vibration is not chased.", "capture_radius_px": "Lock is declared when the estimate is within this of the window centre.",
     "estimator_lag_s": "Assumed delay of the velocity estimate, compensated with acceleration.",
     "acquire_conf_min": "A new track needs at least this detector confidence. Stars and noise clumps score about 0.55, a beacon 0.67 (low light) to 0.96 (clear).",
+    "faint_snr_min": "Faint beacons: weak detections are linked across frames; a chain is promoted when its mean matched-filter SNR is at least this.",
+    "faint_threshold_k": "Faint beacons: detection threshold in noise sigmas for the chain search (the normal threshold is 4).",
 }
 HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "verify_n", "verify_m", "coast_frames",
           "search_roi_px", "gate_px"}

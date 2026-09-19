@@ -32,6 +32,8 @@ Archives are built for every desktop platform in use:
 | macOS 13 or newer, Intel | `FSOC-Tracker-macos-intel.zip` | `FSOC-Tracker` |
 | macOS 13 or newer, Apple silicon | `FSOC-Tracker-macos-arm64.zip` | `FSOC-Tracker` |
 
+A demonstration video (`FSOC-Tracker-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
+
 1. Download the archive for your platform from the downloads page.
 2. Extract it anywhere the user can write to (Desktop, Documents, home folder). Do not run it from
    inside the archive.
@@ -194,6 +196,10 @@ suggested range are allowed where the table says "user-defined".
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
 - Controller gains, deadband, capture radius, estimator lag, minimum confidence to acquire.
+- Faint path: when nothing reaches the acquisition confidence, weak detections (threshold
+  `faint_threshold_k`, default 3 sigma) are linked across frames and a motion-consistent
+  chain with mean SNR above `faint_snr_min` (default 3.5) is promoted. Used automatically for
+  dim beacons in low light; a static dim beacon is not covered by this path.
 - Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 3 to 12 s depending on where the beacon is.
 
 ## 5. Running Benchmark 2 (video input)

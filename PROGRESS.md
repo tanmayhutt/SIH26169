@@ -131,7 +131,7 @@ flowchart LR
 | Platform at PS maximum 20 + 20 px/f | 25 px | 83% | 🟨 documented limit: gimbal at 90% of slew budget |
 | Multi-target stress with haze, noise, sway | 17 px | 93% | 🟨 one seed in five swaps identity |
 | Hard mode | 6.5 to 8.9 px after acquisition | 100% | 🟩 acquisition 3 to 12 s |
-| Faint beacon at SNR 3 | not acquired | 0% | 🟥 needs the CNN |
+| Faint beacon at 3 to 6 sigma | 6.9 to 7.6 px | 93 to 96% (4 of 5 seeds; one seed 78%) | 🟩 track-before-detect on a moving-target residual, acquisition 1.5 to 2 s |
 
 Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 
@@ -175,13 +175,13 @@ flowchart LR
     a[Training data from the simulator, exact labels]:::done --> b[Network: 84k parameter U-Net, 128 to 64 heat map]:::done
     b --> c[Train v1: 4000 samples, 6 epochs, 12 px localisation]:::done
     c --> d[Train v2: 8000 samples, 10 epochs, 8 px localisation]:::done
-    d --> e[Decision: kept as a fallback; faint beacon still open]:::done
+    d --> e[Decision: kept as a fallback; faint beacon solved classically by track-before-detect]:::done
     a --> f[Hybrid policy: CNN fills gaps, never overrides a classical hit]:::done
     f --> g[Fine-tune on a user video: tracker-confident frames become labels]:::done
 ```
 
 Honest state: on simulated scenes the classical pipeline carries the load and the CNN contributes about 0%
-of measurements; on a real phone video it supplied half of them. It is the intended answer for the faint-beacon case.
+of measurements; on a real phone video it supplied half of them. The faint-beacon case is now handled classically (chains of weak detections on a moving-target residual), so the CNN stays a gap filler.
 `training/finetune_from_video.py` adapts it to footage you provide (self-training from the tracker's confident frames).
 
 ### 2.10 Executable builds  🟩
@@ -264,8 +264,8 @@ One assumption: one screen pixel equals one camera pixel, so the 2000 px screen 
 
 ## 5. Open items, in priority order
 
-1. 🟨 Decide on the CNN from the v2 validation; promote or keep as fallback. Fill the report's performance table.
-2. ⬜ Windows and Linux executable builds (GitHub Actions with PyInstaller on three runners is the natural route).
-3. ⬜ Export the technical report and user manual to PDF; record the demo video; write the demo script.
-4. 🟨 Multi-target identity: one hard-case seed still swaps to a decoy.
-5. 🟥 Faint beacon at SNR 3: classical cannot; depends on item 1.
+1. 🟩 CNN kept as a fallback; report's performance table filled from the measured envelope.
+2. 🟩 Windows, Linux, macOS Intel and Apple silicon builds from the build workflow, package-checked on each platform.
+3. 🟩 Technical report and user manual exported to PDF; demo video composed from the engine (`tools/make_demo_video.py`); demo script in `docs/DEMO_SCRIPT.md`.
+4. 🟩 Multi-target identity: candidates ranked by fitted width (noise-independent) instead of blob area; the stress seed that swapped now holds 99% lock.
+5. 🟩 Faint beacon: track-before-detect on a moving-target residual, 1.5 to 2 s acquisition, 93 to 96% lock on four of five seeds.

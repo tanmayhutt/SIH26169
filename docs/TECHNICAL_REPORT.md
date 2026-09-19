@@ -119,14 +119,35 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 
 ### 4.1 Detection and centroiding
 A 3x3 median (5x5 added automatically under heavy salt and pepper) removes specks. A 31x31
-box blur estimates the smooth background, which is subtracted. A Gaussian matched filter at
-one third of the configured beacon size raises the SNR of an extended spot against point
-noise and stars. Pixels above mean + k sigma (k = 4) are labelled by connected components;
-blobs are kept if their area, aspect ratio and fill are consistent with a spot. Each blob is
-scored by SNR, peak brightness and agreement with the expected area of the designated beacon.
-The leading candidates are refined by an intensity-weighted centre of gravity on a
-background-subtracted patch followed by a 2D Gaussian least-squares fit, giving centroids to
-about 0.01 px on clean frames and 0.1 to 0.2 px under heavy noise.
+box blur estimates the smooth background, which is subtracted in signed 16-bit arithmetic
+(an unsigned subtraction clips the negative half and quantises the filtered response, which
+buried faint beacons). A Gaussian matched filter at one third of the configured beacon size
+raises the SNR of an extended spot against point noise and stars. The noise level is the
+median absolute deviation of the filtered image, so stars and the beacon itself cannot inflate
+the threshold they are measured against. Pixels above level + k sigma (k = 4) are labelled by
+connected components; blobs are kept if their area, aspect ratio and fill are consistent
+with a spot. Each blob is scored by matched-filter SNR, peak brightness and agreement with
+the expected size of the designated beacon. The leading candidates are refined by an
+intensity-weighted centre of gravity on a background-subtracted patch followed by a 2D
+Gaussian least-squares fit, giving centroids to about 0.01 px on clean frames and 0.1 to
+0.2 px under heavy noise. Among several acceptable candidates the designated beacon is chosen
+by the fitted width expected from its configured size and shape (rows 9 and 10), a measure
+that does not move with the noise level, then by brightness.
+
+Faint beacons (track-before-detect). After extinction a dim beacon can sit at three to six
+sigma per frame, where a single-frame threshold either misses it or floods the tracker with
+noise. When no candidate reaches the acquisition confidence, the search switches to a
+track-before-detect path: the detector runs at k = 3 with a narrower matched filter on a
+moving-target residual (the frame minus a running mean of the picture, which holds the stars
+and the sky and not a moving beacon), and the resulting weak candidates are linked frame to
+frame into chains with a consistent velocity. A chain hit in at least six of the last eight
+frames, with a mean matched-filter SNR above 3.5 and a fitted width near the designated
+beacon's, is promoted to a provisional track that seeds the estimator with the chain's
+velocity and must survive a stricter verification (five of six frames). While following a
+faint target the association gate is small, the strongest response inside it wins, and a
+running quality measure drops the track back to the chain search when what it accepts is no
+better than noise. On the low-light faint scenario this raised acquisition from none to
+1.5 to 2 s with 93 to 96% lock retention on four of five seeds.
 
 ### 4.2 Estimation
 An IMM runs three Kalman filters (constant velocity, constant acceleration, coordinated
@@ -291,6 +312,8 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
   same simulator.
 - Dual-sensor PAT: a wide field acquisition camera feeding a narrow field tracking camera.
 - Learned denoiser for extreme scintillation.
+- Track-before-detect for a static faint beacon: the moving-target residual removes anything
+  static, so a beacon that does not move must still be found by the single-frame path.
 - Beacon modulation with lock-in detection for identity in dense clutter.
 - Hardware in the loop: the `FrameSource` and gimbal interfaces already isolate the
   simulator, so a real camera and pan-tilt unit can be substituted.

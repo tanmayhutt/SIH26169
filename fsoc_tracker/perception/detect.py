@@ -75,9 +75,22 @@ def refine_centroid(img: np.ndarray, x: float, y: float, r: int = 7) -> tuple[fl
 
 
 class ClassicalDetector:
-    def __init__(self, cfg: TrackerConfig, expected_size_px: float | None = None):
+    def __init__(self, cfg: TrackerConfig, expected_size_px: float | None = None, expected_shape: str = "square"):
         self.cfg = cfg
         self.expected_size_px = expected_size_px   # designated beacon size from config, if known
+        self.expected_shape = expected_shape
+
+    def expected_sigma(self) -> float | None:
+        """Second-moment width the designated beacon's spot should show in a Gaussian fit.
+        Unlike the thresholded blob area this does not change with the noise level."""
+        s = self.expected_size_px
+        if not s:
+            return None
+        if self.expected_shape == "gaussian":
+            return s / 3.0
+        if self.expected_shape == "circle":
+            return float(np.hypot(s / 4.0, 0.6))
+        return float(np.hypot(s / (2 * np.sqrt(3.0)), 0.6))     # uniform square plus the optics blur
 
     def expected_area(self) -> float | None:
         """Blob area the designated beacon produces after the matched filter, in px."""
@@ -86,8 +99,11 @@ class ClassicalDetector:
         mf = max(0.6, self.expected_size_px / 3.0)
         return (self.expected_size_px + 2.0 * mf) ** 2
 
-    def detect(self, img: np.ndarray, roi: tuple[int, int, int, int] | None = None) -> list[Candidate]:
-        """Find bright compact blobs. `roi` = (xa, ya, xb, yb) restricts the search."""
+    def detect(self, img: np.ndarray, roi: tuple[int, int, int, int] | None = None,
+               k: float | None = None, mf_sigma: float | None = None, refine: int = 3, limit: int = 12) -> list[Candidate]:
+        """Find bright compact blobs. `roi` = (xa, ya, xb, yb) restricts the search.
+        `k` overrides the threshold (in noise sigmas), `mf_sigma` the matched-filter width;
+        the faint-beacon path lowers both and asks for many unrefined candidates."""
         if roi is not None:
             xa, ya, xb, yb = roi
             sub = img[ya:yb, xa:xb]
@@ -108,20 +124,26 @@ class ClassicalDetector:
             med = cv2.medianBlur(sub, 3)
         else:
             med = sub          # a median clips faint beacons; Gaussian noise is handled by the matched filter
-        # background: heavy blur approximates the smooth sky; subtract it
+        # background: heavy blur approximates the smooth sky; subtract it. Signed float from
+        # here on: a uint8 subtraction clips the negative half and quantises the matched-filter
+        # response to whole grey levels, which buried faint beacons (response 6 to 8 levels
+        # against a threshold of 9).
         bg = cv2.blur(med, (31, 31))
-        diff = cv2.subtract(med, bg)
+        diff = cv2.subtract(med, bg, dtype=cv2.CV_16S)      # signed, integer, fast
         # matched filter: smoothing at the beacon's scale raises the SNR of an extended
         # spot against single-pixel noise and point-like stars
-        if self.expected_size_px:
-            mf = max(0.6, self.expected_size_px / 3.0)
+        mf = mf_sigma if mf_sigma is not None else (max(0.6, self.expected_size_px / 3.0) if self.expected_size_px else 0.0)
+        if mf > 0:
             diff = cv2.GaussianBlur(diff, (0, 0), mf)
-        mean, std = cv2.meanStdDev(diff)
-        thr = float(mean[0][0] + self.cfg.threshold_k * max(std[0][0], 0.5))
-        _, mask = cv2.threshold(diff, thr, 255, cv2.THRESH_BINARY)
+        # robust noise level (median absolute deviation): stars and the beacon itself must
+        # not inflate the threshold they are measured against
+        probe_d = diff[::8, ::8] if diff.shape[0] > 800 else diff[::2, ::2]
+        level = float(np.median(probe_d))
+        noise = float(max(np.median(np.abs(probe_d - level)) * 1.4826, 0.5))
+        thr = level + (k if k is not None else self.cfg.threshold_k) * noise
+        mask = cv2.compare(diff, thr, cv2.CMP_GT)
         n, labels, stats, cents = cv2.connectedComponentsWithStats(mask, connectivity=8)
         out: list[Candidate] = []
-        noise = float(max(std[0][0], 1.0))
         for i in range(1, n):
             area = int(stats[i, cv2.CC_STAT_AREA])
             if area < self.cfg.min_area_px or area > self.cfg.max_area_px:
@@ -135,7 +157,7 @@ class ClassicalDetector:
             cx, cy = cents[i]
             x0, y0 = int(stats[i, cv2.CC_STAT_LEFT]), int(stats[i, cv2.CC_STAT_TOP])
             peak = float(med[y0:y0 + bh, x0:x0 + bw].max())
-            snr = (peak - float(mean[0][0])) / noise
+            snr = (float(diff[y0:y0 + bh, x0:x0 + bw].max()) - level) / noise   # matched-filter SNR
             # confidence: SNR (saturating softly), peak brightness, and size match to the
             # designated beacon when its size is known. Bright stars are small and dim
             # compared with a beacon, so both terms separate them.
@@ -149,10 +171,10 @@ class ClassicalDetector:
             # and peak brightness carry most of the weight
             conf = float(np.clip(0.30 * c_snr + 0.35 * c_peak + 0.35 * c_size, 0, 1))
             out.append((conf, cx + xa, cy + ya, area, peak, snr, bw, bh))
-        out.sort(key=lambda r: -r[0])
+        out.sort(key=lambda r: -r[5] if k is not None else -r[0])   # faint path ranks by matched-filter SNR
         res: list[Candidate] = []
-        for k, (conf, cx, cy, area, peak, snr, bw, bh) in enumerate(out[:12]):
-            if k < 3:      # sub-pixel refinement is the expensive step; only the leaders need it
+        for j, (conf, cx, cy, area, peak, snr, bw, bh) in enumerate(out[:limit]):
+            if j < refine:      # sub-pixel refinement is the expensive step; only the leaders need it
                 gx, gy, sig = refine_centroid(img, cx, cy, r=max(6, int(max(bw, bh))))
             else:
                 gx, gy, sig = float(cx), float(cy), float(max(bw, bh)) / 3.0

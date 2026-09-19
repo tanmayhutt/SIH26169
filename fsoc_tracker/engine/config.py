@@ -96,6 +96,8 @@ class TrackerConfig:
     deadband_px: float = 1.5             # do not command the gimbal inside this radius
     capture_radius_px: float = 30.0      # lock is declared when the estimate is within this of the boresight
     acquire_conf_min: float = 0.62       # a new track needs at least this detector confidence (stars score ~0.55, a beacon 0.67-0.96)
+    faint_snr_min: float = 3.5           # faint path: mean matched-filter SNR a chain of weak detections must show
+    faint_threshold_k: float = 3.0       # faint path: detection threshold in noise sigmas (track-before-detect links the rest)
     kp: float = 5.0                      # rate command per degree of error (1/s)
     kd: float = 0.3
     ki: float = 0.8

@@ -99,6 +99,13 @@ class IMM:
         self.initialised = True
         self._combine()
 
+    def set_velocity(self, vx: float, vy: float):
+        """Seed the velocity (px/s) from an external estimate, e.g. a track-before-detect chain."""
+        for m in self.models:
+            m.x[2], m.x[3] = vx, vy
+            m.P[2, 2] = m.P[3, 3] = 100.0
+        self._combine()
+
     def _mix(self):
         cbar = self.Pi.T @ self.mu
         cbar = np.maximum(cbar, 1e-9)
