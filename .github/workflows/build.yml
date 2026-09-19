@@ -60,7 +60,7 @@ jobs:
           cd dist/FSOC-Tracker
           if [ "$RUNNER_OS" = "Windows" ]; then EXE=./FSOC-Tracker-cli.exe; else EXE=./FSOC-Tracker; fi
           $EXE run -s configs/scenarios/clear_line.yaml --duration 2 --seed 0 --out results/smoke
-          ls results/smoke/*/report.pdf
+          ls results/smoke/report.pdf results/smoke/frames.csv
           rm -rf results
       - name: Archive
         shell: bash
