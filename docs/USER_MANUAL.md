@@ -56,11 +56,13 @@ executable on that platform before publishing it.
 ### 2.3 Web application
 
 The same engine is also served as a web application, so no installation at all is needed on
-any platform: open the project site in a current browser (Chrome, Edge, Firefox or Safari, on
-Windows, Linux, macOS, or a tablet). Pick a scenario or set the parameters, press Start, and
-watch the scene, the camera window and the live specification tiles. Benchmark 2 videos can be
-uploaded from the page. The report, per-frame CSV and summary are downloadable when the run
-ends. One run is executed at a time per server.
+any platform: the project site opens it directly in a current browser (Chrome, Edge, Firefox or
+Safari, on Windows, Linux, macOS, or a tablet). Pick a scenario or set the parameters, press
+Start, and watch the scene, the camera window and the live specification tiles. Benchmark 2
+videos can be uploaded from the page. The report, per-frame CSV and summary are downloadable
+when the run ends. One run is executed at a time per server; a second visitor sees the run in
+progress and can watch it. The Download desktop app button at the top right of the page
+recommends the archive for the visitor's computer and lists the others.
 
 ### 2.2 From source
 
