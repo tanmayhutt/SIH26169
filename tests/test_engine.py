@@ -137,12 +137,22 @@ def test_video_source_runs(tmp_path: Path):
     cfg.screen.width = cfg.screen.height = 800
     cfg.targets = [TargetConfig(motion="circular", radius_px=150, period_s=6, start="centre")]
     w = World(cfg)
-    path = tmp_path / "bench.mp4"
-    vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 30, (800, 800), isColor=False)
-    for _ in range(90):
-        img, _ = w.render()
-        vw.write(img)
-    vw.release()
+    # the bundled OpenCV lacks an mp4 encoder on some platforms; try the codecs the wheel may carry
+    path = None
+    for name, fourcc in (("bench.mp4", "mp4v"), ("bench.avi", "MJPG"), ("bench.mkv", "FFV1")):
+        cand = tmp_path / name
+        vw = cv2.VideoWriter(str(cand), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), isColor=False)
+        if not vw.isOpened():
+            continue
+        for _ in range(90):
+            img, _ = w.render()
+            vw.write(img)
+        vw.release()
+        if cand.exists() and cand.stat().st_size > 1000:
+            path = cand
+            break
+    if path is None:
+        pytest.skip("this OpenCV build has no video encoder; reading videos (the Benchmark 2 path) does not need one")
     vcfg = RunConfig(video=str(path), duration_s=0)
     sim = Simulation(vcfg, tmp_path / "out")
     s = sim.run()
