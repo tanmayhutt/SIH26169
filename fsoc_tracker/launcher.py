@@ -4,6 +4,7 @@ same executable can run headless benchmarks."""
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -18,8 +19,12 @@ def _chdir_to_bundle():
             if not (base / name).exists() and (internal / name).exists():
                 try:
                     os.symlink(internal / name, base / name, target_is_directory=True)
-                except OSError:
-                    pass
+                except (OSError, NotImplementedError):
+                    # Windows needs a privilege for symlinks; a copy is small and works everywhere.
+                    try:
+                        shutil.copytree(internal / name, base / name)
+                    except OSError:
+                        pass
 
 
 def _absolutise(args: list[str]) -> list[str]:

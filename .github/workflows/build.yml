@@ -1,0 +1,81 @@
+# Builds the standalone desktop application for every supported platform, runs the test suite
+# and a smoke test of the packaged executable and of the web app on each one.
+#   Trigger: push of a tag v*, or manually (Actions > Build desktop application > Run workflow).
+#   Fetch the archives afterwards with:  bash webapp/fetch_builds.sh
+name: Build desktop application
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+            archive: zip
+          - os: ubuntu-22.04        # oldest glibc still common on government desktops (Ubuntu 22.04, Debian 12, BOSS)
+            label: linux-x64
+            archive: tar.gz
+          - os: macos-13
+            label: macos-intel
+            archive: zip
+          - os: macos-14
+            label: macos-arm64
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux libraries needed by Qt
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgl1 libopengl0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 libxcb-image0 libxcb-render-util0 libxcb-randr0 libdbus-1-3
+      - name: Install
+        shell: bash
+        run: |
+          python -m pip install -q --upgrade pip
+          python -m pip install -q -e ".[dev,web]"
+      - name: Tests
+        shell: bash
+        run: python -m pytest -q
+      - name: Web app smoke test
+        shell: bash
+        run: python webapp/smoke.py
+      - name: Package
+        shell: bash
+        run: python -m PyInstaller --noconfirm --clean fsoc_tracker.spec
+      - name: Packaged executable smoke test
+        shell: bash
+        run: |
+          cd dist/FSOC-Tracker
+          if [ "$RUNNER_OS" = "Windows" ]; then EXE=./FSOC-Tracker-cli.exe; else EXE=./FSOC-Tracker; fi
+          $EXE run -s configs/scenarios/clear_line.yaml --duration 2 --seed 0 --out results/smoke
+          ls results/smoke/*/report.pdf
+          rm -rf results
+      - name: Archive
+        shell: bash
+        run: |
+          mkdir -p out
+          cd dist
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            if [ "$RUNNER_OS" = "Windows" ]; then 7z a -tzip -r "../out/FSOC-Tracker-${{ matrix.label }}.zip" FSOC-Tracker > /dev/null
+            else zip -qry "../out/FSOC-Tracker-${{ matrix.label }}.zip" FSOC-Tracker; fi
+          else
+            tar -czf "../out/FSOC-Tracker-${{ matrix.label }}.tar.gz" FSOC-Tracker
+          fi
+          ls -l ../out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FSOC-Tracker-${{ matrix.label }}
+          path: out/*
+          retention-days: 90
