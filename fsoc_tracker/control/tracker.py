@@ -50,12 +50,16 @@ class TrackOutput:
 
 
 class Tracker:
+    MIN_SIGMA = 0.9   # fitted width below this is a single pixel; PS row 10 beacons are 5 to 20 px
+
     def __init__(self, cfg: RunConfig, dt: float, screen_shape: tuple[int, int]):
         self.cfg = cfg
         self.tc = cfg.tracker
         self.dt = dt
         self.h, self.w = screen_shape
-        exp = cfg.targets[0].size_px if (cfg.targets and not cfg.video) else None
+        # the configured beacon size (PS row 10, default 10 px) is the matched-filter prior;
+        # for a video it is the user's statement of what to look for, not ground truth
+        exp = cfg.targets[0].size_px if cfg.targets else None
         self.classical = ClassicalDetector(self.tc, exp, cfg.targets[0].shape if cfg.targets else "square")
         self.cnn = CNNDetector(self.tc.cnn_model) if self.tc.detector in ("cnn", "hybrid") else None
         self.imm = IMM(dt)
@@ -325,6 +329,9 @@ class Tracker:
         cands = strong
         self.provisional = False
         self.faint = False
+        if len(cands) == 1 and self._det_img is not None:
+            c = self.classical.refine(self._det_img, cands[0])
+            return c if c.sigma >= self.MIN_SIGMA else None
         # The designated target is the first configured target. Its expected appearance
         # (size, shape) is known from config, so prefer candidates matching it.
         exp_sigma = self.classical.expected_sigma()
@@ -334,6 +341,7 @@ class Tracker:
             # level, unlike the thresholded area), then brightness, then detector confidence.
             # the width comes from the sub-pixel fit, so refine the few strong candidates
             cands = [self.classical.refine(self._det_img, c) for c in cands[:6]]
+            cands = [c for c in cands if c.sigma >= self.MIN_SIGMA] or cands   # a hot pixel is not a beacon
             peak_max = max(c.peak for c in cands) or 1.0
             cands = sorted(cands, key=lambda c: self._config_score(c, peak_max))
             return cands[0]
@@ -431,6 +439,8 @@ class Tracker:
             # the gate are refined here (the detector leaves refinement to whoever needs it)
             if self._det_img is not None:
                 c = self.classical.refine(self._det_img, c)
+            if c.sigma < self.MIN_SIGMA:      # a single hot pixel (salt, cosmic ray), not a 5 to 20 px spot
+                continue
             g = self.imm.gate(c.x, c.y)
             sd = _signature_distance(self.designated_sig, _signature(c))
             # appearance rejection once a signature exists (TRACK, COAST, REACQUIRE); in VERIFY
