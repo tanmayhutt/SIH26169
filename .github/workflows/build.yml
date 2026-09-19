@@ -19,7 +19,7 @@ jobs:
           - os: ubuntu-22.04        # oldest glibc still common on government desktops (Ubuntu 22.04, Debian 12, BOSS)
             label: linux-x64
             archive: tar.gz
-          - os: macos-13
+          - os: macos-15-intel      # macos-13 runners are retired and never start
             label: macos-intel
             archive: zip
           - os: macos-14
