@@ -1,7 +1,7 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 21 \u00b7 2 PDFs \u00b7 1 executable \u00b7 web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 21 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-20",
   "verification": {
     "title": "Build verification: September 19, 2026",
@@ -375,6 +375,10 @@
         },
         {
           "name": "Web app on the project server",
+          "status": "done"
+        },
+        {
+          "name": "Desktop builds for Windows, Linux, macOS",
           "status": "done"
         }
       ]
@@ -932,6 +936,14 @@
             },
             {
               "name": "Deployed on the server behind Caddy with landing, progress, downloads",
+              "status": "done"
+            },
+            {
+              "name": "Build workflow: Windows x64, Linux x64, macOS Intel and Apple silicon, with tests and packaged smoke test on each",
+              "status": "done"
+            },
+            {
+              "name": "Web app usable from any current browser; phone layout",
               "status": "done"
             }
           ]
