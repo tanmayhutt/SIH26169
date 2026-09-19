@@ -16,15 +16,21 @@ def _chdir_to_bundle():
         os.chdir(base)
         internal = base / "_internal"
         for name in ("configs", "models", "docs"):
-            if not (base / name).exists() and (internal / name).exists():
+            link, target = base / name, internal / name
+            if not target.exists():
+                continue
+            if link.is_symlink() and not link.exists():      # dangling link left by an archive built elsewhere
+                link.unlink()
+            if link.exists():
+                continue
+            try:
+                os.symlink(os.path.join("_internal", name), link, target_is_directory=True)   # relative: survives moves
+            except (OSError, NotImplementedError):
+                # Windows needs a privilege for symlinks; a copy is small and works everywhere.
                 try:
-                    os.symlink(internal / name, base / name, target_is_directory=True)
-                except (OSError, NotImplementedError):
-                    # Windows needs a privilege for symlinks; a copy is small and works everywhere.
-                    try:
-                        shutil.copytree(internal / name, base / name)
-                    except OSError:
-                        pass
+                    shutil.copytree(target, link)
+                except OSError:
+                    pass
 
 
 def _absolutise(args: list[str]) -> list[str]:
