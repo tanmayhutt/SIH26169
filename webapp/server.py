@@ -56,7 +56,9 @@ class Run:
         self.cfg = cfg
         self.speed = speed            # 1 = real time, 0 = as fast as the server can
         self.out = RUNS / run_id
-        self.q: queue.Queue = queue.Queue(maxsize=8)
+        self.subs: list[queue.Queue] = []      # one queue per connected viewer
+        self.subs_lock = threading.Lock()
+        self.last: dict | None = None            # latest message, sent first to a late viewer
         self.stop = threading.Event()
         self.done = threading.Event()
         self.summary = None
@@ -85,7 +87,8 @@ class Run:
                        "n_cand": r.n_candidates, "pan": r.cam_pan_deg, "tilt": r.cam_tilt_deg, "cmd_pan": r.cmd_pan_rate, "cmd_tilt": r.cmd_tilt_rate,
                        "sat": int(r.sat_pan or r.sat_tilt), "det": [r.det_x, r.det_y], "est": [r.est_x, r.est_y], "vel": [r.vel_x, r.vel_y],
                        "true": [r.true_x, r.true_y], "terr": r.tracking_err_px, "cerr": r.centroid_err_px, "proc_ms": r.proc_ms,
-                       "win": list(res.window), "probs": [r.p_cv, r.p_ca, r.p_ct], "unc": r.uncertainty_px}
+                       "win": list(res.window), "probs": [r.p_cv, r.p_ca, r.p_ct], "unc": r.uncertainty_px,
+                       "screen_w": self.cfg.screen.width, "screen_h": self.cfg.screen.height}
                 now = time.perf_counter()
                 if now - last_frame >= 1 / 12:          # picture at ~12 fps, telemetry every frame
                     last_frame = now
@@ -95,10 +98,7 @@ class Run:
                         msg[k] = None
                     elif isinstance(v, list):
                         msg[k] = [None if (isinstance(x, float) and (math.isnan(x) or math.isinf(x))) else x for x in v]
-                try:
-                    self.q.put(msg, timeout=0.5)
-                except queue.Full:
-                    pass
+                self._publish(msg)
             if self.stop.is_set():
                 sim.finish()
             self.summary = sim.summary
@@ -108,10 +108,38 @@ class Run:
             self.error = traceback.format_exc()
         finally:
             self.done.set()
-            try:
-                self.q.put({"end": True}, timeout=1)
-            except queue.Full:
-                pass
+            self._publish({"end": True})
+
+    def subscribe(self) -> queue.Queue:
+        q: queue.Queue = queue.Queue(maxsize=16)
+        with self.subs_lock:
+            self.subs.append(q)
+            if self.last is not None:
+                q.put(self.last)
+            if self.done.is_set():
+                q.put({"end": True})
+        return q
+
+    def unsubscribe(self, q: queue.Queue) -> None:
+        with self.subs_lock:
+            if q in self.subs:
+                self.subs.remove(q)
+
+    def _publish(self, msg: dict) -> None:
+        """Fan out to every viewer; a slow viewer loses old messages, the engine never waits."""
+        if not msg.get("end"):
+            self.last = msg
+        with self.subs_lock:
+            for q in self.subs:
+                if q.full():
+                    try:
+                        q.get_nowait()
+                    except queue.Empty:
+                        pass
+                try:
+                    q.put_nowait(msg)
+                except queue.Full:
+                    pass
 
     def _pictures(self, res):
         img = res.observed
@@ -216,9 +244,13 @@ async def start_run(body: dict):
         run_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
         speed = float(body.get("speed", 1.0))
         RUN[run_id] = Run(cfg, run_id, speed if speed in (0.0, 0.5, 1.0, 2.0, 4.0) else 1.0)
-        # keep only the last 30 runs on disk
+        # keep only the last 30 runs and the last 10 uploaded videos on disk
         for old in sorted(RUNS.iterdir())[:-30]:
             shutil.rmtree(old, ignore_errors=True)
+        ups = sorted((u for u in UPLOADS.iterdir() if u.is_file()), key=lambda u: u.stat().st_mtime)
+        for old in ups[:-10]:
+            if str(old) != cfg.video:
+                old.unlink(missing_ok=True)
         return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict()}
 
 
@@ -292,9 +324,10 @@ async def ws(websocket: WebSocket, run_id: str):
     if not r:
         await websocket.close(code=4004); return
     loop = asyncio.get_event_loop()
+    q = r.subscribe()
     try:
         while True:
-            msg = await loop.run_in_executor(None, r.q.get)
+            msg = await loop.run_in_executor(None, q.get)
             await websocket.send_text(json.dumps(msg))
             if msg.get("end"):
                 break
@@ -302,9 +335,11 @@ async def ws(websocket: WebSocket, run_id: str):
         pass
     except Exception:
         pass
+    finally:
+        r.unsubscribe(q)
 
 
 @app.get("/api/health")
 def health():
     a = _active()
-    return {"ok": True, "version": __version__, "busy": a.id if a else None}
+    return {"ok": True, "version": __version__, "busy": a.id if a else None, "busy_name": a.cfg.name if a else None}

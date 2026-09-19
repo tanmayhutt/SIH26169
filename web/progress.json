@@ -935,7 +935,7 @@
               "status": "done"
             },
             {
-              "name": "Deployed on the server behind Caddy with landing, progress, downloads",
+              "name": "Deployed on the server behind Caddy: web app at the root, progress record, downloads",
               "status": "done"
             },
             {
