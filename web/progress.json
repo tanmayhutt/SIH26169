@@ -5,7 +5,7 @@
   "updated": "2026-09-20",
   "verification": {
     "title": "Build verification: September 20, 2026",
-    "summary": "21 of 21 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. All four desktop archives ran a packaged scenario on their own platform; both macOS archives were also run by hand (scenarios, video mode, GUI start). The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf.",
+    "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Windows and Linux archives are verified by the runner's tests and packaged smoke test plus archive inspection, not by a hand-driven GUI session on those systems.",
     "checks": [
       {
@@ -36,7 +36,7 @@
       {
         "name": "Standalone executable",
         "status": "pass",
-        "text": "Four native archives from one workflow: Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel, macOS Apple silicon. Each job ran the 21 tests, the web smoke test and the packaged executable on a scenario. Apple silicon archive by hand: clear line 233 FPS, full stress 109 FPS, video mode 190 FPS, GUI alive after 12 s. Intel archive under Rosetta 2: 176, 115, 119 FPS, GUI alive. Windows and Linux archives inspected: both executables, configs, model, manual present."
+        "text": "Four native archives from one workflow: Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel, macOS Apple silicon. On each platform's own runner the archive was extracted fresh and the executable ran clear line, full stress and video mode, wrote report, CSV and summary, and the GUI stayed alive for 12 s: Windows 77/52/113 FPS, Linux 76/61/105 FPS, Intel Mac 76/41/87 FPS, Apple silicon 176/82/258 FPS, identical tracking numbers on all four. Both macOS archives repeated by hand on a Mac (Apple silicon native 238/108/367 FPS, Intel under Rosetta 2 174/115/236 FPS). The served archives are byte-identical to the tested ones."
       },
       {
         "name": "AI detector",
