@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
+import cv2
 import numpy as np
 
 from ..engine.config import RunConfig
@@ -55,11 +56,17 @@ class Tracker:
         self.dt = dt
         self.h, self.w = screen_shape
         exp = cfg.targets[0].size_px if (cfg.targets and not cfg.video) else None
-        self.classical = ClassicalDetector(self.tc, exp)
+        self.classical = ClassicalDetector(self.tc, exp, cfg.targets[0].shape if cfg.targets else "square")
         self.cnn = CNNDetector(self.tc.cnn_model) if self.tc.detector in ("cnn", "hybrid") else None
         self.imm = IMM(dt)
         self.mode = Mode.SEARCH
         self.verify_hits: list[bool] = []
+        self.provisional = False          # current VERIFY candidate came through the faint path
+        self.faint = False                # the target being followed was acquired through the faint path
+        self._chains: list[dict] = []     # track-before-detect chains while searching
+        self._faint_v = (0.0, 0.0)
+        self._faint_q: list[float] = []
+        self._static: np.ndarray | None = None   # running mean of the picture: stars and sky, not a moving beacon
         self.miss_count = 0
         self.frames_in_mode = 0
         self.designated_sig: dict | None = None   # appearance signature of the target we follow
@@ -119,14 +126,28 @@ class Tracker:
 
         if self.mode in (Mode.SEARCH, Mode.VERIFY):
             roi = window_only_rect and _rect_to_roi(window_only_rect, img.shape)
-            cands = self.classical.detect(img, roi)
+            if self.mode == Mode.VERIFY and self.faint and self.imm.initialised:
+                # verifying a faint chain: look near the prediction with the faint threshold
+                px, py = self.imm.position()
+                half = int(self.tc.search_roi_px + 4 * self.jitter_sigma)
+                roi = (int(max(px - half, 0)), int(max(py - half, 0)), int(min(px + half, self.w)), int(min(py + half, self.h)))
+                fk, fmf = self._faint_params()
+                cands = self.classical.detect(self._residual(img, 0.03), roi, k=fk, mf_sigma=fmf)
+            else:
+                cands = self.classical.detect(img, roi)
             tier = "classical" if cands else "none"
             chosen = self._pick_new(cands)
+            if chosen is None and self.mode == Mode.SEARCH and self.classical.expected_size_px:
+                chosen = self._faint_search(img, roi)
+                if chosen is not None:
+                    tier = "classical"
             if chosen is not None:
                 detection = (chosen.x, chosen.y)
                 conf, snr, sigma = chosen.confidence, chosen.snr, chosen.sigma
                 if self.mode == Mode.SEARCH:
                     self.imm.reset(chosen.x, chosen.y)
+                    if self.faint:
+                        self.imm.set_velocity(self._faint_v[0] / self.dt, self._faint_v[1] / self.dt)
                     self.designated_sig = _signature(chosen)
                     self.verify_hits = [True]
                     self._set(Mode.VERIFY)
@@ -136,13 +157,17 @@ class Tracker:
             elif self.mode == Mode.VERIFY:
                 self.verify_hits.append(False)
             if self.mode == Mode.VERIFY:
-                hist = self.verify_hits[-self.tc.verify_m:]
-                if sum(hist) >= self.tc.verify_n:
+                # a provisional (faint) candidate needs a longer, stricter confirmation
+                v_n, v_m = (5, 6) if self.provisional else (self.tc.verify_n, self.tc.verify_m)
+                hist = self.verify_hits[-v_m:]
+                if sum(hist) >= v_n:
                     self._set(Mode.TRACK)
                     self.miss_count = 0
-                elif len(hist) >= self.tc.verify_m and sum(hist) < self.tc.verify_n:
+                    self.provisional = False
+                elif len(hist) >= v_m and sum(hist) < v_n:
                     self._set(Mode.SEARCH)
                     self.imm.initialised = False
+                    self.provisional = False
             n_c = len(cands)
 
         else:  # TRACK, COAST, REACQUIRE
@@ -152,7 +177,11 @@ class Tracker:
                 half = int(min(half * (1.5 + 0.25 * self.miss_count), max(self.w, self.h)))
             roi = (int(max(px - half, 0)), int(max(py - half, 0)),
                    int(min(px + half, self.w)), int(min(py + half, self.h)))
-            cands = self.classical.detect(img, roi)
+            if self.faint:
+                fk, fmf = self._faint_params()
+                cands = self.classical.detect(self._residual(img, 0.03), roi, k=fk, mf_sigma=fmf, refine=4, limit=30)
+            else:
+                cands = self.classical.detect(img, roi)
             n_c = len(cands)
             chosen, gate_d = self._associate(cands)
             tier = "classical" if chosen is not None else "none"
@@ -189,6 +218,7 @@ class Tracker:
                 elif self.mode == Mode.REACQUIRE and (self.imm.uncertainty_px() > 0.5 * max(self.w, self.h) or self.miss_count > 6 * self.tc.coast_frames):
                     self._set(Mode.SEARCH)
                     self.imm.initialised = False
+                    self.faint = False
 
         if self.mode == Mode.TRACK and self.frames_in_mode % 15 == 0 and len(self.cfg.targets) > 1:
             self._audit_designation(img)
@@ -218,8 +248,8 @@ class Tracker:
     def _config_score(self, c: Candidate, peak_max: float) -> float:
         """How well a candidate matches the designated beacon as configured (size) and
         as the brightest spot. Lower is better."""
-        exp_area = self.classical.expected_area() or (c.area + 1)
-        return 1.5 * abs(np.log((c.area + 1) / (exp_area + 1))) - 1.0 * (c.peak / max(peak_max, 1.0)) - 0.5 * c.confidence
+        exp_sigma = self.classical.expected_sigma() or max(c.sigma, 0.3)
+        return 3.0 * abs(np.log(max(c.sigma, 0.3) / exp_sigma)) - 1.0 * (c.peak / max(peak_max, 1.0)) - 0.5 * c.confidence
 
     def _audit_designation(self, img: np.ndarray):
         """Every half second in TRACK with several targets configured, look at the whole
@@ -267,23 +297,106 @@ class Tracker:
             return best
         # a new track must look like a beacon, not a star or a noise clump
         floor = self.tc.acquire_conf_min + (0.13 if self.cfg.camera.window_only else 0.0)
-        cands = [c for c in cands if c.confidence >= floor]
-        if not cands:
+        strong = [c for c in cands if c.confidence >= floor]
+        if not strong:
             return None
+        cands = strong
+        self.provisional = False
+        self.faint = False
         # The designated target is the first configured target. Its expected appearance
         # (size, shape) is known from config, so prefer candidates matching it.
-        exp_area = self.classical.expected_area()
-        if exp_area is not None and len(cands) > 1:
-            # the designated beacon is described by its configured size; among several
-            # candidates prefer the size match, then brightness, then detector confidence
+        exp_sigma = self.classical.expected_sigma()
+        if exp_sigma is not None and len(cands) > 1:
+            # the designated beacon is described by its configured size and shape; among
+            # several candidates prefer the fitted-width match (independent of the noise
+            # level, unlike the thresholded area), then brightness, then detector confidence
             peak_max = max(c.peak for c in cands) or 1.0
-            cands = sorted(cands, key=lambda c: 1.5 * abs(np.log((c.area + 1) / (exp_area + 1)))
-                           - 1.0 * (c.peak / peak_max) - 0.5 * c.confidence)
+            cands = sorted(cands, key=lambda c: self._config_score(c, peak_max))
             return cands[0]
         return cands[0]
 
+    # ------------------------------------------------------- faint beacon path
+    def _faint_params(self) -> tuple[float, float]:
+        """Threshold and matched-filter width for a dim beacon: a lower threshold, and a
+        narrower filter because after extinction only the core of the spot stands above
+        the sky."""
+        size = self.classical.expected_size_px or 8.0
+        return self.tc.faint_threshold_k, max(0.6, size / 6.0)
+
+    def _residual(self, img: np.ndarray, alpha: float) -> np.ndarray:
+        """Moving-target residual: the running mean of the picture holds everything static
+        (stars, sky gradient, hot pixels); a beacon that moves leaves it behind. The faint
+        path detects on the residual so that stars cannot form chains."""
+        if self._static is None or self._static.shape != img.shape:
+            self._static = img.astype(np.float32)
+        else:
+            cv2.accumulateWeighted(img, self._static, alpha)
+        return cv2.subtract(img, cv2.convertScaleAbs(self._static))
+
+    def _faint_search(self, img: np.ndarray, roi) -> Candidate | None:
+        """Track-before-detect. A beacon at 3 to 6 sigma per frame cannot be told from noise
+        in one picture, but noise does not move in a straight line: weak candidates are
+        linked frame to frame into chains with a consistent velocity, and a chain that keeps
+        being hit is promoted to a provisional track. Stars form chains too (static ones),
+        so the chain must also carry a matched-filter SNR above `faint_snr_min` on average
+        and a spot size near the designated beacon's."""
+        k, mf = self._faint_params()
+        res = self._residual(img, 0.1)
+        cands = self.classical.detect(res, roi, k=k, mf_sigma=mf, refine=0, limit=400)
+        gate = 8.0 + 4.0 * self.jitter_sigma
+        used = set()
+        for ch in self._chains:
+            px, py = ch["x"] + ch["vx"], ch["y"] + ch["vy"]
+            best, bd = None, gate * (1 + 0.5 * ch["miss"])
+            for i, c in enumerate(cands):
+                if i in used:
+                    continue
+                d = float(np.hypot(c.x - px, c.y - py))
+                if d < bd:
+                    best, bd = i, d
+            if best is None:
+                ch["miss"] += 1
+                ch["x"], ch["y"] = px, py
+                ch["hist"].append(False)
+            else:
+                c = cands[best]; used.add(best)
+                a = 0.5
+                ch["vx"] = (1 - a) * ch["vx"] + a * (c.x - ch["x"]); ch["vy"] = (1 - a) * ch["vy"] + a * (c.y - ch["y"])
+                ch["x"], ch["y"] = c.x, c.y
+                ch["miss"] = 0; ch["hits"] += 1; ch["snr"].append(c.snr); ch["sig"].append(c.sigma); ch["hist"].append(True)
+                ch["last"] = c
+        self._chains = [ch for ch in self._chains if ch["miss"] <= 2][:600]
+        # unmatched candidates start new chains (velocity unknown, learned on the next hit)
+        for i, c in enumerate(cands):
+            if i not in used and len(self._chains) < 600:
+                self._chains.append({"x": c.x, "y": c.y, "vx": 0.0, "vy": 0.0, "miss": 0, "hits": 1,
+                                     "snr": [c.snr], "sig": [c.sigma], "hist": [True], "last": c})
+        # promotion: hit in at least 6 of the last 8 frames, a credible mean SNR, and a spot
+        # whose fitted size is within a factor of two of the designated beacon's
+        exp_sigma = max(0.6, (self.classical.expected_size_px or 8.0) / 3.0)
+        ready = []
+        for ch in self._chains:
+            h = ch["hist"][-8:]
+            if len(h) >= 8 and sum(h) >= 6 and float(np.mean(ch["snr"][-6:])) >= self.tc.faint_snr_min:
+                sig = float(np.median(ch["sig"][-6:]))
+                if abs(np.log(max(sig, 0.3) / exp_sigma)) < np.log(2.2):
+                    ready.append((float(np.mean(ch["snr"][-6:])), ch))
+        if not ready:
+            return None
+        ready.sort(key=lambda r: -r[0])
+        ch = ready[0][1]
+        self._chains = []
+        self.provisional = True
+        self.faint = True
+        self._faint_q = []
+        self._faint_v = (ch["vx"], ch["vy"])
+        last = ch["last"]   # appearance of the real detection, so the track's signature is realistic
+        return Candidate(ch["x"], ch["y"], last.area, last.peak, float(np.mean(ch["snr"][-6:])), float(np.median(ch["sig"][-6:])), 0.5, "classical")
+
     def _associate(self, cands: list[Candidate]) -> tuple[Candidate | None, float]:
         """Gate candidates by Mahalanobis distance, then score by gate and signature."""
+        if self.faint:
+            return self._associate_faint(cands)
         best, best_score, best_g = None, 1e9, 0.0
         for c in cands:
             g = self.imm.gate(c.x, c.y)
@@ -299,6 +412,33 @@ class Tracker:
             score = g + 2.0 * sd - 0.5 * c.confidence
             if score < best_score:
                 best, best_score, best_g = c, score, g
+        return best, best_g
+
+    def _associate_faint(self, cands: list[Candidate]) -> tuple[Candidate | None, float]:
+        """A faint target sits among noise clumps of similar size, so the gate is small and
+        the strongest matched-filter response inside it wins. A running quality measure
+        drops the track back to the chain search when what it accepts is no better than
+        noise, instead of letting the estimate wander off on noise."""
+        px, py = self.imm.position()
+        gate = min(12.0 + 3.0 * self.jitter_sigma, 40.0) * (1 + 0.3 * self.miss_count)
+        best, best_g = None, 0.0
+        for c in cands:
+            if c.snr < 2.5 or np.hypot(c.x - px, c.y - py) > gate:
+                continue
+            g = self.imm.gate(c.x, c.y)
+            if g > 5.0:
+                continue
+            if best is None or c.snr > best.snr:
+                best, best_g = c, g
+        if best is not None:
+            self._faint_q.append(best.snr)
+            self._faint_q = self._faint_q[-12:]
+            if len(self._faint_q) >= 12 and float(np.mean(self._faint_q)) < 3.0:
+                self._set(Mode.SEARCH)
+                self.imm.initialised = False
+                self.faint = False
+                self._faint_q = []
+                return None, 0.0
         return best, best_g
 
     def _update_signature(self, c: Candidate):
