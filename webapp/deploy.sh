@@ -44,7 +44,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 </ul><p><a href="/">Back</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
-rsync -az --delete "$STAGE/" "$HOST:$SITE/site/"
+rsync -az --delete --chmod=D755,F644 "$STAGE/" "$HOST:$SITE/site/"
 rm -rf "$STAGE"
 
 echo "== 3. venv, service, caddy"
