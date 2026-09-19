@@ -50,7 +50,10 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 </ul><p><a href="/">Back to the web app</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
-rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "$STAGE/" "$HOST:$SITE/site/"
+# keep the archives already on the server when dist/ holds none locally (a docs-only deploy)
+KEEP=()
+ls "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz >/dev/null 2>&1 || KEEP=(--exclude '*.zip' --exclude '*.tar.gz')
+rsync -az --delete "${KEEP[@]}" --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "$STAGE/" "$HOST:$SITE/site/"
 ssh "$HOST" "chmod -R u=rwX,go=rX $SITE"   # caddy runs as its own user and must read the site
 rm -rf "$STAGE"
 
