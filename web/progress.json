@@ -16,7 +16,7 @@
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "12 scenarios, 15 s each, 3 seeds. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.9 to 7.4 px at 94 to 96%. Acquisition 0.6 to 2.0 s everywhere. Hard mode 7.0 to 12.1 px after a 3 to 12 s sweep. Tracking numbers are identical between the September 19 baseline and the September 20 engine except where they improved."
+        "text": "12 scenarios, 15 s each, 3 seeds, compared run by run with the September 19 baseline: no run worse, four better. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 7.1 to 12.3 px at 91 to 96% (was not acquired at all). Multi-target stress 13.6 to 14.4 px at 98 to 99% on every seed (one seed was 69%). Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep."
       },
       {
         "name": "Multi-seed envelope",
