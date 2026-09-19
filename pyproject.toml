@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 train = ["torch>=2.2", "onnx>=1.15"]
+web = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
 dev = ["pytest>=8.0", "pyinstaller>=6.5"]
 
 [project.scripts]

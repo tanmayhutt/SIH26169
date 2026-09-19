@@ -43,6 +43,12 @@ docs/                USER_MANUAL.md, TECHNICAL_REPORT.md, plan.html
 models/              beacon_heatmap.onnx
 ```
 
+## Web app
+
+The same engine served to a browser (`webapp/`): `.venv/bin/uvicorn webapp.server:app --port 8095`,
+then open http://127.0.0.1:8095/. `bash webapp/deploy.sh` deploys the repository, the web app, the
+progress record and the downloads to the server behind Caddy.
+
 ## Documents
 
 - `docs/USER_MANUAL.md`: installation, GUI, parameters, Benchmark 2, output files, metric definitions.
