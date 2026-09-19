@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy everything to the server: the repository into ~/repo, a Python venv, the web app as a
+# Deploy everything to the server: the repository into ~/SIH169, a Python venv, the web app as a
 # systemd service on 127.0.0.1:8095, the progress site, downloads, and one Caddy site block.
 #
 #   bash webapp/deploy.sh                       # full deploy
@@ -13,7 +13,7 @@
 set -euo pipefail
 HOST=${HOST:-ubuntu@15.206.247.203}
 DOMAIN=${DOMAIN:-sih26169.blankpoint.club}
-REPO=/home/ubuntu/repo
+REPO=/home/ubuntu/SIH169
 SITE=/srv/sih26169
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 
