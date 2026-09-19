@@ -183,12 +183,13 @@
 </div>
 
 <dialog id="dlg"><div class="dlg">
-  <h2>Desktop application</h2>
+  <h2 id="dlg-title">Desktop application</h2>
+  <p id="dlg-intro" style="display:none">This project is delivered as a standalone desktop application, as the problem statement asks. Download it for your computer below, or continue in the browser: this page runs the same engine on the server and needs no installation.</p>
   <p>The standalone executable the problem statement asks for: every parameter, real-time pacing at 60 to 250 FPS on your own machine, keyboard control, the full HUD and the user manual built in. No installation and no Python. Extract the archive to a folder you can write to and run <code>FSOC-Tracker</code>.</p>
   <div class="rec" id="rec"></div>
   <ul id="dl-all"></ul>
   <div class="steps" id="dl-steps"></div>
-  <div class="foot"><span><a href="/downloads/">All downloads</a><a href="/downloads/USER_MANUAL.pdf" target="_blank">User manual (PDF)</a></span><button id="dlg-close">Close</button></div>
+  <div class="foot"><span><a href="/downloads/">All downloads</a><a href="/downloads/USER_MANUAL.pdf" target="_blank">User manual (PDF)</a></span><span><label style="font-size:11.5px;color:var(--muted);margin-right:12px;display:none" id="dlg-remember"><input type="checkbox" id="dlg-skip"> do not show this again</label><button id="dlg-close" class="primary">Continue in the browser</button></span></div>
 </div></dialog>
 
 <script>
@@ -439,7 +440,11 @@ with it can watch the same run.`;
     if (/Linux|X11/i.test(ua) || /Linux/i.test(plat)) return { key: "linux", sure: true };
     return { key: null, sure: false };
   }
-  function openDownloads() {
+  function openDownloads(welcome) {
+    $("dlg-title").textContent = welcome ? "Download the desktop application" : "Desktop application";
+    $("dlg-intro").style.display = welcome ? "block" : "none";
+    $("dlg-remember").style.display = welcome ? "inline" : "none";
+    $("dlg-close").textContent = welcome ? "Continue in the browser" : "Close";
     const p = detectPlatform(); const rec = BUILDS.find(b => b.key === p.key);
     const link = b => `<a href="/downloads/${b.file}">Download ${b.file}</a>`;
     $("rec").innerHTML = rec
@@ -449,8 +454,13 @@ with it can watch the same run.`;
     $("dl-steps").innerHTML = `Windows: SmartScreen may show "Windows protected your PC" because the build is not code-signed; choose More info, Run anyway. macOS: if Gatekeeper objects, System Settings, Privacy and Security, Open Anyway. Linux: needs the usual desktop libraries; on a minimal image install <code>libxcb-cursor0 libxkbcommon-x11-0 libegl1</code>. Full steps in the user manual, section 2.`;
     $("dlg").showModal();
   }
-  $("dl").addEventListener("click", openDownloads);
-  $("dlg-close").addEventListener("click", () => $("dlg").close());
+  $("dl").addEventListener("click", () => openDownloads(false));
+  $("dlg-close").addEventListener("click", () => { $("dlg").close(); if ($("dlg-skip").checked) { try { localStorage.setItem("fsoc.skipWelcome", "1"); } catch (e) {} } });
+  // first thing a visitor sees: the desktop application offer (skipped on shared run links and when they opted out)
+  (function welcome() {
+    let skip = false; try { skip = localStorage.getItem("fsoc.skipWelcome") === "1"; } catch (e) {}
+    if (!skip && !location.hash.match(/run=/)) setTimeout(() => openDownloads(true), 400);
+  })();
   $("dlg").addEventListener("click", e => { if (e.target === $("dlg")) $("dlg").close(); });
   init();
 </script>
