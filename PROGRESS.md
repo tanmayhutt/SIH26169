@@ -184,37 +184,47 @@ Honest state: on simulated scenes the classical pipeline carries the load and th
 of measurements; on a real phone video it supplied half of them. It is the intended answer for the faint-beacon case.
 `training/finetune_from_video.py` adapts it to footage you provide (self-training from the tracker's confident frames).
 
-### 2.10 Executable builds  🟨
+### 2.10 Executable builds  🟩
 
-| Target | Status |
-|---|---|
-| macOS arm64 (this machine) | 🟩 built, self-tested |
-| Linux x86_64 | ⬜ needs a Linux machine or CI |
-| Windows x86_64 | ⬜ needs a Windows machine or CI |
+Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
+21 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
+scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
+`bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
 
-### 2.11 Documents  🟨
+| Target | Runner | Status |
+|---|---|---|
+| Windows x64 (`FSOC-Tracker-windows-x64.zip`, with `FSOC-Tracker-cli.exe`) | windows-latest | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| Linux x64 (`FSOC-Tracker-linux-x64.tar.gz`, glibc of Ubuntu 22.04) | ubuntu-22.04 | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| macOS Intel (`FSOC-Tracker-macos-intel.zip`) | macos-15-intel | 🟩 runner checks passed; archive also run by hand under Rosetta 2: two scenarios, video mode, GUI start |
+| macOS Apple silicon (`FSOC-Tracker-macos-arm64.zip`) | macos-14 | 🟩 runner checks passed; archive also run by hand natively: two scenarios, video mode, GUI start |
+
+Native code per platform is unavoidable: the bundles carry NumPy, OpenCV, SciPy, Qt and ONNX Runtime.
+The web app is the architecture-neutral path.
+
+### 2.11 Documents  🟩
 
 | Document | Status |
 |---|---|
 | `COMPLIANCE.md`, point-by-point check of every PS row, shall item, deliverable and evaluation stage, backed by `tests/test_ps_compliance.py` | 🟩 |
 | Progress website (`web/`), served from the project server under /progress/ | 🟩 |
-| Web app (`webapp/`), same engine in the browser, deployed under /app/ | 🟩 |
+| Web app (`webapp/`), same engine in the browser, served at the project site root with a desktop download prompt | 🟩 |
 | Desktop builds for Windows x64, Linux x64, macOS Intel and Apple silicon (`.github/workflows/build.yml`, tests and smoke test per OS) | 🟩 |
 | `docs/USER_MANUAL.md` and `.pdf` | 🟩 |
 | `docs/TECHNICAL_REPORT.md` and `.pdf` | 🟩 performance table filled from the measured envelope |
 | `ARCHITECTURE.md` | 🟩 |
 | `docs/plan.html` (plain-English briefing, open locally in a browser) | 🟩 |
-| Demo video, 3 to 5 min | ⬜ |
+| Demo video, 3 to 5 min (optional in the PS) | ⬜ |
 
-### 2.12 Submission  ⬜
+### 2.12 Submission  🟨
 
 | Item | Status |
 |---|---|
 | Source with documentation | 🟩 |
-| Standalone executable for the evaluators' machines | ⬜ Windows and Linux builds |
-| Technical report 10 to 15 pages, exported | ⬜ |
-| User manual, exported | ⬜ |
-| Demo video | ⬜ |
+| Standalone executable for the evaluators' machines | 🟩 four archives on the project site |
+| Technical report 10 to 15 pages, exported | 🟩 14-page PDF |
+| User manual, exported | 🟩 PDF, per-platform installation |
+| Web app for review without installation | 🟩 project site, login protected |
+| Demo video (optional) | ⬜ |
 | Rehearsed 10 to 15 minute live demo script | ⬜ |
 
 ---

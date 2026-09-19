@@ -1,8 +1,9 @@
 """Beacon kinematics. Positions are in screen pixels, time in seconds.
 
-Row 12 asks for at least straight line, circular, figure of 8 and random, with spiral and
-sinusoidal optional. All are implemented as closed-form or integrated paths so that a run
-is exactly reproducible from its seed.
+Row 12 asks for at least straight line, circular, figure of 8 and random, with spiral,
+sinusoidal and user-defined optional. All are implemented as closed-form or integrated paths
+so that a run is exactly reproducible from its seed. The user-defined path is a list of
+waypoints in screen pixels, followed at constant speed and looped.
 """
 from __future__ import annotations
 
@@ -47,6 +48,36 @@ class Target:
         self._rvy = cfg.speed_px_s * math.sin(self.heading)
         self._t_prev = 0.0
         self._last = TargetState(self.x0, self.y0, 0.0, 0.0, cfg.intensity)
+        self._poly = self._parse_waypoints(cfg.waypoints) if cfg.motion == "waypoints" else None
+
+    def _parse_waypoints(self, text: str) -> list[tuple[float, float]]:
+        pts = []
+        for item in (text or "").replace("\n", ";").split(";"):
+            item = item.strip()
+            if not item:
+                continue
+            sx, sy = item.split(",")
+            pts.append((min(max(float(sx), 0.0), self.w - 1.0), min(max(float(sy), 0.0), self.h - 1.0)))
+        if len(pts) < 2:  # nothing usable given: a triangle inside the screen so the option works out of the box
+            m = 0.2
+            pts = [(m * self.w, m * self.h), ((1 - m) * self.w, 0.35 * self.h), (0.5 * self.w, (1 - m) * self.h)]
+        return pts
+
+    def _waypoints(self, t: float):
+        """Constant speed along the closed polyline through the user's points."""
+        pts = self._poly
+        segs = [(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+        lens = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in segs]
+        total = sum(lens)
+        if total <= 0:
+            return pts[0][0], pts[0][1], 0.0, 0.0
+        d = (self.cfg.speed_px_s * t) % total
+        for (a, b), L in zip(segs, lens):
+            if d <= L and L > 0:
+                ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+                return a[0] + ux * d, a[1] + uy * d, ux * self.cfg.speed_px_s, uy * self.cfg.speed_px_s
+            d -= L
+        return pts[0][0], pts[0][1], 0.0, 0.0
 
     # ---------------------------------------------------------------- paths
     def state(self, t: float) -> TargetState:
@@ -89,6 +120,8 @@ class Target:
             x, y = min(max(x, 0.0), self.w - 1.0), min(max(y, 0.0), self.h - 1.0)
         elif m == "random":
             x, y, vx, vy = self._random_walk(t)
+        elif m == "waypoints":
+            x, y, vx, vy = self._waypoints(t)
         else:
             raise ValueError(f"unknown motion '{m}'")
         inten = c.intensity

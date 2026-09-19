@@ -1,12 +1,12 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 21 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-20",
   "verification": {
-    "title": "Build verification: September 19, 2026",
-    "summary": "21 of 21 automated checks passed, 11 scenarios ran end to end at 15 s each, the packaged executable ran a scenario headless, and a video went through the Benchmark 2 path. This is a local source verification on one machine, not an evaluator run.",
-    "note": "Statuses below are from runs in the repository's own results folder. Numbers quoted are measured, not estimated. Windows and Linux builds and the exported report are not yet produced and are marked unverified.",
+    "title": "Build verification: September 20, 2026",
+    "summary": "21 of 21 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. All four desktop archives ran a packaged scenario on their own platform; both macOS archives were also run by hand (scenarios, video mode, GUI start). The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf.",
+    "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Windows and Linux archives are verified by the runner's tests and packaged smoke test plus archive inspection, not by a hand-driven GUI session on those systems.",
     "checks": [
       {
         "name": "Automated tests",
@@ -35,8 +35,8 @@
       },
       {
         "name": "Standalone executable",
-        "status": "partial",
-        "text": "macOS arm64 build runs a scenario headless and writes the report. Windows and Linux builds need a machine or CI runner of that type."
+        "status": "pass",
+        "text": "Four native archives from one workflow: Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel, macOS Apple silicon. Each job ran the 21 tests, the web smoke test and the packaged executable on a scenario. Apple silicon archive by hand: clear line 233 FPS, full stress 109 FPS, video mode 190 FPS, GUI alive after 12 s. Intel archive under Rosetta 2: 176, 115, 119 FPS, GUI alive. Windows and Linux archives inspected: both executables, configs, model, manual present."
       },
       {
         "name": "AI detector",
@@ -51,7 +51,17 @@
       {
         "name": "Demo video",
         "status": "unverified",
-        "text": "Technical report (with the measured performance table) and user manual are exported to PDF in docs/. The 3 to 5 minute video and the rehearsed demo script are not produced yet."
+        "text": "Optional in the PS. Not produced; the web app lets an evaluator run every scenario live instead. Technical report (14 pages) and user manual are exported to PDF and on the site."
+      },
+      {
+        "name": "Web app on the server",
+        "status": "pass",
+        "text": "Same engine served by FastAPI behind Caddy on a 4-core ARM server: clear line 123 FPS, full stress 59 FPS there. A noisy-line run through the public site in a real browser locked at 1.43 s, 68 FPS, 5 of 5 specification checks, report and CSV downloaded. One run at a time, any number of viewers, reconnect on socket drop."
+      },
+      {
+        "name": "PS re-read",
+        "status": "pass",
+        "text": "26169.pdf re-read on September 20: rows 1 to 25, the eight shall items, five deliverables, four evaluation stages. All mandatory items implemented and tested. Optional items: colour camera, multiple targets, spiral, sinusoidal and user-defined (waypoint) paths, all disturbance kinds. Only the optional demo video is not produced."
       }
     ]
   },

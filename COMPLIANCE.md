@@ -22,7 +22,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 9 | Target shape | user-defined, default square | square; circle, gaussian | `TargetConfig.shape` | `test_rows_7_to_12` | 🟩 |
 | 10 | Target size | 5 to 20 px, default 10 x 10 | 10, editable | `TargetConfig.size_px` | `test_rows_7_to_12` | 🟩 |
 | 11 | Initial target location | user-defined, default random | random; centre; "x,y" | `TargetConfig.start` | `test_rows_7_to_12` | 🟩 |
-| 12 | Motion | at least line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six plus static | `Target.state` | `test_targets_stay_on_screen_and_are_deterministic` (6 paths) | 🟩 |
+| 12 | Motion | at least line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, user-defined waypoint path, static | `Target.state`, `Target._waypoints` | `test_targets_stay_on_screen_and_are_deterministic` (7 paths) | 🟩 |
 | 13 | Max pan speed | 5 to 10 deg/s, default 5 | 5, editable | `CameraConfig.max_pan_rate_deg_s`, enforced in `Gimbal.apply` | `test_rows_13_to_15`, `test_gimbal_rate_and_pose_limits` | 🟩 |
 | 14 | Max tilt speed | 5 to 10 deg/s, default 5 | 5, editable | same | same | 🟩 |
 | 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz | `Simulation.steps` | `test_rows_13_to_15` | 🟩 |
@@ -54,11 +54,11 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 
 | Deliverable | PS wording | Where | Status |
 |---|---|---|---|
-| Software application | standalone executable implementing the complete system | `fsoc_tracker.spec` -> `dist/FSOC-Tracker/` (macOS built and self-tested) | 🟨 Windows and Linux builds pending |
+| Software application | standalone executable implementing the complete system | `fsoc_tracker.spec`, built by `.github/workflows/build.yml` for Windows x64, Linux x64, macOS Intel and macOS Apple silicon; each build runs the test suite and a packaged smoke test on its own platform; both macOS archives also exercised by hand (scenarios, video mode, GUI start) | 🟩 |
 | Source code | complete, modular, adequately commented, documented | `fsoc_tracker/`, docstrings, `README.md`, `ARCHITECTURE.md` | 🟩 |
 | Technical report | 10 to 15 pages: problem understanding, architecture, modules, tracking methods, AI methods, test methodology, performance analysis, future improvements | `docs/TECHNICAL_REPORT.md` and `.pdf`, performance table from the measured envelope | 🟩 |
 | User manual | installation, operation, parameter configuration, GUI description | `docs/USER_MANUAL.md` and `.pdf`; also the User manual button and Help in the application | 🟩 |
-| Demo video (optional) | 3 to 5 minutes | | ⬜ |
+| Demo video (optional) | 3 to 5 minutes | not produced; the web app at the project site lets an evaluator run every scenario live instead | ⬜ optional |
 | Performance log | automatically generated: simulation duration, FPS, acquisition time, average and maximum tracking error, lock retention rate, processing time | `frames.csv`, `summary.json`, `report.pdf` written at the end of every run, each metric with its definition | 🟩 |
 
 ## Evaluation stages
@@ -68,7 +68,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | Functional verification | 20 | implementation of all mandatory functions, operational success, GUI | all eight functions demonstrable live; scenario picker; live tiles | 🟩 |
 | Benchmark performance 1 | 30 | execution of given scenarios; log of centroiding error; automatically generated performance logs | scenario YAML loads in one click; `centroid_err_px` per frame in `frames.csv`; report automatic | 🟩 (their file format may need a mapping) |
 | Benchmark performance 2 | 30 | video files (.mp4 @30 fps) covering a complete screen with noise and moving beacon; bypass the PTZ camera; comparison of centroiding error with predefined values; RMSE, acquisition and re-acquisition time, lock retention, FPS | Open video: simulator bypassed, frames used as the scene, `det_x/det_y` per frame, timing and lock metrics in the report | 🟩 |
-| Technical evaluation | 20 | understanding, architecture, algorithms, AI and CV, novelty, documentation, Q and A | `ARCHITECTURE.md`, `docs/TECHNICAL_REPORT.md`, this file | 🟨 report export pending |
+| Technical evaluation | 20 | understanding, architecture, algorithms, AI and CV, novelty, documentation, Q and A | `ARCHITECTURE.md`, `docs/TECHNICAL_REPORT.pdf` (14 pages), `docs/USER_MANUAL.pdf`, this file | 🟩 |
 
 ## Things the PS does not specify, and what we chose
 

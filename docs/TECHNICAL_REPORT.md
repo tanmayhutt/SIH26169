@@ -98,7 +98,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 |---|---|
 | `engine/config.py` | Typed configuration; one field per problem statement parameter row; YAML load and save. |
 | `world/scene.py` | Backgrounds: starfield, terrain, gradient, flat. |
-| `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, static. |
+| `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, user-defined waypoints, static. |
 | `world/camera.py` | Gimbal: pose in degrees, rate and acceleration limits, command latency, IFOV conversions. |
 | `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, Poisson, Gaussian and salt-and-pepper noise, in physical order. |
 | `world/renderer.py` | Draws the scene with sub-pixel beacon placement; returns ground truth. |
@@ -358,7 +358,7 @@ the run can be repeated). `batch` adds `envelope.md` and `envelope.json`.
 | 9 | Target shape | user-defined, default square | square, circle, gaussian |
 | 10 | Target size | 5 to 20 px, default 10 x 10 | `TargetConfig.size_px` |
 | 11 | Initial target location | user-defined, default random | random, centre, or "x,y" |
-| 12 | Motion | line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, plus static |
+| 12 | Motion | line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, a user-defined waypoint path, and static |
 | 13, 14 | Max pan and tilt speed | 5 to 10 deg/s, default 5 | enforced in the gimbal model |
 | 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz |
 | 16 | Acquisition time | <= 2 s | measured, pass or fail printed |

@@ -176,7 +176,9 @@ suggested range are allowed where the table says "user-defined".
 
 ### Designated target (rows 7 to 12)
 - Shape: square (default), circle, gaussian. Size in pixels (default 10). Peak intensity.
-- Motion: line, circular, figure8, random, spiral, sinusoidal, static.
+- Motion: line, circular, figure8, random, spiral, sinusoidal, waypoints, static. For
+  `waypoints`, the Waypoints field takes screen-pixel points as `x,y; x,y; ...`; the beacon
+  follows them at Speed and loops (the PS row 12 user-defined path).
 - Speed, Radius, Period, Heading: path parameters. Start: random or centre.
 - Blink: optional intensity modulation in Hz. 0 is steady.
 
