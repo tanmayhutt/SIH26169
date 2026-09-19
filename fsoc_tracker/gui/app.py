@@ -830,18 +830,24 @@ class MainWindow(QtWidgets.QMainWindow):
             self._video_label()
 
     def _preview_video(self, path: str):
-        """Show the first frame and the file's facts as soon as a video is chosen."""
+        """Probe the file, calibrate the settings to it, and show the first frame."""
         import cv2
-        cap = cv2.VideoCapture(path)
-        ok, bgr = cap.read()
-        fps = cap.get(cv2.CAP_PROP_FPS) or 0
-        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
+        from ..engine.sources import probe_video
+        try:
+            info = probe_video(path)
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Video", f"Could not read this file:\n{e}"); return
+        cap = cv2.VideoCapture(path); ok, bgr = cap.read(); cap.release()
         if not ok:
             QtWidgets.QMessageBox.warning(self, "Video", "Could not read the first frame of this file."); return
-        gray = bgr if (self.forms["screen"].read().colour and bgr.ndim == 3) else (cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr)
-        self.video_info = {"w": w, "h": h, "fps": fps, "frames": n, "seconds": n / fps if fps else 0}
+        w, h, fps, n = info["width"], info["height"], info["fps"], info["frames"]
+        self.video_info = {"w": w, "h": h, "fps": fps, "frames": n, "seconds": info["seconds"], "rotation": info["rotation_deg"],
+                           "variable": info["variable_rate"], "fps_ts": info["fps_timestamps"]}
+        # calibrate the panel: the scene is the video, the clock is its frame rate
+        sc = self.forms["screen"].read(); sc.width, sc.height = w, h; self.forms["screen"].write(sc)
+        cam = self.forms["camera"].read(); cam.update_rate_hz = float(fps); cam.width = min(cam.width, w); cam.height = min(cam.height, h); self.forms["camera"].write(cam)
+        self._set_video_mode(True)
+        gray = bgr if (sc.colour and bgr.ndim == 3) else (cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr)
         side = min(self.scene_view.width(), self.scene_view.height()) - 8
         s = side / max(h, w)
         pm = QtGui.QPixmap.fromImage(to_qimage(gray).scaled(int(w * s), int(h * s), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation))
@@ -850,7 +856,9 @@ class MainWindow(QtWidgets.QMainWindow):
         pnt.setPen(QtGui.QColor(C["good"])); pnt.setFont(QtGui.QFont("Menlo", 10, QtGui.QFont.Weight.Bold))
         pnt.drawText(8, 16, "VIDEO LOADED")
         pnt.setPen(QtGui.QColor(C["ink"])); pnt.setFont(QtGui.QFont("Menlo", 9))
-        pnt.drawText(130, 16, f"{w} x {h} px   {fps:.1f} fps   {n} frames   {self.video_info['seconds']:.1f} s   first frame shown")
+        rot = f"   rotated {self.video_info['rotation']:.0f} deg" if self.video_info["rotation"] else ""
+        vfr = "   variable rate" if self.video_info["variable"] else ""
+        pnt.drawText(130, 16, f"{w} x {h} px   {fps:.2f} fps{vfr}   {n} frames   {self.video_info['seconds']:.2f} s{rot}")
         # the camera window at its start position, for scale
         cw, ch = min(self.cfg.camera.width, w), min(self.cfg.camera.height, h)
         pnt.setPen(_pen(C["accent"], 2)); pnt.drawRect(int((w - cw) / 2 * s), int((h - ch) / 2 * s), int(cw * s), int(ch * s))
@@ -861,17 +869,37 @@ class MainWindow(QtWidgets.QMainWindow):
         for t in self.tiles.values():
             t.set("-")
         self.tiles["state"].set("video ready", None)
-        self.tele.setPlainText("\n".join([
-            "VIDEO LOADED", "", f"file     {Path(path).name}", f"size     {w} x {h} px", f"rate     {fps:.2f} fps",
-            f"frames   {n}", f"length   {self.video_info['seconds']:.1f} s", "",
-            "The simulator is bypassed. Each video", "frame becomes the scene picture and", "the camera window moves over it.", "",
-            "No ground truth exists in a video,", "so tracking and centroiding error", "read n/a; lock, acquisition,", "re-acquisition and FPS are measured.", "",
-            "If the spot moves faster than the", "gimbal limit allows, raise Max pan", "and Max tilt (PS allows 5 to 10 deg/s)", "or widen the FOV.", "",
-            "Press Start (Space) to run.",
-        ]))
+        cam = self.forms["camera"].read()
+        lines = ["VIDEO LOADED, SETTINGS CALIBRATED", "", f"file      {Path(path).name}", f"size      {w} x {h} px (as displayed)"]
+        if self.video_info["rotation"]:
+            lines.append(f"rotation  {self.video_info['rotation']:.0f} deg tag applied")
+        lines += [f"rate      {fps:.2f} fps (container average)"]
+        if self.video_info["variable"]:
+            lines.append(f"          variable-rate file; timestamps {self.video_info['fps_ts']:.1f} fps")
+        lines += [f"frames    {n} (counted)", f"length    {self.video_info['seconds']:.2f} s", "",
+                  "Calibrated into the panel:", f"  screen {w} x {h}, update rate {fps:.2f} Hz", "",
+                  "Not in the file, set by you:", f"  camera window {cam.width} x {cam.height} px",
+                  f"  FOV {cam.fov_w_deg:g} x {cam.fov_h_deg:g} deg, so 1 px =", f"  {cam.ifov_deg*3600:.1f} arcsec; degree readouts", "  depend on this setting.", "",
+                  "Target and disturbance settings are", "locked: the video already contains", "them. No ground truth exists, so", "tracking and centroiding error read", "n/a; lock, acquisition, re-acquisition", "and FPS are measured.", "",
+                  "Press Start (Space) to run."]
+        self.tele.setPlainText("\n".join(lines))
 
     def clear_video(self):
-        self.video_path = None; self._video_label()
+        self.video_path = None; self.video_info = None
+        self._set_video_mode(False)
+        self._video_label()
+
+    def _set_video_mode(self, on: bool):
+        """With a video loaded the scene, beacons and disturbances come from the file, so
+        those sections are locked; the camera window, its FOV and rate limits still apply."""
+        for key in ("target", "disturbance"):
+            self.forms[key].setEnabled(not on)
+        for name in ("width", "height", "background", "background_level", "star_density"):
+            w = self.forms["screen"].widgets.get(name)
+            if w is not None:
+                w.setEnabled(not on)
+        self.forms["camera"].widgets["update_rate_hz"].setEnabled(not on)
+        self.sp_extra.setEnabled(not on); self.sp_dur.setEnabled(not on)
 
     def screenshot(self):
         Path(self.cfg.output_dir).mkdir(exist_ok=True)

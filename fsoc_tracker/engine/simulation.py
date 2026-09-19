@@ -38,6 +38,8 @@ class Simulation:
         self.source = make_source(cfg)
         self.dt = self.source.dt
         self.h, self.w = self.source.shape
+        if isinstance(self.source, VideoSource) and cfg.duration_s <= 0:
+            cfg.duration_s = self.source.n_frames * self.dt
         if isinstance(self.source, SyntheticSource):
             self.gimbal = self.source.world.gimbal
         else:

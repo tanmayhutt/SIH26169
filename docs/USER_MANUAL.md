@@ -162,8 +162,13 @@ suggested range are allowed where the table says "user-defined".
 
 ## 5. Running Benchmark 2 (video input)
 
-1. Click "Open video (Benchmark 2)" and choose the `.mp4` file.
-2. Set the camera window size and FOV if the graders specify them.
+1. Click "Open video (Benchmark 2)" and choose the `.mp4` file. The application reads the
+   file's real facts (displayed size with any rotation tag applied, average frame rate with a
+   variable-rate warning, exact frame count, length) and calibrates the settings to them:
+   the screen becomes the video's size and the update rate its frame rate. Target and
+   disturbance settings are locked, because the video already contains them.
+2. Set the camera window size, FOV and rate limits if the graders specify them; these are
+   not in the file. Degree readouts depend on the FOV you set.
 3. Click Start. The video frames are used as the scene; nothing is drawn by the simulator.
 4. When the run ends, `frames.csv` contains the measured beacon centre for every frame
    (`det_x`, `det_y`) and `report.pdf` contains acquisition time, re-acquisition time,

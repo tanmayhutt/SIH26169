@@ -38,11 +38,12 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         fig.text(0.07, 0.955, "FSOC Tracker performance report", fontsize=17, weight="bold", color=INK)
         sub = f"Run '{cfg.name}'   seed {cfg.seed}   {datetime.now():%Y-%m-%d %H:%M}   v{__version__}   {platform.system()} {platform.machine()}"
         fig.text(0.07, 0.932, sub, fontsize=8.5, color=MUTED)
-        src = f"Source: video {cfg.video}" if cfg.video else (
+        src = (f"Source: video {cfg.video}  ({cfg.screen.width}x{cfg.screen.height} px as displayed, {cfg.camera.update_rate_hz:.2f} fps average, "
+               f"{len(records)} frames, {cfg.duration_s:.2f} s)" if cfg.video else (
             f"Source: simulator, screen {cfg.screen.width}x{cfg.screen.height}, targets {len(cfg.targets)}, "
             f"motion {cfg.targets[0].motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
             f"platform {cfg.disturbance.platform_motion} {cfg.disturbance.platform_px_frame:g} px/f, jitter {cfg.disturbance.jitter_px:g} px, "
-            f"S&P {cfg.disturbance.salt_pepper_frac:g}, gauss {cfg.disturbance.gaussian_sigma:g}")
+            f"S&P {cfg.disturbance.salt_pepper_frac:g}, gauss {cfg.disturbance.gaussian_sigma:g}"))
         fig.text(0.07, 0.905, src, fontsize=7.5, color=MUTED, wrap=True)
         fig.text(0.07, 0.878, f"Camera {cfg.camera.width}x{cfg.camera.height}, FOV {cfg.camera.fov_w_deg:g}x{cfg.camera.fov_h_deg:g} deg, "
                  f"IFOV {cfg.camera.ifov_deg*3600:.1f} arcsec/px, max rate {cfg.camera.max_pan_rate_deg_s:g}/{cfg.camera.max_tilt_rate_deg_s:g} deg/s, "
