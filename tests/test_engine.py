@@ -141,13 +141,16 @@ def test_video_source_runs(tmp_path: Path):
     path = None
     for name, fourcc in (("bench.mp4", "mp4v"), ("bench.avi", "MJPG"), ("bench.mkv", "FFV1")):
         cand = tmp_path / name
-        vw = cv2.VideoWriter(str(cand), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), isColor=False)
-        if not vw.isOpened():
+        try:
+            vw = cv2.VideoWriter(str(cand), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), isColor=True)
+            if not vw.isOpened():
+                continue
+            for _ in range(90):
+                img, _ = w.render()
+                vw.write(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
+            vw.release()
+        except cv2.error:
             continue
-        for _ in range(90):
-            img, _ = w.render()
-            vw.write(img)
-        vw.release()
         if cand.exists() and cand.stat().st_size > 1000:
             path = cand
             break
