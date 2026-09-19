@@ -95,10 +95,23 @@ class World:
             truth.beacons.append((x + d.shift[0], y + d.shift[1]))
             truth.visible.append(st.visible)
         img = self.disturbance.apply_image(img, boxes, d)
+        if cfg.screen.colour:
+            img = self._colourise(img)
         truth.window = self.gimbal.window_rect()
         self.t += self.dt
         self.frame_idx += 1
         return img, truth
+
+    def _colourise(self, gray: np.ndarray) -> np.ndarray:
+        """Colour camera option (PS row 2): a three-channel frame. The sky takes a faint
+        blue cast and bright sources a warm one, as a colour FPA would render a near-white
+        beacon; luminance is preserved so the tracker sees the same picture."""
+        g = gray.astype(np.float32)
+        w = np.clip((g - 60.0) / 140.0, 0.0, 1.0)          # 0 on the sky, 1 on a bright source
+        b = g * (1.06 - 0.10 * w)
+        gch = g * (1.00 + 0.00 * w)
+        r = g * (0.94 + 0.12 * w)
+        return np.clip(np.dstack([b, gch, r]), 0, 255).astype(np.uint8)   # BGR for OpenCV
 
     def observed(self, img: np.ndarray) -> np.ndarray:
         """What the tracker is allowed to see. Full picture by default; in hard mode only

@@ -44,6 +44,7 @@ class VideoSource:
         path = Path(cfg.video)
         if not path.exists():
             raise FileNotFoundError(path)
+        self.colour = bool(cfg.screen.colour)
         self.cap = cv2.VideoCapture(str(path))
         if not self.cap.isOpened():
             raise RuntimeError(f"cannot open video {path}")
@@ -67,8 +68,11 @@ class VideoSource:
             ok, bgr = self.cap.read()
             if not ok:
                 break
-            gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
-            yield Frame(i, i * self.dt, gray, None)
+            if self.colour and bgr.ndim == 3:
+                yield Frame(i, i * self.dt, bgr, None)
+            else:
+                gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+                yield Frame(i, i * self.dt, gray, None)
             i += 1
         self.cap.release()
 

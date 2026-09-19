@@ -8,6 +8,8 @@ root = Path(SPECPATH)
 datas = [
     (str(root / "configs" / "scenarios"), "configs/scenarios"),
     (str(root / "docs" / "USER_MANUAL.md"), "docs"),
+    *([(str(root / "docs" / "USER_MANUAL.pdf"), "docs")] if (root / "docs" / "USER_MANUAL.pdf").exists() else []),
+    *([(str(root / "docs" / "TECHNICAL_REPORT.pdf"), "docs")] if (root / "docs" / "TECHNICAL_REPORT.pdf").exists() else []),
 ]
 if (root / "models" / "beacon_heatmap.onnx").exists():
     datas.append((str(root / "models" / "beacon_heatmap.onnx"), "models"))
