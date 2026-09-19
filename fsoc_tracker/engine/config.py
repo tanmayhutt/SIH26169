@@ -50,13 +50,14 @@ class TargetConfig:
     shape: str = "square"            # square | circle | gaussian
     size_px: int = 10
     intensity: int = 235             # peak grey level 0..255
-    motion: str = "line"             # line | circular | figure8 | random | spiral | sinusoidal | static
+    motion: str = "line"             # line | circular | figure8 | random | spiral | sinusoidal | waypoints | static
     speed_px_s: float = 120.0        # along-track speed for line, random, sinusoidal
     radius_px: float = 400.0         # circular, figure8, spiral
     period_s: float = 12.0           # circular, figure8, sinusoidal
     start: str = "random"            # random | centre | "x,y"
     heading_deg: float = 30.0        # line, sinusoidal
     blink_hz: float = 0.0            # 0 = steady; >0 modulates intensity (optional realism)
+    waypoints: str = ""              # user-defined path for motion "waypoints": "x,y; x,y; ..." in screen px, looped at speed_px_s
 
 
 @dataclass

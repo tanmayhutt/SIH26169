@@ -42,7 +42,7 @@ def test_gimbal_rate_and_pose_limits():
 
 
 # ------------------------------------------------------------------ targets
-@pytest.mark.parametrize("motion", ["line", "circular", "figure8", "random", "spiral", "sinusoidal"])
+@pytest.mark.parametrize("motion", ["line", "circular", "figure8", "random", "spiral", "sinusoidal", "waypoints"])
 def test_targets_stay_on_screen_and_are_deterministic(motion):
     tc = TargetConfig(motion=motion, speed_px_s=200, radius_px=400)
     a = Target(tc, 2000, 2000, np.random.default_rng(3))

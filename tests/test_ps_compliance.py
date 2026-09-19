@@ -35,7 +35,7 @@ def test_rows_7_to_12_target_parameters():
     src = inspect.getsource(targets.Target.state)
     for m in ("line", "circular", "figure8", "random"):                 # row 12: at least these four
         assert f'"{m}"' in src, m
-    for m in ("spiral", "sinusoidal"):                                  # row 12: optional ones present too
+    for m in ("spiral", "sinusoidal", "waypoints"):                     # row 12: optional ones present too, incl. user-defined
         assert f'"{m}"' in src, m
 
 

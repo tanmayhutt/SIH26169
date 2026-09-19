@@ -141,11 +141,13 @@
     <div class="row"><span>Shape</span><select id="target.shape"><option>square</option><option>circle</option><option>gaussian</option></select></div>
     <div class="row"><span>Size (px)</span><input type="number" id="target.size_px" min="2" max="60"></div>
     <div class="row"><span>Peak intensity</span><input type="number" id="target.intensity" min="20" max="255"></div>
-    <div class="row"><span>Motion</span><select id="target.motion"><option>line</option><option>circular</option><option>figure8</option><option>random</option><option>spiral</option><option>sinusoidal</option><option>static</option></select></div>
+    <div class="row"><span>Motion</span><select id="target.motion"><option>line</option><option>circular</option><option>figure8</option><option>random</option><option>spiral</option><option>sinusoidal</option><option>waypoints</option><option>static</option></select></div>
     <div class="row"><span>Speed (px/s)</span><input type="number" id="target.speed_px_s"></div>
     <div class="row"><span>Radius (px)</span><input type="number" id="target.radius_px"></div>
     <div class="row"><span>Period (s)</span><input type="number" id="target.period_s" step="0.5"></div>
     <div class="row"><span>Start</span><select id="target.start"><option>random</option><option>centre</option></select></div>
+    <div class="row"><span>Waypoints (x,y; x,y)</span><input type="text" id="target.waypoints" placeholder="300,300; 1700,400; 1000,1600"></div>
+    <div class="hint">Waypoints define the user-defined path for motion "waypoints" (PS row 12, optional): followed at the speed above and looped.</div>
     <div class="sec">Disturbances (PS rows 21-25)</div>
     <div class="row"><span>Atmosphere</span><select id="disturbance.atmosphere"></select></div>
     <div class="row"><span>Salt and pepper (0-0.5)</span><input type="number" id="disturbance.salt_pepper_frac" step="0.01" min="0" max="0.5"></div>
