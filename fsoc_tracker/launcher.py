@@ -22,11 +22,25 @@ def _chdir_to_bundle():
                     pass
 
 
+def _absolutise(args: list[str]) -> list[str]:
+    """Relative file paths on the command line mean 'relative to where I launched from',
+    so resolve them before the working directory moves into the bundle."""
+    out = []
+    for a in args:
+        p = Path(a)
+        if not a.startswith("-") and not p.is_absolute() and (p.exists() or p.parent.exists() and p.suffix):
+            out.append(str(p.resolve()))
+        else:
+            out.append(a)
+    return out
+
+
 def main():
+    args = _absolutise(sys.argv[1:])
     _chdir_to_bundle()
-    if len(sys.argv) > 1:
+    if args:
         from fsoc_tracker.cli import main as cli_main
-        return cli_main(sys.argv[1:])
+        return cli_main(args)
     from fsoc_tracker.gui.app import main as gui_main
     return gui_main()
 
