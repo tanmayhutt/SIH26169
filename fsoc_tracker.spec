@@ -1,6 +1,8 @@
 # PyInstaller spec: builds the standalone desktop application.
 #   .venv/bin/pyinstaller fsoc_tracker.spec
-# Output: dist/FSOC-Tracker/  (one folder, run FSOC-Tracker inside it)
+# Output: dist/FSOC-Tracker/  (one folder, run FSOC-Tracker inside it; FSOC-Tracker-cli.exe on Windows for the terminal)
+# Built for Windows, Linux and macOS (Intel and Apple silicon) by .github/workflows/build.yml.
+import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
@@ -35,4 +37,8 @@ exe = EXE(
     console=False,
     icon=None,
 )
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="FSOC-Tracker")
+extra = []
+if sys.platform == "win32":
+    # Windowed executables print nothing on Windows; this second entry point is the command line tool.
+    extra.append(EXE(pyz, a.scripts, [], exclude_binaries=True, name="FSOC-Tracker-cli", console=True, icon=None))
+coll = COLLECT(exe, *extra, a.binaries, a.datas, strip=False, upx=False, name="FSOC-Tracker")
