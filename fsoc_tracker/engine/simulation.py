@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterator
 
+import cv2
 import numpy as np
 
 from ..control.controller import Controller
@@ -60,12 +61,14 @@ class Simulation:
             t0 = time.perf_counter()
             img = frame.image
             obs = self.source.world.observed(img) if isinstance(self.source, SyntheticSource) else img
+            # the tracker always works on luminance; a colour frame is display only
+            lum = cv2.cvtColor(obs, cv2.COLOR_BGR2GRAY) if obs.ndim == 3 else obs
             # ego-motion: mask the current estimate so the beacon does not bias the shift
             mask_c = self.tracker.imm.position() if self.tracker.imm.initialised else None
-            ego_dx, ego_dy, ego_conf = self.ego.step(obs, mask_c)
+            ego_dx, ego_dy, ego_conf = self.ego.step(lum, mask_c)
             self.tracker.observe_ego(ego_dx, ego_dy, ego_conf)
             win_rect = self.gimbal.window_rect()
-            out = self.tracker.step(obs, win_rect if window_only else None)
+            out = self.tracker.step(lum, win_rect if window_only else None)
             cmd = self.controller.step(out, ego_dx, ego_dy, window_only)
             acted = self.gimbal.apply(cmd, self.dt)
             self.last_cmd = acted

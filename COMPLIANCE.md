@@ -12,7 +12,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | Row | PS text | Suggested value | Our default | Implemented in | Verified by | Status |
 |---|---|---|---|---|---|---|
 | 1 | Screen Size (min.) | 2000 x 2000, user-defined | 2000 x 2000, editable | `ScreenConfig.width/height` | `test_rows_1_to_6` | 🟩 |
-| 2 | Camera Type | Monochrome FPA, colour optional | monochrome, colour switch | `ScreenConfig.colour` | `test_rows_1_to_6` | 🟩 |
+| 2 | Camera Type | Monochrome FPA, colour optional | monochrome; colour renders a three-channel frame, tracker uses luminance | `ScreenConfig.colour`, `World._colourise` | `test_rows_1_to_6` | 🟩 |
 | 3 | Camera Resolution | 640 x 480, user-defined | 640 x 480, editable | `CameraConfig.width/height` | `test_rows_1_to_6` | 🟩 |
 | 4 | Camera FOV | user-defined, default 4 x 3 deg | 4 x 3 deg, editable; IFOV derived | `CameraConfig.fov_*`, `ifov_deg` | `test_rows_1_to_6`, `test_ifov_and_conversions` | 🟩 |
 | 5 | Camera update rate | 30 Hz min | 30 Hz, editable upward | `CameraConfig.update_rate_hz` | `test_rows_1_to_6` | 🟩 |
@@ -56,8 +56,8 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 |---|---|---|---|
 | Software application | standalone executable implementing the complete system | `fsoc_tracker.spec` -> `dist/FSOC-Tracker/` (macOS built and self-tested) | 🟨 Windows and Linux builds pending |
 | Source code | complete, modular, adequately commented, documented | `fsoc_tracker/`, docstrings, `README.md`, `ARCHITECTURE.md` | 🟩 |
-| Technical report | 10 to 15 pages: problem understanding, architecture, modules, tracking methods, AI methods, test methodology, performance analysis, future improvements | `docs/TECHNICAL_REPORT.md` | 🟨 performance table to fill from the batch envelope; export to PDF pending |
-| User manual | installation, operation, parameter configuration, GUI description | `docs/USER_MANUAL.md` | 🟩 (export to PDF pending) |
+| Technical report | 10 to 15 pages: problem understanding, architecture, modules, tracking methods, AI methods, test methodology, performance analysis, future improvements | `docs/TECHNICAL_REPORT.md` and `.pdf`, performance table from the measured envelope | 🟩 |
+| User manual | installation, operation, parameter configuration, GUI description | `docs/USER_MANUAL.md` and `.pdf`; also the User manual button and Help in the application | 🟩 |
 | Demo video (optional) | 3 to 5 minutes | | ⬜ |
 | Performance log | automatically generated: simulation duration, FPS, acquisition time, average and maximum tracking error, lock retention rate, processing time | `frames.csv`, `summary.json`, `report.pdf` written at the end of every run, each metric with its definition | 🟩 |
 

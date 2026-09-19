@@ -244,9 +244,13 @@ class Worker(QtCore.QObject):
 
 
 # ----------------------------------------------------------------------------- image views
-def to_qimage(gray: np.ndarray) -> QtGui.QImage:
-    h, w = gray.shape
-    g = np.ascontiguousarray(gray)
+def to_qimage(img: np.ndarray) -> QtGui.QImage:
+    if img.ndim == 3:
+        rgb = np.ascontiguousarray(img[:, :, ::-1])          # OpenCV BGR to RGB
+        h, w, _ = rgb.shape
+        return QtGui.QImage(rgb.data, w, h, 3 * w, QtGui.QImage.Format.Format_RGB888).copy()
+    h, w = img.shape
+    g = np.ascontiguousarray(img)
     return QtGui.QImage(g.data, w, h, w, QtGui.QImage.Format.Format_Grayscale8).copy()
 
 
@@ -270,7 +274,7 @@ class SceneView(QtWidgets.QLabel):
 
     def update_view(self, res: StepResult, ifov_deg: float):
         img = res.observed
-        h, w = img.shape
+        h, w = img.shape[:2]
         side = min(self.width(), self.height()) - 8
         s = side / max(h, w)
         small = to_qimage(img).scaled(int(w * s), int(h * s), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
@@ -335,11 +339,11 @@ class CameraView(QtWidgets.QLabel):
 
     def update_view(self, res: StepResult, ifov_deg: float, capture_px: float):
         img = res.observed
-        H, W = img.shape
+        H, W = img.shape[:2]
         x0, y0, w, h = res.window
         xa, ya = max(x0, 0), max(y0, 0)
         xb, yb = min(x0 + w, W), min(y0 + h, H)
-        crop = np.zeros((h, w), np.uint8)
+        crop = np.zeros((h, w) if img.ndim == 2 else (h, w, 3), np.uint8)
         if xb > xa and yb > ya:
             crop[ya - y0:yb - y0, xa - x0:xb - x0] = img[ya:yb, xa:xb]
         # display-only contrast stretch so faint scenes stay visible
@@ -449,6 +453,7 @@ class MainWindow(QtWidgets.QMainWindow):
         tb.addAction("Save scenario", self.save_scenario).setToolTip("Ctrl+S")
         tb.addAction("Screenshot", self.screenshot).setToolTip("Ctrl+P: save a PNG of this window into results/")
         tb.addAction("Results folder", self.open_results)
+        tb.addAction("User manual", self.open_manual).setToolTip("Opens the user manual (PDF if present, otherwise the Markdown)")
         tb.addAction("Help", self.help)
 
         central = QtWidgets.QWidget(); self.setCentralWidget(central)
@@ -835,7 +840,7 @@ class MainWindow(QtWidgets.QMainWindow):
         cap.release()
         if not ok:
             QtWidgets.QMessageBox.warning(self, "Video", "Could not read the first frame of this file."); return
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+        gray = bgr if (self.forms["screen"].read().colour and bgr.ndim == 3) else (cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr)
         self.video_info = {"w": w, "h": h, "fps": fps, "frames": n, "seconds": n / fps if fps else 0}
         side = min(self.scene_view.width(), self.scene_view.height()) - 8
         s = side / max(h, w)
@@ -872,6 +877,12 @@ class MainWindow(QtWidgets.QMainWindow):
         Path(self.cfg.output_dir).mkdir(exist_ok=True)
         p = Path(self.cfg.output_dir) / f"screenshot_{time.strftime('%Y%m%d_%H%M%S')}.png"
         self.grab().save(str(p)); self.lbl_status.setText(f"Screenshot saved: {p}")
+
+    def open_manual(self):
+        for cand in ("docs/USER_MANUAL.pdf", "docs/USER_MANUAL.md", "_internal/docs/USER_MANUAL.pdf", "_internal/docs/USER_MANUAL.md"):
+            if Path(cand).exists():
+                _open_path(Path(cand)); return
+        QtWidgets.QMessageBox.information(self, "User manual", "The manual was not found next to the application. It is docs/USER_MANUAL.md in the repository.")
 
     def open_results(self):
         d = Path(self.cfg.output_dir); d.mkdir(exist_ok=True); _open_path(d)

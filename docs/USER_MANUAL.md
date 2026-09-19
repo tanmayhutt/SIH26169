@@ -75,6 +75,7 @@ Optional, to retrain the AI detector: `pip install -e ".[train]"` then
 | Save scenario | Save the panel as a `.yaml`; it appears in the Scenario list. Ctrl+S. |
 | Screenshot | Save a PNG of the window into `results/`. Ctrl+P. |
 | Results folder | Open `results/`. |
+| User manual | Open this manual. |
 | Help | Legend and output summary. |
 
 ### Tiles (live specification check)
@@ -128,7 +129,7 @@ suggested range are allowed where the table says "user-defined".
 
 ### Screen (rows 1 to 2)
 - Width, Height: scene size in pixels. Default 2000 x 2000.
-- Colour camera: renders in colour; the tracker uses luminance.
+- Colour camera: renders a three-channel colour frame (PS row 2, optional); the tracker always works on luminance, so results are identical.
 - Background: starfield, terrain, gradient or flat. Sky level and star density.
 
 ### Camera (rows 3 to 6, 13 to 15)

@@ -198,8 +198,8 @@ of measurements; on a real phone video it supplied half of them. It is the inten
 |---|---|
 | `COMPLIANCE.md`, point-by-point check of every PS row, shall item, deliverable and evaluation stage, backed by `tests/test_ps_compliance.py` | 🟩 |
 | Progress website (`web/`, published by GitHub Pages at https://tanmaytiwari.me/SIH26169/ on every push) | 🟩 |
-| `docs/USER_MANUAL.md` | 🟩 |
-| `docs/TECHNICAL_REPORT.md` | 🟨 structure and methods written; performance table to fill from the batch envelope |
+| `docs/USER_MANUAL.md` and `.pdf` | 🟩 |
+| `docs/TECHNICAL_REPORT.md` and `.pdf` | 🟩 performance table filled from the measured envelope |
 | `ARCHITECTURE.md` | 🟩 |
 | `docs/plan.html` (plain-English briefing, open locally in a browser) | 🟩 |
 | Demo video, 3 to 5 min | ⬜ |

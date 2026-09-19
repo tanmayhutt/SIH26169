@@ -173,25 +173,51 @@ the classical path.
 
 ## 7. Performance analysis
 
-Fill from `results/batch/<stamp>/envelope.md` and the individual `report.pdf` files.
+All figures below are measured by the software itself and copied from
+`results/batch/20260919_015655/envelope.md` (five seeds per scenario, 15 s each) and
+`results/batch_hard/20260919_020453/envelope.md` (hard mode, five seeds, 25 s). Tracking error
+is the mean distance from the true beacon to the window centre over frames after acquisition;
+centroiding error is the mean distance from the measured centroid to the true centroid; lock
+retention is the share of frames in TRACK with the estimate within 30 px of the window centre.
 
-| Scenario | Acquisition (s) | Tracking error mean (px) | Centroiding error mean (px) | Lock retention (%) | FPS |
-|---|---|---|---|---|---|
-| clear, line | | | | | |
-| clear, circular | | | | | |
-| clear, figure of 8 | | | | | |
-| clear, random | | | | | |
-| noise (S&P 10%, Gaussian 20, Poisson) | | | | | |
-| fog | | | | | |
-| low light | | | | | |
-| platform sway 20 px/f + vibration 20 px/f | | | | | |
-| multi-target stress | | | | | |
+| Scenario | Acquisition mean / max (s) | Tracking error mean / worst seed (px) | Centroiding error mean (px) | Lock retention, worst seed (%) | FPS, worst seed | Spec rows 16 to 20 |
+|---|---|---|---|---|---|---|
+| clear, line | 1.01 / 1.27 | 7.98 / 8.85 | 0.01 | 100.0 | 187 | pass |
+| clear, circular | 0.93 / 1.43 | 6.60 / 7.31 | 0.01 | 100.0 | 182 | pass |
+| clear, figure of 8 | 1.05 / 1.37 | 7.18 / 7.80 | 0.01 | 99.8 | 178 | pass |
+| clear, random walk | 1.01 / 1.23 | 10.13 / 11.48 | 0.01 | 98.1 | 180 | mean at the 10 px limit |
+| noise: salt and pepper 10%, Gaussian sigma 20, Poisson | 0.95 / 1.10 | 7.66 / 8.05 | 0.19 | 100.0 | 95 | pass |
+| fog | 0.91 / 1.43 | 6.62 / 7.29 | 0.08 | 100.0 | 105 | pass |
+| low light | 1.07 / 1.43 | 7.17 / 8.01 | 0.17 | 100.0 | 104 | pass |
+| platform sway 12 px/frame + vibration 20 px/frame | 0.84 / 0.97 | 19.89 / 20.11 (14.6 with vibration removed) | 0.02 | 96.5 | 87 | tracking error above 10 px: the truth itself moves 20 px per frame |
+| platform at the PS maximum, 20 + 20 px/frame | 0.94 / 1.23 | 25.30 / 26.25 | 0.05 | 79.3 | 87 | fails lock retention: gimbal at 90% of its slew budget |
+| multi-target stress: 3 beacons, haze, noise, sway, vibration | 0.95 / 1.27 | 42.77 / 153.70 | 26.63 | 69.2 | 54 | one seed of five swapped to a decoy; the other four hold 13 to 17 px |
+| hard mode, tracker sees only the window | 6.93 / 12.07 | 7.05 / 7.56 | 0.05 | 100.0 | 47 | acquisition beyond 2 s: a blind sweep at 5 deg/s needs up to 12 s |
 
-Discussion points: centroiding accuracy versus noise; the vibration-removed tracking error
-as the physically followable part; slew saturation under maximum platform motion; where the
-CNN contributed measurements.
+Discussion.
 
----
+- Centroiding accuracy is set by the sub-pixel Gaussian fit and holds at 0.01 px in clear air and
+  0.2 px under the heaviest noise the problem statement lists. This is the quantity compared in
+  both benchmark rounds.
+- Tracking error on smooth paths is 6.6 to 8 px, inside the 10 px specification, with lock at
+  or near 100%. The random walk sits at the limit because its accelerations are unpredictable
+  by construction: the controller can only lead what the estimator can extrapolate.
+- Under vibration the raw tracking error exceeds 10 px because the true beacon position jumps
+  up to 20 px every frame; the vibration-removed figure (14.6 px) is the part a rate-limited
+  gimbal can physically follow. Both are printed in every report.
+- At the maximum platform motion the gimbal saturates in about a third of frames and lock drops
+  to 79 to 88%. This is a property of the mandated 5 deg/s motor against a 3.75 deg/s
+  disturbance, documented rather than tuned away; raising the limit to the allowed 10 deg/s
+  restores lock.
+- Identity among decoys holds in four seeds of five; the failing seed loses the beacon during a
+  sway excursion and re-locks a similar decoy. The designation audit recovers some cases; a
+  stronger appearance model is future work.
+- Processing runs at 47 to 190 FPS on a 2000 x 2000 scene on a laptop CPU, against the 20 FPS
+  requirement. Hard mode is slowest because full-window detection runs every frame during the
+  sweep.
+- The AI detector reached 8 px validation localisation after retraining and is kept as a
+  gap-filling fallback; it supplied about half the measurements on a real 60 fps phone video
+  and none on the simulated scenes, where the classical detector never loses the beacon.
 
 ## 8. Future improvements
 

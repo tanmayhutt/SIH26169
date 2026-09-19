@@ -444,7 +444,21 @@
     .budget div, .usp li, .split > div, .glossary > div { box-shadow: 0 0 0 1px var(--line); }
     .chain li, .split > div, .glossary > div { break-inside: avoid; page-break-inside: avoid; }
   }
+
+  /* sign-in gate */
+  html:not(.gate-open) main, html:not(.gate-open) .shell { visibility: hidden; }
+  #gate { position: fixed; inset: 0; background: var(--ground, #0A1117); display: grid; place-items: center; z-index: 50; padding: 20px; }
+  .gate-card { width: min(380px, 100%); background: var(--surface, #111C24); border: 1px solid var(--line, #22323D); border-radius: 4px; padding: 26px 26px 22px; display: grid; gap: 12px; }
+  .gate-eyebrow { font-family: var(--f-mono, monospace); font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent, #52C4DE); }
+  .gate-card h1 { font-family: var(--f-display, sans-serif); font-size: 26px; margin: 0; }
+  .gate-card p { margin: 0; color: var(--muted, #8DA1AD); font-size: 13.5px; }
+  .gate-card label { display: grid; gap: 4px; font-family: var(--f-mono, monospace); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted, #8DA1AD); }
+  .gate-card input { font: inherit; font-family: var(--f-body, sans-serif); font-size: 14px; padding: 9px 10px; background: var(--ground, #0A1117); border: 1px solid var(--line, #22323D); border-radius: 3px; color: var(--ink, #E3ECF1); }
+  .gate-card input:focus { outline: none; border-color: var(--accent, #52C4DE); }
+  .gate-card button { font: inherit; font-family: var(--f-mono, monospace); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 10px; border: 1px solid var(--accent, #52C4DE); background: var(--accent-bg, #0E2F3A); color: var(--accent, #52C4DE); border-radius: 3px; cursor: pointer; }
+  .gate-err { color: var(--signal, #E08D4C); font-size: 13px; min-height: 1.2em; }
 </style>
+<script src="gate.js"></script>
 </head>
 <body>
 <div class="shell">
