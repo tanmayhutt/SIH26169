@@ -5,8 +5,9 @@ Free Space Optical Communication (FSOC) Terminals. Smart India Hackathon SIH2616
 Organisation: Department of Space / Indian Space Research Organisation, Space Applications Centre.
 
 Sections follow the order the problem statement asks for: problem understanding, system
-architecture, software modules, tracking methods, AI methods, test methodology, performance
-analysis, future improvements. Figures referenced as `results/...` are produced by the
+architecture, software modules, tracking methods, AI methods, the application, test methodology,
+performance analysis, future improvements, with appendices for the scenario pack, metric definitions,
+the command line and the row-by-row parameter mapping. Figures referenced as `results/...` are produced by the
 software itself; the numbers in section 7 are copied from `results/batch/<stamp>/envelope.md`.
 
 ---
@@ -43,6 +44,28 @@ that steers the camera, live statistics, and an automatically generated performa
   the timing and lock metrics.
 - Two error terms appear in the specification and are both logged: tracking error (true
   beacon to window centre) and centroiding error (measured centroid to true centroid).
+
+### 1.4 Points the problem statement leaves open, and the choice made
+
+| Question | Choice | Reason |
+|---|---|---|
+| Does the tracker see the whole screen or only the camera window? | Whole screen by default; a hard mode restricts it to the window | "Observe the surrounding environment" and "simulated video stream"; a blind sweep at 5 deg/s cannot meet 2 s acquisition for far corners |
+| Screen pixels to degrees | One screen pixel equals one camera pixel: 12.5 deg across 2000 px | The only anchor given is 4 deg over 640 px |
+| Meaning of "tracking error" and "centroiding error" | Tracking: true beacon to window centre. Centroiding: measured to true centroid. Both logged with printed definitions | The PS uses both terms without defining them |
+| Meaning of "lock" | TRACK state with the estimate within 30 px of the window centre | Acquisition needs a capture criterion; 20 px was tried and only lowered retention under vibration without lowering error |
+| A sustained 20 px per frame platform shift | A bounded sway with that peak speed, amplitude at most 20% of the screen | A sustained shift leaves the screen in seconds |
+| Role of AI | Classical detector first; CNN fills gaps and targets faint beacons; trained on the simulator's exact labels | Keeps frame rate and reliability independent of the model |
+
+### 1.5 Numbers that shape the design
+
+| Quantity | Value | Derivation |
+|---|---|---|
+| Angular size of one pixel | 22.5 arcsec | 4 deg / 640 px |
+| Allowed tracking error | 0.0625 deg | 10 px x 22.5 arcsec |
+| Maximum window motion | 26.7 px per frame | 5 deg/s / 30 Hz / 0.00625 deg per px |
+| Platform motion at the PS maximum | 20 px per frame, 75% of the slew budget | row 25 against row 13 |
+| Window-sized areas per screen | about 13 | (2000/640) x (2000/480) |
+| Centre to corner with the target known | 0.95 s | max(4.25 deg, 4.75 deg) / 5 deg/s, both axes moving together |
 
 ---
 
@@ -123,6 +146,11 @@ prediction through short dropouts; REACQUIRE widens the search with the growing 
 and falls back to SEARCH if it exceeds the screen. In hard mode (tracker restricted to the
 window) SEARCH drives an outward spiral.
 
+Figure 1 shows both error terms on a clear circular path: the window settles within about
+a second and holds 6 to 8 px while the centroid stays within 0.01 px of the truth.
+
+![Figure 1: tracking and centroiding error on a clear circular path](figures/fig1_clear_circular_errors.png)
+
 ### 4.4 Control
 The angular error is the IFOV times the pixel offset from the window centre to the target
 position led by the command latency (velocity and acceleration), with the window's own
@@ -130,6 +158,19 @@ motion led likewise. The command is feedforward of the target angular rate plus 
 error, with a 1.5 px deadband and integrator clamping while saturated. The gimbal model
 applies rate saturation (5 to 10 deg/s), acceleration saturation and a one-frame latency,
 and reports saturation to the log.
+
+Figure 2 shows the beacon and window paths in the multi-target stress scenario (haze, salt
+and pepper, Gaussian and Poisson noise, circular platform sway, vibration, two decoys): the
+window path follows the figure of eight of the designated beacon and ignores the decoys.
+Figure 3 shows the gimbal command against its limit under platform sway plus vibration, and
+the raw and vibration-removed tracking errors. Figure 4 shows the state machine and the IMM
+model probabilities during a hard-mode run: a square-spiral search, verification, then track.
+
+![Figure 2: paths in the multi-target stress scenario](figures/fig2_stress_paths.png)
+
+![Figure 3: gimbal command and tracking error under platform sway and vibration](figures/fig3_platform_jitter.png)
+
+![Figure 4: tracker state and IMM model probabilities in hard mode](figures/fig4_hardmode_states.png)
 
 ---
 
@@ -154,7 +195,28 @@ the classical path.
 
 ---
 
-## 6. Test methodology
+## 6. The desktop application
+
+The deliverable is a standalone desktop application (PyQt6, packaged with PyInstaller). Its
+window has a parameter panel with one control per problem statement row and a tooltip naming
+that row; six live tiles that turn green when the specification is met (state, acquisition
+time, mean tracking error, mean centroiding error, lock retention, FPS); a scene view of the
+whole screen with the camera window, trails, a 2 degree grid and a legend; a camera view of
+what the window sees with the capture ring, the pointing-error vector, the detection box, the
+prediction with its uncertainty ring and a 1 degree scale bar; four live plots; and a telemetry
+column with every internal quantity. A scenario picker, playback speed control and keyboard
+shortcuts support the ten to fifteen minute functional demonstration. "Open video" bypasses
+the simulator for Benchmark 2 and previews the file's first frame and facts before the run.
+Every run ends with a dialog summarising the specification check and opens the PDF report on
+request.
+
+![Figure 6: the application during the multi-target stress scenario](figures/fig6_application.png)
+
+![Figure 7: a video loaded for Benchmark 2, before Start](figures/fig7_video_preview.png)
+
+---
+
+## 7. Test methodology
 
 - Unit tests (`tests/`): IFOV and pose conversions, gimbal saturation and pose limits,
   determinism and screen bounds of every motion type, centroid accuracy on clean frames,
@@ -171,7 +233,7 @@ the classical path.
 
 ---
 
-## 7. Performance analysis
+## 8. Performance analysis
 
 All figures below are measured by the software itself and copied from
 `results/batch/20260919_015655/envelope.md` (five seeds per scenario, 15 s each) and
@@ -212,6 +274,10 @@ Discussion.
 - Identity among decoys holds in four seeds of five; the failing seed loses the beacon during a
   sway excursion and re-locks a similar decoy. The designation audit recovers some cases; a
   stronger appearance model is future work.
+Figure 5 summarises the envelope: mean and worst-seed tracking error per scenario.
+
+![Figure 5: tracking error across scenarios and seeds](figures/fig5_envelope.png)
+
 - Processing runs at 47 to 190 FPS on a 2000 x 2000 scene on a laptop CPU, against the 20 FPS
   requirement. Hard mode is slowest because full-window detection runs every frame during the
   sweep.
@@ -219,7 +285,7 @@ Discussion.
   gap-filling fallback; it supplied about half the measurements on a real 60 fps phone video
   and none on the simulated scenes, where the classical detector never loses the beacon.
 
-## 8. Future improvements
+## 9. Future improvements
 
 - Reinforcement-learned gain scheduling on top of the classical controller, trained in the
   same simulator.
@@ -228,3 +294,80 @@ Discussion.
 - Beacon modulation with lock-in detection for identity in dense clutter.
 - Hardware in the loop: the `FrameSource` and gimbal interfaces already isolate the
   simulator, so a real camera and pan-tilt unit can be substituted.
+
+
+---
+
+## Appendix A. Scenario pack
+
+| File | Purpose | Beacon | Disturbances |
+|---|---|---|---|
+| clear_line.yaml | mandatory path 1 | square 10 px, straight line 150 px/s | none |
+| clear_circular.yaml | mandatory path 2 | circle radius 450 px, period 14 s | none |
+| clear_figure8.yaml | mandatory path 3 | figure of 8, radius 500 px | none |
+| clear_random.yaml | mandatory path 4 | random walk, 140 px/s | none |
+| noisy_line.yaml | row 21 at its stated levels | line | salt and pepper 10%, Gaussian sigma 20, Poisson |
+| fog_circular.yaml | row 24 | circular | fog preset, Gaussian sigma 8 |
+| lowlight_figure8.yaml | row 24 | figure of 8 | low light preset, Gaussian sigma 12, Poisson |
+| lowlight_faint.yaml | beyond the classical detector | gaussian 8 px, intensity 150 | low light, noise |
+| platform_jitter.yaml | rows 23 and 25 | circular, centred | linear sway 12 px/frame, vibration 20 px/frame |
+| platform_max.yaml | rows 23 and 25 at the PS maximum | circular, centred | linear sway 20 px/frame, vibration 20 px/frame |
+| full_stress.yaml | rows 8, 21, 23, 24, 25 together | figure of 8 plus two decoys | haze, salt and pepper 5%, Gaussian 12, Poisson, circular sway, vibration 10 |
+| hardmode_line.yaml | tracker restricted to the window | line | none |
+
+## Appendix B. Metric definitions printed in every report
+
+| Metric | Definition |
+|---|---|
+| Simulation duration | Last frame time minus first. |
+| FPS | Mean of 1 / per-frame processing time (detection, estimation, control). Row 20. |
+| Acquisition time | First frame in TRACK with the tracked beacon within the capture radius of the window centre, from t = 0. Row 16. |
+| Tracking error, mean and maximum | Distance from the true beacon to the window centre over frames after acquisition. Row 17. |
+| Tracking error, vibration removed | The same with the per-frame vibration subtracted from the truth. |
+| Centroiding error | Distance from the measured centroid to the true centroid over frames with a detection; mean, maximum, RMSE. |
+| Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
+| Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. Row 19. |
+| Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
+| AI share | Percentage of frames in which the CNN provided the accepted measurement. |
+
+## Appendix C. Command line reference
+
+```
+fsoc-tracker run   --scenario configs/scenarios/<name>.yaml [--seed N | -1] [--duration S] [--out DIR]
+fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--out DIR]
+fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--duration S] [--out DIR]
+fsoc-tracker gui
+```
+
+Each run writes `frames.csv` (one row per frame, about 45 columns), `summary.json` (all metrics
+with definitions and pass or fail), `report.pdf` and `scenario.yaml` (the exact parameters, so
+the run can be repeated). `batch` adds `envelope.md` and `envelope.json`.
+
+## Appendix D. Problem statement parameter table, row by row
+
+| Row | Parameter | Suggested value | Implementation |
+|---|---|---|---|
+| 1 | Screen size (min.) | 2000 x 2000, user-defined | `ScreenConfig.width/height`, default 2000 x 2000 |
+| 2 | Camera type | Monochrome FPA, colour optional | monochrome default; colour renders three channels, tracker uses luminance |
+| 3 | Camera resolution | 640 x 480, user-defined | `CameraConfig.width/height` |
+| 4 | Camera FOV | user-defined, default 4 x 3 deg | `CameraConfig.fov_*`; IFOV derived |
+| 5 | Camera update rate | 30 Hz min | `CameraConfig.update_rate_hz` |
+| 6 | Initial camera position | centre of the screen | gimbal pose 0 at the screen centre |
+| 7 | Target type | beacon spot | rendered spot with PSF |
+| 8 | Number of targets | 1 mandatory, multiple optional | `RunConfig.targets` list; the first is designated |
+| 9 | Target shape | user-defined, default square | square, circle, gaussian |
+| 10 | Target size | 5 to 20 px, default 10 x 10 | `TargetConfig.size_px` |
+| 11 | Initial target location | user-defined, default random | random, centre, or "x,y" |
+| 12 | Motion | line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, plus static |
+| 13, 14 | Max pan and tilt speed | 5 to 10 deg/s, default 5 | enforced in the gimbal model |
+| 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz |
+| 16 | Acquisition time | <= 2 s | measured, pass or fail printed |
+| 17 | Tracking error | <= 10 px | measured, pass or fail printed |
+| 18 | Target loss | < 5% | measured, pass or fail printed |
+| 19 | Re-acquisition time | <= 1 s | measured, pass or fail printed |
+| 20 | Processing speed | >= 20 FPS | measured, pass or fail printed |
+| 21 | Image noise | salt and pepper about 10%, Gaussian, Poisson; one or more | three independent switches |
+| 22 | Max standard deviation of noise | 20, user-defined | `gaussian_sigma` |
+| 23 | Max camera jitter | +/- 20 px per frame, user-defined | `jitter_px`, applied to the picture |
+| 24 | Atmospheric disturbance | clear, haze, fog, rain, low light; user-defined contrast and brightness reduction | five presets plus editable contrast, brightness, blur, turbulence |
+| 25 | Platform motion | +/- 20 px per frame max; linear mandatory; others optional | five bounded sway patterns with the configured peak speed |
