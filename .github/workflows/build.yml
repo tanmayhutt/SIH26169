@@ -74,6 +74,9 @@ jobs:
             tar -czf "../out/FSOC-Tracker-${{ matrix.label }}.tar.gz" FSOC-Tracker
           fi
           ls -l ../out
+      - name: Package check (extract the archive as a user would; scenarios, video mode, GUI start)
+        shell: bash
+        run: python tests/package_check.py out/FSOC-Tracker-${{ matrix.label }}.${{ matrix.archive }}
       - uses: actions/upload-artifact@v4
         with:
           name: FSOC-Tracker-${{ matrix.label }}
