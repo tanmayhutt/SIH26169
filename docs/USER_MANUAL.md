@@ -246,6 +246,20 @@ fsoc-tracker gui
 `batch` runs every scenario over every seed and writes `envelope.md`, a table of the
 worst and mean results per scenario.
 
+### Evaluator-supplied files
+
+Benchmark Performance 1 gives you scenario parameters. Copy
+`configs/scenarios/TEMPLATE_evaluator.yaml`, which lists every field with the PS row it
+implements, fill in the given values, save it under `configs/scenarios/`, and it appears in
+the Scenario picker of both applications; or run it with `fsoc-tracker run -s <file>`.
+Fields the evaluators do not specify stay at the PS defaults.
+
+Benchmark Performance 2 gives you `.mp4` files. No scenario file is needed: open the file in
+the desktop application, drop it on the web app, or run `fsoc-tracker video <file>`. The
+per-frame CSV then carries `det_x`, `det_y` (the measured centroids) for comparison with the
+evaluators' predefined values, and the report carries acquisition, re-acquisition, lock
+retention and FPS.
+
 ## 7. Output files
 
 Each run creates `results/<name>_<timestamp>/`:

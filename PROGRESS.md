@@ -127,8 +127,8 @@ flowchart LR
 | Noise: 10% salt and pepper, sigma 20, Poisson | 7.3 px | 100% | 🟩 |
 | Fog | 6.6 px | 100% | 🟩 |
 | Low light | 7.0 px | 100% | 🟩 |
-| Platform sway 12 px/f + vibration 20 px/f | 20 px raw, 14.6 px vibration removed | 99% | 🟨 raw exceeds 10 px because the truth itself jumps 20 px per frame |
-| Platform at PS maximum 20 + 20 px/f | 25 px | 83% | 🟨 documented limit: gimbal at 90% of slew budget |
+| Platform sway 12 px/f + vibration 20 px/f | 20 px raw, 14.6 px vibration removed | 99% | 🟥 physical limit: a random per-frame jitter cannot be cancelled before the frame arrives; the vibration-removed error is reported alongside |
+| Platform at PS maximum 20 + 20 px/f | 23 to 26 px | 80 to 88% | 🟥 physical limit: gimbal at 90% of its 5 deg/s slew budget; 10 deg/s (allowed by the PS) clears it |
 | Multi-target stress with haze, noise, sway | 13.6 to 14.4 px | 98 to 99% | 🟩 identity held on every seed (fitted width, refined association, frozen signature at crossings) |
 | Hard mode | 6.5 to 8.9 px after acquisition | 100% | 🟩 acquisition 3 to 12 s |
 | Faint beacon at 3 to 6 sigma | 6.9 to 7.6 px | 93 to 96% (4 of 5 seeds; one seed 78%) | 🟩 track-before-detect on a moving-target residual, acquisition 1.5 to 2 s |

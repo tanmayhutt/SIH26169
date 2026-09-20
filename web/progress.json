@@ -322,8 +322,8 @@
           "status": "done"
         },
         {
-          "name": "Evaluator-supplied files (at the event; scenario YAML and video paths ready)",
-          "status": "backlog"
+          "name": "Evaluator-supplied files: template scenario with every PS row labelled (configs/scenarios/TEMPLATE_evaluator.yaml) and the video path are ready; the files themselves arrive at the event",
+          "status": "in progress"
         }
       ]
     },
@@ -765,18 +765,18 @@
               "status": "done"
             },
             {
-              "name": "Sway 12 px/f plus vibration: 99% lock",
-              "status": "in progress",
+              "name": "Sway 12 px/f plus vibration: 99% lock; raw error 20 px because the picture itself jumps 20 px per frame, 14.6 px with the vibration removed. A random per-frame jitter is unknowable before the frame arrives, so no controller can cancel it: physical limit, documented",
+              "status": "blocked",
               "tag": "20 px raw"
             },
             {
-              "name": "PS maximum sway: 83% lock",
-              "status": "in progress",
+              "name": "PS maximum sway 20 + 20 px/f: 80 to 88% lock, gimbal at 90% of its 5 deg/s slew budget; the PS allows up to 10 deg/s, which clears it: physical limit, documented",
+              "status": "blocked",
               "tag": "limit"
             },
             {
-              "name": "Multi-target stress: 93% lock",
-              "status": "in progress"
+              "name": "Multi-target stress: 98 to 99% lock on every seed",
+              "status": "done"
             },
             {
               "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 1.5 to 2 s acquisition, 93 to 96% lock",
