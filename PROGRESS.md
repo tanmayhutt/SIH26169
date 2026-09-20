@@ -206,7 +206,7 @@ The web app is the architecture-neutral path.
 | Document | Status |
 |---|---|
 | `COMPLIANCE.md`, point-by-point check of every PS row, shall item, deliverable and evaluation stage, backed by `tests/test_ps_compliance.py` | 🟩 |
-| Progress website (`web/`), served from the project server under /progress/ | 🟩 |
+| Progress website (`web/`), served from the project server at /about/ | 🟩 |
 | Web app (`webapp/`), same engine in the browser, served at the project site root with a desktop download prompt | 🟩 |
 | Desktop builds for Windows x64, Linux x64, macOS Intel and Apple silicon (`.github/workflows/build.yml`, tests and smoke test per OS) | 🟩 |
 | `docs/USER_MANUAL.md` and `.pdf` | 🟩 |

@@ -5,11 +5,11 @@
 #   bash webapp/deploy.sh                       # full deploy
 #   HOST=ubuntu@1.2.3.4 DOMAIN=x.example.com bash webapp/deploy.sh
 #
-# Caddy layout on $DOMAIN:
-#   /            the web app (reverse proxy to the service); /app/* redirects here for old links
-#   /about/      progress record (also at /progress/)
-# The whole site is behind basic auth (credential set once on the server, see below).
-#   /downloads/  desktop builds and the PDF documents
+# Site map on $DOMAIN (everything behind one basic-auth login):
+#   /               the web app (FastAPI on 127.0.0.1:8095): /api/*, /ws/*, /runs/*, /static/*
+#   /about/         progress record and documents (static)
+#   /downloads/     desktop builds, PDFs, demo video (static, browsable)
+#   /progress, /app old addresses, redirected to /about/ and / (temporary redirects, never cached)
 set -euo pipefail
 HOST=${HOST:-ubuntu@15.206.247.203}
 DOMAIN=${DOMAIN:-sih26169.blankpoint.club}
@@ -24,15 +24,16 @@ rsync -az --delete \
   --exclude context.md --exclude '.pytest_cache' \
   "$HERE/" "$HOST:$REPO/"
 
-echo "== 2. static site (progress, downloads) -> $SITE"
+echo "== 2. static site (about, downloads) -> $SITE"
 STAGE=$(mktemp -d)
-mkdir -p "$STAGE/progress/content/docs" "$STAGE/downloads"
-cp "$HERE/web/index.html" "$HERE/web/progress.json" "$HERE/web/plan.html" "$STAGE/progress/"
-cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/progress/content/"
-cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/progress/content/docs/"
+mkdir -p "$STAGE/about/content/docs" "$STAGE/downloads"
+cp "$HERE/web/index.html" "$HERE/web/progress.json" "$STAGE/about/"
+cp "$HERE/docs/plan.html" "$STAGE/about/plan.html"
+cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/about/content/"
+cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/demo/FSOC-Tracker-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
-cp "$HERE/docs/DEMO_SCRIPT.md" "$STAGE/progress/content/docs/" 2>/dev/null || true
+cp "$HERE/docs/DEMO_SCRIPT.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title>
@@ -50,7 +51,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <li><a href="FSOC-Tracker-demo.mp4">FSOC-Tracker-demo.mp4</a> <small>demonstration video, about four minutes: eight scenarios and Benchmark 2, composed from the engine's own frames with live specification tiles</small></li>
 </ul>
 <p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
-</ul><p><a href="/">Back to the web app</a></p></body></html>
+</ul><p><a href="/">Web app</a> &middot; <a href="/about/">Progress and documents</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
 # keep the archives already on the server when dist/ holds none locally (a docs-only deploy)
@@ -95,7 +96,9 @@ if ! sudo test -s "$HASHFILE"; then echo "progress basic auth hash missing: crea
 HASH=$(sudo cat "$HASHFILE")
 USERNAME=$(sudo cat /etc/caddy/sih26169.progress.user 2>/dev/null || echo tanmay123)
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF
-# SIH26169: web app at the root, progress record, downloads. Managed by webapp/deploy.sh.
+# SIH26169 site. Managed by webapp/deploy.sh; edit there, not here.
+#   /            web app (reverse proxy)      /about/      progress record (static)
+#   /downloads/  builds and documents (static) /progress,/app  old addresses -> redirects
 $DOMAIN {
     encode zstd gzip
     header {
@@ -107,23 +110,30 @@ $DOMAIN {
     basic_auth {
         $USERNAME $HASH
     }
-    redir /progress /progress/ 308
-    redir /downloads /downloads/ 308
-    redir /app / 308
-    redir /app/ / 308
+
+    # canonical addresses end with a slash
     redir /about /about/ 302
+    redir /downloads /downloads/ 302
+
+    # old addresses (temporary redirects so browsers never cache them)
+    redir /progress /about/ 302
+    redir /progress/* /about/ 302
+    redir /app /  302
+    redir /app/* / 302
+
+    # static: progress record and documents
     handle_path /about/* {
-        root * $SITE/site/progress
+        root * $SITE/site/about
         file_server
     }
-    handle /progress/* {
-        root * $SITE/site
-        file_server
-    }
-    handle /downloads/* {
-        root * $SITE/site
+
+    # static: desktop builds, PDFs, demo video
+    handle_path /downloads/* {
+        root * $SITE/site/downloads
         file_server browse
     }
+
+    # everything else is the web app: /, /api/*, /ws/*, /runs/*, /static/*
     handle {
         reverse_proxy 127.0.0.1:8095 {
             transport http {
