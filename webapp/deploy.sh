@@ -36,7 +36,7 @@ cp "$HERE/docs/demo/FSOC-Tracker-demo.mp4" "$STAGE/downloads/" 2>/dev/null || tr
 cp "$HERE/docs/DEMO_SCRIPT.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 <style>body{margin:0;background:#0A1117;color:#E3ECF1;font-family:"IBM Plex Sans",-apple-system,sans-serif;padding:40px 22px;max-width:760px;margin:0 auto}h1,h2{font-family:"IBM Plex Sans Condensed",sans-serif}h2{margin-top:28px;font-size:20px}a{color:#52C4DE}li{margin:8px 0}small{color:#8DA1AD}</style></head>
 <body><h1>Downloads and documents</h1>
 <h2>Desktop application</h2><p><small>Download the archive for your platform, extract it to a folder you can write to, run the executable. No installation and no Python needed. Results are written to a <code>results</code> folder next to it.</small></p><ul>

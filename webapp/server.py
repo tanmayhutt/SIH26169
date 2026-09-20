@@ -350,6 +350,12 @@ async def ws(websocket: WebSocket, run_id: str):
         r.unsubscribe(q)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Browsers ask for this path by default; hand them the PNG."""
+    return FileResponse(str(STATIC / "favicon-32.png"), media_type="image/png")
+
+
 @app.get("/api/health")
 def health():
     a = _active()
