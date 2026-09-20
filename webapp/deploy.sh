@@ -7,7 +7,7 @@
 #
 # Caddy layout on $DOMAIN:
 #   /            the web app (reverse proxy to the service); /app/* redirects here for old links
-#   /progress/   progress record
+#   /about/      progress record (also at /progress/)
 # The whole site is behind basic auth (credential set once on the server, see below).
 #   /downloads/  desktop builds and the PDF documents
 set -euo pipefail
@@ -111,8 +111,11 @@ $DOMAIN {
     redir /downloads /downloads/ 308
     redir /app / 308
     redir /app/ / 308
-    redir /about /progress/ 308
-    redir /about/* /progress/ 308
+    redir /about /about/ 308
+    handle_path /about/* {
+        root * $SITE/site/progress
+        file_server
+    }
     handle /progress/* {
         root * $SITE/site
         file_server
