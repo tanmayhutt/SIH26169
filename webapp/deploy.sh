@@ -111,7 +111,7 @@ $DOMAIN {
     redir /downloads /downloads/ 308
     redir /app / 308
     redir /app/ / 308
-    redir /about /about/ 308
+    redir /about /about/ 302
     handle_path /about/* {
         root * $SITE/site/progress
         file_server
