@@ -1,0 +1,15 @@
+name: platform_max_10degs
+# Same disturbances as platform_max, with the gimbal at the 10 deg/s the PS allows (rows 13 and 14: 5 to 10 deg/s).
+camera:
+  max_pan_rate_deg_s: 10
+  max_tilt_rate_deg_s: 10
+seed: 11
+duration_s: 30
+targets:
+  - {shape: square, size_px: 10, motion: circular, radius_px: 300, period_s: 14, start: centre}
+disturbance:
+  platform_motion: linear
+  platform_px_frame: 20
+  jitter_px: 20
+  gaussian_sigma: 6
+  atmosphere: clear
