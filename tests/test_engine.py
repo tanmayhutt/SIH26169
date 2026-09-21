@@ -161,5 +161,5 @@ def test_video_source_runs(tmp_path: Path):
     s = sim.run()
     assert s.values["frames"] >= 80
     assert not s.truth_available
-    assert (tmp_path / "out" / "frames.csv").exists()
+    assert sim.files["frames"].exists() and sim.files["frames"].name.startswith("FSOC_video_")
     assert s.values["lock_retention_pct"] > 80

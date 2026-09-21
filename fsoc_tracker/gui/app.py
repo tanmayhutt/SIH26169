@@ -16,6 +16,7 @@ import pyqtgraph as pg
 from .. import __version__
 from ..engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConfig
 from ..engine.metrics import SPEC
+from ..engine.naming import run_label
 from ..engine.report import write_report
 from ..engine.simulation import Simulation, StepResult
 from .theme import STYLESHEET, C
@@ -658,8 +659,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         try:
             cfg = self.read_cfg()
-            stamp = time.strftime("%Y%m%d_%H%M%S")
-            self.out_dir = Path(cfg.output_dir) / f"{'video_' if cfg.video else ''}{cfg.name}_{stamp}"
+            self.out_dir = Path(cfg.output_dir) / run_label(cfg)
             self.sim = Simulation(cfg, self.out_dir)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Cannot start", str(e)); return
@@ -769,7 +769,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_finished(self, sim: Simulation):
         self._teardown()
         try:
-            report = write_report(sim.cfg, sim.telemetry.records, sim.summary, self.out_dir / "report.pdf")
+            report = write_report(sim.cfg, sim.telemetry.records, sim.summary, sim.files["report"])
         except Exception as e:
             report = None
             QtWidgets.QMessageBox.warning(self, "Report", f"Report generation failed:\n{e}")
@@ -789,7 +789,7 @@ class MainWindow(QtWidgets.QMainWindow):
                f"Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
                f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
                f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99\n\n"
-               f"Log: {self.out_dir / 'frames.csv'}\nReport: {report}")
+               f"Log: {sim.files['frames']}\nReport: {report}")
         sat = v.get("slew_saturation_pct", 0.0)
         if sat > 20:
             msg += (f"\n\nNote: the gimbal was at its rate limit in {sat:.0f}% of frames, so the target moved faster than the camera can turn. "
@@ -927,7 +927,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "Right picture: what the camera window sees. Dashed ring = capture radius (green when locked). "
             "Green box = this frame's detection. Orange dot = prediction with uncertainty ring. Line from centre = pointing error.\n"
             "Tiles: live specification check. Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n\n"
-            "OUTPUT\nEvery run writes frames.csv, summary.json, report.pdf and scenario.yaml into results/.\n\n"
+            "OUTPUT\nEvery run writes a folder results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/ holding <label>_frames.csv, _summary.json, _report.pdf and _scenario.yaml.\n\n"
             "See docs/USER_MANUAL.md for parameters and metric definitions."))
 
 

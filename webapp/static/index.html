@@ -377,7 +377,7 @@ with it can watch the same run.`;
     const b = k => p[k] === true ? '<span class="badge pass">pass</span>' : p[k] === false ? '<span class="badge fail">fail</span>' : '';
     const checks = ["fps_mean", "acquisition_time_s", "tracking_err_mean_px", "target_loss_pct", "reacq_time_max_s"].filter(k => p[k] !== undefined);
     const ok = checks.filter(k => p[k] === true).length;
-    const names = { "report.pdf": "PDF report", "frames.csv": "Per-frame CSV", "summary.json": "Summary JSON", "scenario.yaml": "Scenario file" };
+    const names = { report: "PDF report", frames: "Per-frame CSV", summary: "Summary JSON", scenario: "Scenario file" };
     $("finish").innerHTML = `<h3>Run complete <span class="badge ${ok === checks.length ? "pass" : "fail"}">${ok} of ${checks.length} specification checks pass</span></h3><table>
       <tr><td>Frames</td><td>${v.frames}</td><td>Duration</td><td>${g("duration_s")} s</td></tr>
       <tr><td>FPS mean</td><td>${g("fps_mean")} ${b("fps_mean")}</td><td>Acquisition</td><td>${g("acquisition_time_s")} s ${b("acquisition_time_s")}</td></tr>

@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from .engine.config import RunConfig
+from .engine.naming import run_label
 from .engine.report import write_report
 from .engine.simulation import Simulation
 
@@ -34,7 +35,7 @@ def _run_one(cfg: RunConfig, out: Path, quiet: bool = False) -> dict:
     summary = sim.run(prog)
     if not quiet:
         print(file=sys.stderr)
-    write_report(cfg, sim.telemetry.records, summary, out / "report.pdf")
+    write_report(cfg, sim.telemetry.records, summary, sim.files["report"])
     v = summary.values
     if not quiet:
         print(f"  frames {v.get('frames')}  fps {v.get('fps_mean', 0):.1f}  acq {v.get('acquisition_time_s', float('nan')):.2f}s  "
@@ -81,7 +82,7 @@ def main(argv=None):
             cfg.seed = a.seed if a.seed >= 0 else int(np.random.default_rng().integers(0, 10 ** 6))
         if a.duration is not None:
             cfg.duration_s = a.duration
-        out = Path(a.out) if a.out else Path(cfg.output_dir) / f"{cfg.name}_{stamp}"
+        out = Path(a.out) if a.out else Path(cfg.output_dir) / run_label(cfg)
         _run_one(cfg, out)
         return 0
 
@@ -90,7 +91,7 @@ def main(argv=None):
         cfg.video = a.path
         cfg.name = Path(a.path).stem
         cfg.duration_s = a.duration if a.duration is not None else 0.0
-        out = Path(a.out) if a.out else Path(cfg.output_dir) / f"video_{cfg.name}_{stamp}"
+        out = Path(a.out) if a.out else Path(cfg.output_dir) / run_label(cfg)
         _run_one(cfg, out)
         return 0
 
