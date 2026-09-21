@@ -57,6 +57,8 @@ cross-platform smoke test the build workflow runs.
 
 - `docs/USER_MANUAL.md`: installation, GUI, parameters, Benchmark 2, output files, metric definitions.
 - `docs/TECHNICAL_REPORT.md`: problem understanding, architecture, modules, methods, tests, performance.
+- `docs/TESTING_GUIDE.md`: how to exercise every input and configuration by hand, with expected outcomes.
+- `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 - `ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
 
 ## Licence
