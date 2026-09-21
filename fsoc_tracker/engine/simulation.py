@@ -19,6 +19,7 @@ from ..world.camera import Gimbal, RateCommand
 from .config import RunConfig
 from .metrics import Summary, summarise
 from .sources import Frame, SyntheticSource, VideoSource, make_source
+from .naming import label_from_dir, output_paths
 from .telemetry import Record, Telemetry
 
 
@@ -48,9 +49,11 @@ class Simulation:
         self.controller = Controller(cfg.tracker, self.gimbal, self.dt)
         self.ego = EgoMotion()
         self.out_dir = out_dir
+        self.label = label_from_dir(out_dir, cfg) if out_dir is not None else None
+        self.files = output_paths(out_dir, self.label) if out_dir is not None else {}
         if out_dir is not None:
             out_dir.mkdir(parents=True, exist_ok=True)
-        self.telemetry = Telemetry(out_dir / "frames.csv" if (out_dir and write_csv) else None)
+        self.telemetry = Telemetry(self.files["frames"] if (out_dir and write_csv) else None)
         self.t_start = None
         self.summary: Summary | None = None
         self.last_cmd = RateCommand()
@@ -92,9 +95,9 @@ class Simulation:
         self.telemetry.close()
         self.summary = summarise(self.telemetry.records, self.cfg.camera.ifov_deg, wall)
         if self.out_dir is not None:
-            with open(self.out_dir / "summary.json", "w", encoding="utf-8") as f:
+            with open(self.files["summary"], "w", encoding="utf-8") as f:
                 json.dump({"config": self.cfg.to_dict(), **self.summary.to_dict()}, f, indent=2)
-            self.cfg.save(self.out_dir / "scenario.yaml")
+            self.cfg.save(self.files["scenario"])
         return self.summary
 
     # --------------------------------------------------------------- record

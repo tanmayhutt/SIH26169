@@ -20,9 +20,10 @@ statement (PS) rows they implement.
    TRACK, COAST, REACQUIRE.
 4. **Controller.** From the prediction it commands pan and tilt rates so the beacon sits at the
    window centre, leading the target through the latency and feeding forward its velocity.
-5. **Log and report.** Every frame goes to `frames.csv`; at the end `summary.json` and
-   `report.pdf` are written with acquisition time, tracking error, centroiding error, lock
-   retention, re-acquisition times, FPS and the definitions of each.
+5. **Log and report.** Every run gets a folder `results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/`.
+   Every frame goes to `<label>_frames.csv`; at the end `<label>_summary.json` and
+   `<label>_report.pdf` are written with acquisition time, tracking error, centroiding error,
+   lock retention, re-acquisition times, FPS and the definitions of each.
 
 Lock means: state TRACK and the estimate within 30 px of the window centre. Acquisition time
 is the first frame with lock. Tracking error is the true beacon to the window centre.
@@ -38,8 +39,8 @@ retention.
    above 20 FPS (green). The cyan window on the scene view follows the orange truth circle.
 3. Stop. Report. A PDF opens: header with the configuration, a table with pass and fail
    marks against the PS limits, plots, and the metric definitions.
-4. Open the results folder next to the application. It holds `frames.csv`, `summary.json`,
-   `scenario.yaml`, `report.pdf`.
+4. Open the results folder next to the application. It holds one folder per run named
+   `FSOC_sim_clear_line_seed<N>_<date-time>`, with the four labelled files inside.
 
 If step 2 does not lock within 2 s on clear line, something is wrong with the installation,
 not the settings; see the manual, section 2.
@@ -140,7 +141,7 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 4. Start. The simulator is bypassed and the frames are the scene. No ground truth exists, so
    the tracking and centroiding error tiles read n/a; State, Acquisition, Lock and Processing
    still work.
-5. Open `frames.csv`: `det_x`, `det_y` are the measured centroids per frame for comparison with
+5. Open `<label>_frames.csv`: `det_x`, `det_y` are the measured centroids per frame for comparison with
    the evaluators' predefined values; `est_x`, `est_y` the filtered estimate; `mode` and
    `locked` the state. The report carries acquisition, re-acquisition, lock retention and FPS.
 

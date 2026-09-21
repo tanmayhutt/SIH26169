@@ -9,7 +9,7 @@ Endpoints
     POST /api/stop/{run_id}        stop early (the report is still written)
     WS   /ws/{run_id}              live frames (scene, camera) and per-frame telemetry
     POST /api/video                upload an .mp4 for Benchmark 2; returns its probed facts
-    GET  /runs/{run_id}/...        frames.csv, summary.json, report.pdf, scenario.yaml
+    GET  /runs/{run_id}/{report|frames|summary|scenario}   the run's files, named FSOC_<kind>_<name>_seed<N>_<time>_<file>
 One run at a time per server; a second request while one is live gets 409.
 """
 from __future__ import annotations
@@ -102,7 +102,7 @@ class Run:
             if self.stop.is_set():
                 sim.finish()
             self.summary = sim.summary
-            write_report(self.cfg, sim.telemetry.records, sim.summary, self.out / "report.pdf")
+            write_report(self.cfg, sim.telemetry.records, sim.summary, sim.files["report"])
         except Exception as e:  # surface to the client
             import traceback
             self.error = traceback.format_exc()
@@ -314,18 +314,19 @@ def run_status(run_id: str):
     out = {"run_id": run_id, "done": r.done.is_set(), "error": r.error}
     if r.summary is not None:
         out["summary"] = _json_safe(r.summary.to_dict())
-        out["files"] = {k: f"/runs/{run_id}/{k}" for k in ("report.pdf", "frames.csv", "summary.json", "scenario.yaml") if (r.out / k).exists()}
+        files = getattr(r.sim, "files", {}) if hasattr(r, "sim") else {}
+        out["files"] = {k: f"/runs/{run_id}/{k}" for k in ("report", "frames", "summary", "scenario") if k in files and files[k].exists()}
+        out["label"] = getattr(r.sim, "label", None) if hasattr(r, "sim") else None
     return out
 
 
 @app.get("/runs/{run_id}/{name}")
 def run_file(run_id: str, name: str):
-    if name not in ("report.pdf", "frames.csv", "summary.json", "scenario.yaml"):
+    r = RUN.get(run_id)
+    files = getattr(r.sim, "files", {}) if (r is not None and hasattr(r, "sim")) else {}
+    if name not in files or not files[name].exists():
         raise HTTPException(404)
-    p = RUNS / run_id / name
-    if not p.exists():
-        raise HTTPException(404)
-    return FileResponse(str(p), filename=f"{run_id}_{name}")
+    return FileResponse(str(files[name]), filename=files[name].name)
 
 
 @app.websocket("/ws/{run_id}")

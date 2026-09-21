@@ -15,8 +15,8 @@ The application simulates the coarse alignment stage of an FSOC link entirely in
   motion, camera vibration, and sensor noise.
 - The tracker detects the beacon, measures its centre to a fraction of a pixel, predicts
   where it is going, and steers the camera window to keep it centred.
-- Every run writes a per-frame log (`frames.csv`), a summary (`summary.json`) and an
-  automatic performance report (`report.pdf`).
+- Every run writes a per-frame log, a summary and an automatic performance report into
+  one folder named `FSOC_<sim|video>_<name>_seed<N>_<date-time>` (section 7).
 - For Benchmark 2, an `.mp4` video can be opened in place of the simulated scene.
 
 ## 2. Installation
@@ -262,14 +262,27 @@ retention and FPS.
 
 ## 7. Output files
 
-Each run creates `results/<name>_<timestamp>/`:
+Every run gets one label and one folder named after it:
+
+```
+results/FSOC_sim_<scenario>_seed<N>_<YYYYMMDD-HHMMSS>/      simulated run
+results/FSOC_video_<file name>_<YYYYMMDD-HHMMSS>/           Benchmark 2 run on a video
+```
+
+for example `results/FSOC_sim_clear_line_seed7_20260922-101530/`. The four files inside carry
+the same label as a prefix, so a report copied out of its folder still says which scenario,
+seed and time it belongs to:
 
 | File | Contents |
 |---|---|
-| `frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time. |
-| `summary.json` | All metrics with their definitions and pass/fail against the specification. |
-| `report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. |
-| `scenario.yaml` | The exact parameters used, so the run can be repeated. |
+| `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time. |
+| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification. |
+| `<label>_report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. |
+| `<label>_scenario.yaml` | The exact parameters used, so the run can be repeated. |
+
+With `--out <folder>` on the command line the folder is yours; the files inside are still
+labelled. Batch runs write `results/batch/<time>/<scenario>_seed<N>/` with labelled files and
+an `envelope.md` table. The web app names its downloads the same way.
 
 ## 8. Metric definitions
 

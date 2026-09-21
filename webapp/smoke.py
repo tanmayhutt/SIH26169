@@ -45,7 +45,7 @@ def main() -> int:
             time.sleep(1)
         else:
             print("run did not finish"); return 1
-        with urllib.request.urlopen(f"{BASE}/runs/{rid}/report.pdf", timeout=10) as r:
+        with urllib.request.urlopen(f"{BASE}/runs/{rid}/report", timeout=10) as r:
             pdf = r.read()
         if not pdf.startswith(b"%PDF"):
             print("report is not a PDF"); return 1

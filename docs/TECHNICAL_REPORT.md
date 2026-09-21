@@ -73,7 +73,7 @@ that steers the camera, live statistics, and an automatically generated performa
 
 ```
 DISPLAY (PyQt6)      scene view, camera view with HUD, live plots, parameter panel
-INSTRUMENTATION      telemetry bus -> frames.csv, summary.json, report.pdf
+INSTRUMENTATION      telemetry bus -> <label>_frames.csv, _summary.json, _report.pdf
 SIMULATION LOOP      fixed step at the camera update rate; deterministic from (scenario, seed)
    WORLD             scene, beacons, camera window and gimbal, disturbance chain, renderer
    PERCEPTION        FrameSource (simulator | video), classical detector, CNN detector,
@@ -369,7 +369,8 @@ fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--duration S] [-
 fsoc-tracker gui
 ```
 
-Each run writes `frames.csv` (one row per frame, about 45 columns), `summary.json` (all metrics
+Each run writes, into a folder named `FSOC_<sim|video>_<name>_seed<N>_<date-time>` and with that
+label prefixed to every file, `frames.csv` (one row per frame, about 45 columns), `summary.json` (all metrics
 with definitions and pass or fail), `report.pdf` and `scenario.yaml` (the exact parameters, so
 the run can be repeated). `batch` adds `envelope.md` and `envelope.json`.
 

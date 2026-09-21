@@ -92,7 +92,7 @@ def main() -> int:
             line = [l for l in out.splitlines() if "fps" in l and "frames" in l]
             print(f"{scen}: {line[-1].strip() if line else 'no summary line'}")
             for f in ("report.pdf", "frames.csv", "summary.json"):
-                if not (folder / "results" / name / f).is_file():
+                if not list((folder / "results" / name).glob(f"FSOC_*_{f}")):
                     raise SystemExit(f"{scen}: {f} not written")
         vid = make_video(tmp)
         if vid is None:
@@ -102,7 +102,7 @@ def main() -> int:
             line = [l for l in out.splitlines() if "fps" in l and "frames" in l]
             print(f"video: {line[-1].strip() if line else 'no summary line'}")
             for f in ("report.pdf", "frames.csv"):
-                if not (folder / "results" / "t3" / f).is_file():
+                if not list((folder / "results" / "t3").glob(f"FSOC_video_*_{f}")):
                     raise SystemExit(f"video: {f} not written")
         for d in ("configs", "models", "docs"):
             if not (folder / d).exists():
