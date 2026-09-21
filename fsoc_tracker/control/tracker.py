@@ -62,6 +62,8 @@ class Tracker:
         exp = cfg.targets[0].size_px if cfg.targets else None
         self.classical = ClassicalDetector(self.tc, exp, cfg.targets[0].shape if cfg.targets else "square")
         self.cnn = CNNDetector(self.tc.cnn_model) if self.tc.detector in ("cnn", "hybrid") else None
+        if self.cnn is not None:
+            self.cnn.warm_up()          # pay the model start-up here, not in the middle of a track
         self.imm = IMM(dt)
         self.mode = Mode.SEARCH
         self.verify_hits: list[bool] = []

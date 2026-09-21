@@ -244,6 +244,16 @@ class CNNDetector:
         except Exception:
             return False
 
+    def warm_up(self) -> None:
+        """Load the model and run one inference on an empty patch, so the first real call
+        during tracking does not pay the session start-up (about 1.5 s on a laptop)."""
+        if self.available():
+            try:
+                x = np.zeros((1, 1, self.patch, self.patch), np.float32)
+                self.session.run(None, {self.input_name: x})
+            except Exception:
+                pass
+
     def detect(self, img: np.ndarray, cx: float, cy: float) -> Candidate | None:
         if not self.available():
             return None
