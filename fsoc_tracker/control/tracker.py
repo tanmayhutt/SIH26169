@@ -71,6 +71,7 @@ class Tracker:
         self._faint_v = (0.0, 0.0)
         self._faint_q: list[float] = []
         self._det_img: np.ndarray | None = None
+        self._audit_det: ClassicalDetector | None = None   # half-resolution detector for the identity audit
         self._static: np.ndarray | None = None   # running mean of the picture: stars and sky, not a moving beacon
         self.miss_count = 0
         self.frames_in_mode = 0
@@ -276,13 +277,25 @@ class Tracker:
         picture and ask whether some other spot matches the designated beacon clearly
         better than the one being followed. Three consecutive strikes re-designate. This
         recovers from locking a decoy while the beacon was briefly out of the picture."""
-        cands = self.classical.detect(img)
-        if len(cands) < 2:
+        # the audit only needs to find the few bright spots, so it looks at a half-size copy
+        # of the picture (a quarter of the work); the spots it keeps are then re-measured at
+        # full resolution, so sizes and widths are compared on the real pixels
+        if self._audit_det is None:
+            self._audit_det = ClassicalDetector(self.tc, (self.classical.expected_size_px or 10) / 2.0, self.classical.expected_shape)
+        small = img[::2, ::2]
+        coarse = self._audit_det.detect(small, refine=0, limit=8)
+        if len(coarse) < 2:
             self._audit_strikes = 0
             return
-        # the comparison is by fitted width, so the spots compared must be refined
         floor = self.tc.acquire_conf_min
-        cands = [self.classical.refine(img, c) for c in cands if c.confidence >= floor - 0.1][:6]
+        cands = []
+        for c in coarse:
+            if c.confidence < floor - 0.1:
+                continue
+            full = self.classical.detect(img, (int(max(2 * c.x - 24, 0)), int(max(2 * c.y - 24, 0)), int(min(2 * c.x + 24, self.w)), int(min(2 * c.y + 24, self.h))), refine=1, limit=1)
+            if full:
+                cands.append(full[0])
+        cands = cands[:6]
         if len(cands) < 2:
             self._audit_strikes = 0
             return
