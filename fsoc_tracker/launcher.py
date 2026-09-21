@@ -9,6 +9,15 @@ import sys
 from pathlib import Path
 
 
+def _quiet_environment():
+    """The bundle carries its own libraries. Tools from a developer's package manager on the
+    PATH (Homebrew's fontconfig, for one) would otherwise be picked up by the font cache
+    build and print a harmless but alarming loader warning."""
+    if getattr(sys, "frozen", False) and sys.platform == "darwin":
+        parts = [p for p in os.environ.get("PATH", "").split(os.pathsep) if not p.startswith(("/opt/homebrew", "/usr/local"))]
+        os.environ["PATH"] = os.pathsep.join(parts)
+
+
 def _chdir_to_bundle():
     """Packaged runs resolve configs/, models/ and results/ next to the executable."""
     if getattr(sys, "frozen", False):
@@ -48,6 +57,7 @@ def _absolutise(args: list[str]) -> list[str]:
 
 def main():
     args = _absolutise(sys.argv[1:])
+    _quiet_environment()
     _chdir_to_bundle()
     if args:
         from fsoc_tracker.cli import main as cli_main
