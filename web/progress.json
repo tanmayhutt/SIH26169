@@ -2,11 +2,11 @@
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
   "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 13 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
-  "updated": "2026-09-20",
+  "updated": "2026-09-21",
   "verification": {
-    "title": "Build verification: September 20, 2026",
-    "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf.",
-    "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Windows and Linux archives are verified by the runner's tests and packaged smoke test plus archive inspection, not by a hand-driven GUI session on those systems.",
+    "title": "Build verification: September 21, 2026",
+    "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
+    "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
       {
         "name": "Automated tests",
@@ -16,12 +16,12 @@
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "12 scenarios, 15 s each, 3 seeds, compared run by run with the September 19 baseline: no run worse, four better. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 7.1 to 12.3 px at 91 to 96% (was not acquired at all). Multi-target stress 13.6 to 14.4 px at 98 to 99% on every seed (one seed was 69%). Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep."
+        "text": "13 scenarios (incl. the platform maximum at 10 deg/s), 15 s each, 3 seeds, compared run by run with the September 19 baseline: no run worse, four better. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.7 to 12.3 px at 91 to 97.5% over ten seeds (was not acquired at all). Multi-target stress 13.6 to 14.4 px at 98 to 99% on every seed (one seed was 69%). Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep."
       },
       {
         "name": "Multi-seed envelope",
         "status": "pass",
-        "text": "3 seeds per scenario, all 12 scenarios. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum holds 80 to 88% lock, the documented gimbal limit."
+        "text": "3 seeds per scenario, all 13 scenarios; the faint scenario over 10 seeds. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum holds 76 to 88% lock at 5 and at 10 deg/s alike: the random per-frame vibration is the physical limit."
       },
       {
         "name": "Truth independence",
@@ -749,19 +749,19 @@
           "caption": "results, 15 s runs",
           "items": [
             {
-              "name": "Clear paths 6.7 to 7.3 px, 100% lock",
+              "name": "Clear paths 6.4 to 8.2 px, 100% lock, 3 seeds",
               "status": "done"
             },
             {
-              "name": "Heavy noise 7.3 px, 100% lock",
+              "name": "Heavy noise 7.3 to 8.2 px, 100% lock",
               "status": "done"
             },
             {
-              "name": "Fog 6.6 px, low light 7.0 px",
+              "name": "Fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, 100% lock",
               "status": "done"
             },
             {
-              "name": "Acquisition 0.6 to 1.4 s everywhere",
+              "name": "Acquisition 0.6 to 2.0 s on every scenario except hard mode (3 to 12 s sweep) and one faint seed (5.5 s)",
               "status": "done"
             },
             {
@@ -999,7 +999,7 @@
               "status": "done"
             },
             {
-              "name": "Demo video, about 4 min, composed from the engine (tools/make_demo_video.py)",
+              "name": "Demo video, about 4 min, composed from the engine (tools/make_demo_video.py); a narrated screen recording is optional",
               "status": "done"
             }
           ]
