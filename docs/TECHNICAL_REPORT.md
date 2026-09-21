@@ -273,8 +273,9 @@ retention is the share of frames in TRACK with the estimate within 30 px of the 
 | fog | 0.91 / 1.43 | 6.62 / 7.29 | 0.08 | 100.0 | 105 | pass |
 | low light | 1.07 / 1.43 | 7.17 / 8.01 | 0.17 | 100.0 | 104 | pass |
 | platform sway 12 px/frame + vibration 20 px/frame | 0.84 / 0.97 | 19.89 / 20.11 (14.6 with vibration removed) | 0.02 | 96.5 | 87 | tracking error above 10 px: the truth itself moves 20 px per frame |
-| platform at the PS maximum, 20 + 20 px/frame | 0.94 / 1.23 | 25.30 / 26.25 | 0.05 | 79.3 | 87 | fails lock retention: gimbal at 90% of its slew budget |
-| multi-target stress: 3 beacons, haze, noise, sway, vibration | 0.95 / 1.27 | 42.77 / 153.70 | 26.63 | 69.2 | 54 | one seed of five swapped to a decoy; the other four hold 13 to 17 px |
+| platform at the PS maximum, 20 + 20 px/frame | 0.78 / 1.07 | 25.2 / 26.3 (23 with vibration removed) | 0.05 | 79.6 | 87 | fails lock retention; same result at 10 deg/s, so the random vibration is the limit, not the motor |
+| multi-target stress: 3 beacons, haze, noise, sway, vibration | 0.90 / 1.27 | 14.0 / 14.4 | 0.25 | 98.4 | 98 | identity held on every seed tested (0 to 3 and 9) |
+| low light, faint beacon at 3 to 6 sigma per frame | 1.9 / 5.5 (9 of 10 seeds under 2.8 s) | 7.9 / 12.3 | 4.4 | 90.9 | 93 | track-before-detect; 10 seeds all at 91 to 97.5% lock |
 | hard mode, tracker sees only the window | 6.93 / 12.07 | 7.05 / 7.56 | 0.05 | 100.0 | 47 | acquisition beyond 2 s: a blind sweep at 5 deg/s needs up to 12 s |
 
 Discussion.
@@ -288,10 +289,15 @@ Discussion.
 - Under vibration the raw tracking error exceeds 10 px because the true beacon position jumps
   up to 20 px every frame; the vibration-removed figure (14.6 px) is the part a rate-limited
   gimbal can physically follow. Both are printed in every report.
-- At the maximum platform motion the gimbal saturates in about a third of frames and lock drops
-  to 79 to 88%. This is a property of the mandated 5 deg/s motor against a 3.75 deg/s
-  disturbance, documented rather than tuned away; raising the limit to the allowed 10 deg/s
-  restores lock.
+- At the maximum platform motion (20 px per frame sway plus 20 px per frame vibration) lock
+  drops to 76 to 88%. The binding limit was measured, not assumed: with the gimbal at the
+  10 deg/s the PS allows (`platform_max_10degs.yaml`) slew saturation falls from about a third
+  of frames to 2%, yet lock and error do not improve. The vibration is the limit: a random
+  20 px jump of the picture every frame is unknowable before the frame arrives, so each frame
+  the pointing is off by roughly the jump, the estimator must average many noisy frames, and
+  the 30 px lock criterion flickers. No controller design removes this; a wider FOV or a
+  sensor larger than the 640 x 480 window (electronic stabilisation) would, and neither is
+  within the PS. Documented, not tuned away.
 - Identity among decoys holds in four seeds of five; the failing seed loses the beacon during a
   sway excursion and re-locks a similar decoy. The designation audit recovers some cases; a
   stronger appearance model is future work.
@@ -335,6 +341,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | lowlight_faint.yaml | beyond the classical detector | gaussian 8 px, intensity 150 | low light, noise |
 | platform_jitter.yaml | rows 23 and 25 | circular, centred | linear sway 12 px/frame, vibration 20 px/frame |
 | platform_max.yaml | rows 23 and 25 at the PS maximum | circular, centred | linear sway 20 px/frame, vibration 20 px/frame |
+| platform_max_10degs.yaml | the same with the gimbal at the allowed 10 deg/s | circular, centred | shows the motor is not the binding limit |
 | full_stress.yaml | rows 8, 21, 23, 24, 25 together | figure of 8 plus two decoys | haze, salt and pepper 5%, Gaussian 12, Poisson, circular sway, vibration 10 |
 | hardmode_line.yaml | tracker restricted to the window | line | none |
 

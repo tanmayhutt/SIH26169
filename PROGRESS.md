@@ -128,10 +128,10 @@ flowchart LR
 | Fog | 6.6 px | 100% | 🟩 |
 | Low light | 7.0 px | 100% | 🟩 |
 | Platform sway 12 px/f + vibration 20 px/f | 20 px raw, 14.6 px vibration removed | 99% | 🟥 physical limit: a random per-frame jitter cannot be cancelled before the frame arrives; the vibration-removed error is reported alongside |
-| Platform at PS maximum 20 + 20 px/f | 23 to 26 px | 80 to 88% | 🟥 physical limit: gimbal at 90% of its 5 deg/s slew budget; 10 deg/s (allowed by the PS) clears it |
+| Platform at PS maximum 20 + 20 px/f | 25 to 27 px (23 vibration removed) | 76 to 88% | 🟥 physical limit: measured the same at the allowed 10 deg/s (slew saturation 2%), so the random 20 px per-frame vibration is the limit, not the motor |
 | Multi-target stress with haze, noise, sway | 13.6 to 14.4 px | 98 to 99% | 🟩 identity held on every seed (fitted width, refined association, frozen signature at crossings) |
 | Hard mode | 6.5 to 8.9 px after acquisition | 100% | 🟩 acquisition 3 to 12 s |
-| Faint beacon at 3 to 6 sigma | 6.9 to 7.6 px | 93 to 96% (4 of 5 seeds; one seed 78%) | 🟩 track-before-detect on a moving-target residual, acquisition 1.5 to 2 s |
+| Faint beacon at 3 to 6 sigma | 6.7 to 12.3 px | 91 to 97.5% on all 10 seeds | 🟩 track-before-detect on a moving-target residual; acquisition 1.3 to 2.8 s on 9 seeds, 5.5 s on one |
 
 Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 
@@ -268,4 +268,4 @@ One assumption: one screen pixel equals one camera pixel, so the 2000 px screen 
 2. 🟩 Windows, Linux, macOS Intel and Apple silicon builds from the build workflow, package-checked on each platform.
 3. 🟩 Technical report and user manual exported to PDF; demo video composed from the engine (`tools/make_demo_video.py`); demo script in `docs/DEMO_SCRIPT.md`.
 4. 🟩 Multi-target identity: candidates ranked by fitted width (noise-independent) instead of blob area; the stress seed that swapped now holds 99% lock.
-5. 🟩 Faint beacon: track-before-detect on a moving-target residual, 1.5 to 2 s acquisition, 93 to 96% lock on four of five seeds.
+5. 🟩 Faint beacon: track-before-detect on a moving-target residual; 10 seeds all hold 91 to 97.5% lock, acquisition under 2.8 s on nine of them.

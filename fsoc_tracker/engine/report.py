@@ -68,6 +68,11 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         if sat > 20:
             notes.append(f"Gimbal at its rate limit in {sat:.0f}% of frames: the target moved faster than the camera can turn at {cfg.camera.max_pan_rate_deg_s:g} deg/s "
                          f"({cfg.camera.max_pan_rate_deg_s / cfg.camera.ifov_deg / cfg.camera.update_rate_hz:.0f} px per frame). Raise the rate limit (PS allows 5 to 10 deg/s) or widen the FOV.")
+        stab = summary.values.get("tracking_err_stab_mean_px")
+        if cfg.disturbance.jitter_px > 0 and stab is not None and summary.truth_available:
+            notes.append(f"Camera vibration of +/- {cfg.disturbance.jitter_px:g} px per frame shifts the whole picture at random every frame. No controller can "
+                         f"anticipate a random jump before the frame arrives, so the raw tracking error carries it; with the vibration removed the pointing error is "
+                         f"{stab:.1f} px, which is the part the gimbal can physically follow.")
         cnn = summary.values.get("cnn_frames_pct", 0.0)
         if cnn > 0:
             notes.append(f"The AI detector supplied the measurement in {cnn:.0f}% of frames (used when the classical detector found nothing near the prediction).")

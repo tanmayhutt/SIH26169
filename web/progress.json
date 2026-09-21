@@ -1,7 +1,7 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 12 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 13 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-20",
   "verification": {
     "title": "Build verification: September 20, 2026",
@@ -46,7 +46,7 @@
       {
         "name": "Platform at PS maximum",
         "status": "blocked",
-        "text": "20 px per frame sway plus 20 px per frame vibration: 80 to 88% lock over 3 seeds, 23 to 26 px raw error. The gimbal is at 90% of its slew budget. A physical limit of the mandated 5 deg/s motor, documented rather than tuned away; the PS allows up to 10 deg/s, which clears it."
+        "text": "20 px per frame sway plus 20 px per frame vibration: 76 to 88% lock over the seeds run, 25 to 27 px raw error, 23 px with the vibration removed. Measured again with the gimbal at the 10 deg/s the PS allows (platform_max_10degs.yaml): slew saturation drops from about a third of frames to 2%, lock and error do not improve. So the motor is not the limit; the random per-frame vibration is, and no controller can anticipate a random jump before the frame arrives. Every report under vibration now prints this in words beside the vibration-removed figure."
       },
       {
         "name": "Demo video",
@@ -770,7 +770,7 @@
               "tag": "20 px raw"
             },
             {
-              "name": "PS maximum sway 20 + 20 px/f: 80 to 88% lock, gimbal at 90% of its 5 deg/s slew budget; the PS allows up to 10 deg/s, which clears it: physical limit, documented",
+              "name": "PS maximum sway 20 + 20 px/f: 76 to 88% lock; identical at the allowed 10 deg/s (slew saturation 2%), so the random per-frame vibration is the physical limit, not the motor",
               "status": "blocked",
               "tag": "limit"
             },
@@ -779,7 +779,7 @@
               "status": "done"
             },
             {
-              "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 1.5 to 2 s acquisition, 93 to 96% lock",
+              "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 10 seeds all at 91 to 97.5% lock, acquisition under 2.8 s on nine",
               "status": "done",
               "tag": "needs cnn"
             }
