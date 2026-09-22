@@ -33,7 +33,7 @@ cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/READ
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/demo/FSOC-Tracker-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
-cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$STAGE/about/content/docs/" 2>/dev/null || true
+cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$HERE/docs/HANDOVER.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
@@ -94,7 +94,9 @@ sudo systemctl restart sih26169-web
 HASHFILE=/etc/caddy/sih26169.progress.hash
 if ! sudo test -s "$HASHFILE"; then echo "progress basic auth hash missing: create it with  sudo bash -c 'caddy hash-password --plaintext <password> > $HASHFILE'"; exit 2; fi
 HASH=$(sudo cat "$HASHFILE")
-USERNAME=$(sudo cat /etc/caddy/sih26169.progress.user 2>/dev/null || echo tanmay123)
+USERFILE=/etc/caddy/sih26169.progress.user
+if ! sudo test -s "$USERFILE"; then echo "site login user missing: create it with  echo <username> | sudo tee $USERFILE"; exit 2; fi
+USERNAME=$(sudo cat "$USERFILE")
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF
 # SIH26169 site. Managed by webapp/deploy.sh; edit there, not here.
 #   /            web app (reverse proxy)      /about/      progress record (static)
