@@ -14,91 +14,20 @@ from PyQt6.QtCore import Qt
 import pyqtgraph as pg
 
 from .. import __version__
-from ..engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConfig
-from ..engine.metrics import SPEC
+from ..engine.config import ATMOSPHERE_PRESETS, RunConfig
 from ..engine.naming import run_label
 from ..engine.report import write_report
 from ..engine.simulation import Simulation, StepResult
 from .theme import STYLESHEET, C, mono, ui_font
 
 SCENARIO_DIR = Path("configs/scenarios")
-
-CHOICES = {
-    "background": ["starfield", "terrain", "gradient", "flat"],
-    "shape": ["square", "circle", "gaussian"],
-    "motion": ["line", "circular", "figure8", "random", "spiral", "sinusoidal", "waypoints", "static"],
-    "start": ["random", "centre"],
-    "atmosphere": list(ATMOSPHERE_PRESETS.keys()),
-    "platform_motion": ["none", "linear", "circular", "random", "spiral", "figure8"],
-    "detector": ["hybrid", "classical", "cnn"],
-}
-LABELS = {
-    "width": "Width (px)", "height": "Height (px)", "fov_w_deg": "FOV width (deg)", "fov_h_deg": "FOV height (deg)",
-    "update_rate_hz": "Update rate (Hz)", "max_pan_rate_deg_s": "Max pan (deg/s)", "max_tilt_rate_deg_s": "Max tilt (deg/s)",
-    "max_accel_deg_s2": "Max accel (deg/s2)", "command_latency_frames": "Latency (frames)",
-    "window_only": "Hard mode: see window only", "size_px": "Size (px)", "intensity": "Peak intensity",
-    "speed_px_s": "Speed (px/s)", "radius_px": "Radius (px)", "period_s": "Period (s)", "heading_deg": "Heading (deg)",
-    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper", "gaussian_sigma": "Gaussian sigma",
-    "poisson": "Poisson shot noise", "jitter_px": "Camera jitter (px/frame)", "atmosphere": "Atmosphere preset",
-    "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
-    "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
-    "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
-    "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
-    "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
-    "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
-    "faint_snr_min": "Faint: min chain SNR", "faint_threshold_k": "Faint: threshold (sigma)",
-}
-TIPS = {
-    "width": "PS row 1 (screen) or row 3 (camera). The screen is the whole scene the tracker observes; the camera window is what the terminal points at.",
-    "height": "PS row 1 (screen) or row 3 (camera).",
-    "colour": "PS row 2. Monochrome by default; colour renders three channels and the tracker uses luminance.",
-    "fov_w_deg": "PS row 4. Degrees per pixel = FOV / camera width. Default 4 deg over 640 px = 22.5 arcsec per pixel.",
-    "fov_h_deg": "PS row 4. Default 3 deg.",
-    "update_rate_hz": "PS row 5. Frames per second of the camera and the simulation clock. Minimum 30.",
-    "max_pan_rate_deg_s": "PS row 13. The gimbal cannot turn faster than this. 5 deg/s = 26.7 px per frame at 30 Hz.",
-    "max_tilt_rate_deg_s": "PS row 14.",
-    "max_accel_deg_s2": "Our gimbal model: how fast the turn rate can change.",
-    "command_latency_frames": "Our gimbal model: frames between a command and the motion. The controller leads the target by this.",
-    "window_only": "Hard mode. The tracker sees only the inside of the camera window and must sweep a spiral to find the beacon.",
-    "shape": "PS row 9. Default square.", "size_px": "PS row 10. 5 to 20 px, default 10.", "intensity": "Peak grey level of the beacon, 0-255.",
-    "motion": "PS row 12. Straight line, circular, figure of 8 and random are mandatory; spiral and sinusoidal optional.",
-    "speed_px_s": "Along-track speed for line, random and sinusoidal paths.", "radius_px": "Radius for circular, figure of 8, spiral; half-amplitude for sinusoidal.",
-    "period_s": "Time for one loop of the path.", "heading_deg": "Direction of a line or sinusoidal path.", "start": "PS row 11. Default random.",
-    "blink_hz": "Optional intensity modulation of the beacon.",
-    "waypoints": "PS row 12, user-defined path: points in screen pixels for motion 'waypoints', followed at Speed and looped. Example 300,300; 1700,400; 1000,1600.",
-    "salt_pepper_frac": "PS row 21. 0.10 means 10 percent of pixels are set to black or white.",
-    "gaussian_sigma": "PS row 21 and 22. Read-noise standard deviation in grey levels, up to 20.",
-    "poisson": "PS row 21. Shot noise that grows with brightness.",
-    "jitter_px": "PS row 23. Random shift of the whole picture each frame, up to 20 px.",
-    "atmosphere": "PS row 24. Choosing a preset fills contrast, brightness, blur and turbulence; edit them afterwards if you like.",
-    "contrast": "PS row 24. 1.0 = none. Fog is about 0.4.", "brightness": "PS row 24. Grey levels added; fog lifts the black level, low light lowers it.",
-    "turbulence": "Beam wander and flicker strength.", "blur_sigma": "PSF broadening from the atmosphere.",
-    "platform_motion": "PS row 25. Linear is mandatory. All patterns are bounded sways whose peak speed is the value below.",
-    "platform_px_frame": "PS row 25. Peak speed of the platform sway, up to 20 px per frame.", "platform_period_s": "Period of circular, figure of 8 and spiral sways.",
-    "background": "Scene background.", "background_level": "Mean sky brightness.", "star_density": "Stars per pixel in the starfield.",
-    "detector": "hybrid: classical first, CNN fills gaps. classical: never use the CNN. cnn: CNN whenever it is confident.",
-    "ego_motion": "Use the frame-to-frame picture shift (phase correlation) as a hint for vibration level.",
-    "threshold_k": "Detection threshold in sigmas above the local background.", "kp": "Proportional gain, deg/s per deg of error.",
-    "kd": "Derivative gain.", "ki": "Integral gain.", "feedforward": "Weight on the predicted target angular rate.",
-    "deadband_px": "No command inside this radius, so vibration is not chased.", "capture_radius_px": "Lock is declared when the estimate is within this of the window centre.",
-    "estimator_lag_s": "Assumed delay of the velocity estimate, compensated with acceleration.",
-    "acquire_conf_min": "A new track needs at least this detector confidence. Stars and noise clumps score about 0.55, a beacon 0.67 (low light) to 0.96 (clear).",
-    "faint_snr_min": "Faint beacons: weak detections are linked across frames; a chain is promoted when its mean matched-filter SNR is at least this.",
-    "faint_threshold_k": "Faint beacons: detection threshold in noise sigmas for the chain search (the normal threshold is 4).",
-}
-HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "verify_n", "verify_m", "coast_frames",
-          "search_roi_px", "gate_px"}
-RANGES = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "intensity": (20, 255), "salt_pepper_frac": (0, 0.5),
-          "gaussian_sigma": (0, 60), "jitter_px": (0, 60), "platform_px_frame": (0, 60), "contrast": (0.05, 2.0),
-          "brightness": (-120, 120), "turbulence": (0, 1), "blur_sigma": (0, 8), "fov_w_deg": (0.2, 60), "fov_h_deg": (0.2, 60),
-          "update_rate_hz": (5, 120), "max_pan_rate_deg_s": (0.5, 60), "max_tilt_rate_deg_s": (0.5, 60), "speed_px_s": (0, 2000),
-          "radius_px": (10, 3000), "period_s": (1, 600), "heading_deg": (-360, 360), "background_level": (0, 120),
-          "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2), "deadband_px": (0, 20),
-          "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10), "blink_hz": (0, 15),
-          "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1)}
-MODES = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
 LABEL_W = 140          # one label column width for every form, so all sections line up
-SPEEDS = [("0.25x", 0.25), ("0.5x", 0.5), ("1x real time", 1.0), ("2x", 2.0), ("4x", 4.0), ("Max speed", 0.0)]
+
+from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, DEFAULT_SPEED_INDEX, DURATION_RANGE,
+                         EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
+                         field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
+                         about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
+                         new_random_seed, section_object)
 
 
 # ----------------------------------------------------------------------------- form helpers
@@ -132,23 +61,24 @@ class DataclassForm(QtWidgets.QWidget):
             lay.addRow(lab, w)
 
     def _widget(self, name, v):
-        lo, hi = RANGES.get(name, (-1e9, 1e9))
-        if isinstance(v, bool):
+        spec = field_spec(name, v)
+        if spec is None:
+            return None
+        k = spec["kind"]
+        if k == "bool":
             w = QtWidgets.QCheckBox(); w.setChecked(v); w.toggled.connect(self.changed)
-        elif isinstance(v, int):
-            w = QtWidgets.QSpinBox(); w.setRange(int(lo), int(hi)); w.setValue(v); w.valueChanged.connect(self.changed)
-        elif isinstance(v, float):
-            w = QtWidgets.QDoubleSpinBox(); w.setRange(lo, hi); w.setDecimals(3 if hi - lo <= 2 else 2)
-            w.setSingleStep(0.01 if hi - lo <= 2 else 1.0); w.setValue(v); w.valueChanged.connect(self.changed)
-        elif isinstance(v, str) and name in CHOICES:
-            w = QtWidgets.QComboBox(); w.addItems(CHOICES[name])
-            if v in CHOICES[name]:
+        elif k == "int":
+            w = QtWidgets.QSpinBox(); w.setRange(spec["min"], spec["max"]); w.setValue(v); w.valueChanged.connect(self.changed)
+        elif k == "float":
+            w = QtWidgets.QDoubleSpinBox(); w.setRange(spec["min"], spec["max"]); w.setDecimals(spec["decimals"])
+            w.setSingleStep(spec["step"]); w.setValue(v); w.valueChanged.connect(self.changed)
+        elif k == "choice":
+            w = QtWidgets.QComboBox(); w.addItems(spec["choices"])
+            if v in spec["choices"]:
                 w.setCurrentText(v)
             w.currentTextChanged.connect(self.changed)
-        elif isinstance(v, str):
-            w = QtWidgets.QLineEdit(v); w.textChanged.connect(self.changed)
         else:
-            return None
+            w = QtWidgets.QLineEdit(v); w.textChanged.connect(self.changed)
         return w
 
     def read(self):
@@ -210,6 +140,9 @@ class Tile(QtWidgets.QFrame):
         self.setMinimumWidth(110)
         for lab in (self.t, self.v, self.u):
             lab.setMinimumWidth(1)          # let a narrow tile shrink instead of pushing its neighbours
+
+    def show(self, d: dict):
+        self.set(d["text"], d.get("state"), d.get("unit"))
 
     def set(self, text: str, state: str | None = None, unit: str | None = None):
         self.v.setText(text)
@@ -343,10 +276,11 @@ class SceneView(QtWidgets.QLabel):
             p.drawLine(int(ex * s - 8), int(ey * s), int(ex * s + 8), int(ey * s)); p.drawLine(int(ex * s), int(ey * s - 8), int(ex * s), int(ey * s + 8))
         f = mono(8.5); W = pm.width()
         _bar(p, 0, 20, W)
-        _text(p, 8, 14, f"Screen {w} x {h} px  |  {w * ifov_deg:.1f} x {h * ifov_deg:.1f} deg  |  t {res.frame.t:6.2f} s  |  grid 2 deg", C["muted"], f, W - 16)
+        _text(p, 8, 14, scene_header(w, h, ifov_deg, res.frame.t), C["muted"], f, W - 16)
         _bar(p, pm.height() - 20, 20, W)
         x = 8.0
-        for col, txt in ((C["accent"], "camera window"), (C["signal"], "true beacon"), (C["good"], "estimate"), (C["muted"], "other targets")):
+        for key, txt in SCENE_LEGEND:
+            col = C[key]
             if x > W - 40:
                 break
             p.fillRect(QtCore.QRectF(x, pm.height() - 13, 8, 3), QtGui.QColor(col))
@@ -374,16 +308,7 @@ class CameraView(QtWidgets.QLabel):
         x0, y0, w, h = res.window
         xa, ya = max(x0, 0), max(y0, 0)
         xb, yb = min(x0 + w, W), min(y0 + h, H)
-        crop = np.zeros((h, w) if img.ndim == 2 else (h, w, 3), np.uint8)
-        inside = img[ya:yb, xa:xb] if (xb > xa and yb > ya) else None
-        if inside is not None:
-            # display-only contrast stretch so faint scenes stay visible. Measured on the part
-            # of the window that is on the screen (the area beyond the edge is black and would
-            # drag the low end down), and never stretched more than 4x so an empty sky stays dark.
-            lo, hi = np.percentile(inside[::4, ::4], (1, 99.8))
-            hi = max(hi, lo + 64.0)
-            view = np.clip((inside.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
-            crop[ya - y0:yb - y0, xa - x0:xb - x0] = view
+        crop = camera_crop(img, res.window)
         qi = to_qimage(crop)
         avail_w, avail_h = self.width() - 8, self.height() - 8
         s = min(avail_w / w, avail_h / h, 1.6)
@@ -426,14 +351,12 @@ class CameraView(QtWidgets.QLabel):
         col = {"TRACK": C["good"], "COAST": C["signal"], "REACQUIRE": C["signal"]}.get(tr.mode.value, C["accent"])
         W, Hh = pm.width(), pm.height()
         _bar(p, 0, 22, W)
-        x = _text(p, 8, 15, f"{tr.mode.value}{'  locked' if locked else ''}", col, mono(9, bold=True), W - 16) + 16
-        err = res.record.tracking_err_px
-        err_s = f"err {err:.1f} px ({err * ifov_deg * 3600:.0f} arcsec)" if np.isfinite(err) else "err n/a (no truth in a video)"
-        _text(p, x, 15, f"{err_s}   conf {tr.confidence:.2f}   {tr.tier}", C["ink2"], mono(8.5), W - x - 8)
+        top_state, top_detail = camera_top(res.record, ifov_deg)
+        x = _text(p, 8, 15, top_state, col, mono(9, bold=True), W - 16) + 16
+        _text(p, x, 15, top_detail, C["ink2"], mono(8.5), W - x - 8)
         _bar(p, Hh - 20, 20, W)
-        sat = res.cmd.saturated_pan or res.cmd.saturated_tilt
-        x = _text(p, 8, Hh - 6, f"pan {res.record.cam_pan_deg:+.2f}  tilt {res.record.cam_tilt_deg:+.2f} deg   cmd {res.cmd.pan_rate:+.2f} {res.cmd.tilt_rate:+.2f} deg/s",
-                  C["muted"], mono(8.5), W - 16)
+        bottom, sat = camera_bottom(res.record)
+        x = _text(p, 8, Hh - 6, bottom, C["muted"], mono(8.5), W - 16)
         if sat:
             _text(p, x + 10, Hh - 6, "rate limit", C["signal"], mono(8.5, bold=True), W - x - 18)
         p.end()
@@ -482,7 +405,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cmb_speed = QtWidgets.QComboBox()
         for name, _ in SPEEDS:
             self.cmb_speed.addItem(name)
-        self.cmb_speed.setCurrentIndex(2)
+        self.cmb_speed.setCurrentIndex(DEFAULT_SPEED_INDEX)
         self.cmb_speed.setToolTip("Playback pacing. Max speed shows the true processing rate.")
         tb.addWidget(self.cmb_speed)
         tb.addSeparator()
@@ -514,8 +437,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ed_name = QtWidgets.QLineEdit(self.cfg.name)
         self.sp_seed = QtWidgets.QSpinBox(); self.sp_seed.setRange(0, 10 ** 6); self.sp_seed.setValue(self.cfg.seed)
         self.sp_seed.setToolTip("Same seed and settings give exactly the same run.")
-        self.sp_dur = QtWidgets.QDoubleSpinBox(); self.sp_dur.setRange(1, 3600); self.sp_dur.setValue(self.cfg.duration_s)
-        self.sp_extra = QtWidgets.QSpinBox(); self.sp_extra.setRange(0, 8); self.sp_extra.setValue(len(self.cfg.targets) - 1)
+        self.sp_dur = QtWidgets.QDoubleSpinBox(); self.sp_dur.setRange(*DURATION_RANGE); self.sp_dur.setValue(self.cfg.duration_s)
+        self.sp_extra = QtWidgets.QSpinBox(); self.sp_extra.setRange(0, EXTRA_TARGETS_MAX); self.sp_extra.setValue(len(self.cfg.targets) - 1)
         self.sp_extra.setToolTip("Decoy beacons with random paths. The tracker must keep following the designated one.")
         self.chk_random = QtWidgets.QCheckBox("New seed each run"); self.chk_random.setChecked(True)
         self.chk_random.setToolTip("On: each Start draws a new seed (start position, noise, decoys) and a new heading for line paths, so every run is different. "
@@ -524,11 +447,8 @@ class MainWindow(QtWidgets.QMainWindow):
             l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); rl.addRow(l, w)
         panel = QtWidgets.QWidget(); pl = QtWidgets.QVBoxLayout(panel); pl.setContentsMargins(4, 0, 10, 0); pl.setSpacing(0)
         pl.addWidget(section("Run", run_w))
-        pl.addWidget(section("Screen", self.forms["screen"], "The whole scene the tracker observes.", "PS rows 1-2"))
-        pl.addWidget(section("Camera", self.forms["camera"], "The window the terminal points at, and how fast it can turn.", "PS rows 3-6, 13-15"))
-        pl.addWidget(section("Designated target", self.forms["target"], "The beacon to follow.", "PS rows 7-12"))
-        pl.addWidget(section("Disturbances", self.forms["disturbance"], "Everything that degrades the picture. All zero is a clear sky.", "PS rows 21-25"))
-        pl.addWidget(section("Tracker", self.forms["tracker"], "How the software finds and follows the beacon. The defaults are tuned; change with care."))
+        for key, title, ref, hint in SECTIONS:
+            pl.addWidget(section(title, self.forms[key], hint, ref))
         pl.addStretch(1)
         scroll = QtWidgets.QScrollArea(); scroll.setWidget(panel); scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -537,11 +457,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         centre = QtWidgets.QVBoxLayout(); centre.setSpacing(8)
         tiles = QtWidgets.QHBoxLayout(); tiles.setSpacing(8)
-        self.tiles = {
-            "state": Tile("State", "waiting"), "acq": Tile("Acquisition", "spec \u2264 2 s"), "terr": Tile("Tracking error", "mean, spec \u2264 10 px"),
-            "cerr": Tile("Centroid error", "mean, vs truth"), "lock": Tile("Lock retention", "spec: loss < 5%"),
-            "fps": Tile("Processing", "spec \u2265 20 FPS"),
-        }
+        self.tiles = {k: Tile(title, unit) for k, title, unit in TILES}
         for t in self.tiles.values():
             tiles.addWidget(t)
         centre.addLayout(tiles)
@@ -582,7 +498,7 @@ class MainWindow(QtWidgets.QMainWindow):
         root.addWidget(self.tele)
 
         self.status = self.statusBar()
-        self.lbl_status = QtWidgets.QLabel("Ready. Pick a scenario and press Start, or open a video for Benchmark 2.")
+        self.lbl_status = QtWidgets.QLabel(status_text("ready"))
         self.status.addWidget(self.lbl_status, 1)
         self.progress = QtWidgets.QProgressBar(); self.progress.setFixedWidth(220); self.progress.setTextVisible(False); self.progress.setValue(0)
         self.status.addPermanentWidget(self.progress)
@@ -629,16 +545,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pause()
 
     def _welcome(self) -> str:
-        return "\n".join([
-            "Getting started", "",
-            "1  Pick a scenario in the toolbar,", "   or set values on the left.",
-            "2  Press Start, or Space.", "3  Watch the tiles: green meets", "   the specification, amber not", "   yet.",
-            "4  When the run ends the report", "   opens. The results folder holds", "   the CSV, summary, PDF and the", "   scenario file of every run.", "",
-            "Benchmark 2", "", "Open video, then Start. The video", "replaces the simulated scene.", "",
-            "Keys", "", "Space   start or pause", "N       one frame while paused", "Esc     stop",
-            "Ctrl+S  save scenario", "Ctrl+P  screenshot", "Ctrl+O  open video", "",
-            "Hover any setting to see what it", "does and which PS row it covers.",
-        ])
+        return welcome_text()
 
     # ------------------------------------------------------------- scenarios
     def _fill_scenarios(self):
@@ -655,7 +562,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if path:
             try:
                 self.apply_cfg(RunConfig.load(path))
-                self.lbl_status.setText(f"Loaded {path}. Press Start.")
+                self.lbl_status.setText(status_text("loaded", path=path))
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Load failed", str(e))
 
@@ -675,27 +582,13 @@ class MainWindow(QtWidgets.QMainWindow):
         cfg.screen = self.forms["screen"].read(); cfg.camera = self.forms["camera"].read()
         t0 = self.forms["target"].read(); cfg.disturbance = self.forms["disturbance"].read(); cfg.tracker = self.forms["tracker"].read()
         cfg.name = self.ed_name.text().strip() or "run"; cfg.duration_s = self.sp_dur.value()
+        cfg.targets = [t0] + cfg.targets[1:]
         if self.chk_random.isChecked():
-            cfg.seed = int(np.random.default_rng().integers(0, 10 ** 6))
-            self.sp_seed.setValue(cfg.seed)
-            if t0.motion in ("line", "sinusoidal"):
-                t0.heading_deg = float(np.random.default_rng(cfg.seed).uniform(0, 360))
-                self.forms["target"].write(t0)
+            new_random_seed(cfg)
+            self.sp_seed.setValue(cfg.seed); self.forms["target"].write(cfg.targets[0])
         else:
             cfg.seed = self.sp_seed.value()
-        extra = self.sp_extra.value()
-        rng = np.random.default_rng(cfg.seed + 99)
-        targets = [t0]
-        motions = ["circular", "line", "figure8", "random", "sinusoidal"]
-        for i in range(extra):
-            if i + 1 < len(cfg.targets):
-                targets.append(cfg.targets[i + 1])
-            else:
-                targets.append(TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
-                                            intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
-                                            speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
-                                            period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre"))
-        cfg.targets = targets
+        cfg.targets = extra_targets(cfg.targets[0], cfg.targets, self.sp_extra.value(), cfg.seed)
         cfg.video = self.video_path
         return cfg
 
@@ -711,9 +604,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _video_label(self):
         if self.video_path:
-            self.lbl_status.setText(f"Benchmark 2 input: {self.video_path}  (simulator bypassed). Press Start.")
+            self.lbl_status.setText(status_text("video", path=self.video_path))
         else:
-            self.lbl_status.setText("Simulator input. Pick a scenario or set values, then press Start.")
+            self.lbl_status.setText(status_text("ready"))
 
     # ------------------------------------------------------------- actions
     def start(self):
@@ -726,8 +619,8 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Cannot start", str(e)); return
         self._buf_reset(); self.scene_view.reset(); self.cam_view.reset(); self._last_res = None
-        for t in self.tiles.values():
-            t.set("\u2013")
+        for k, d in blank_tiles().items():
+            self.tiles[k].show(d)
         self.tiles["state"].set("starting", None, "")
         lim = cfg.camera.max_pan_rate_deg_s
         for ln, v in zip(self.lim_lines, (lim, -lim)):
@@ -747,7 +640,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.failed.connect(self.on_failed, Qt.ConnectionType.QueuedConnection)
         self.thread.start()
         self._set_running(True)
-        self.lbl_status.setText(f"Running '{cfg.name}' seed {cfg.seed}  ->  {self.out_dir}")
+        self.lbl_status.setText(status_text("running", name=cfg.name, seed=cfg.seed, out=self.out_dir))
 
     def pause(self):
         if self.worker:
@@ -770,6 +663,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _buf_reset(self):
         self.b_t, self.b_terr, self.b_cerr, self.b_pan, self.b_tilt, self.b_proc, self.b_mode, self.b_lock = ([] for _ in range(8))
         self._acq_t = None
+        self.live = LiveTiles()
 
     @QtCore.pyqtSlot(object)
     def on_step(self, res: StepResult):
@@ -778,8 +672,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.b_pan.append(r.cmd_pan_rate); self.b_tilt.append(r.cmd_tilt_rate); self.b_proc.append(r.proc_ms)
         self.b_mode.append(MODES.index(r.mode)); self.b_lock.append(r.locked)
         self._last_res = res
-        if self._acq_t is None and r.locked:
-            self._acq_t = r.t_sim
+        self.live.push(r)
         now = time.perf_counter()
         if now - self._last_draw < 1 / 30:
             return
@@ -794,49 +687,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.c_proc.setData(t, np.array(self.b_proc[-n:])); self.c_mode.setData(t, np.array(self.b_mode[-n:]))
         self.progress.setValue(r.frame)
         self._update_tiles(r)
-        tr = res.track
-        lines = [
-            f"frame      {r.frame}", f"t          {r.t_sim:8.2f} s", f"state      {r.mode}", f"locked     {'yes' if r.locked else 'no'}",
-            f"detector   {r.tier}", f"candidates {r.n_candidates}", f"confidence {r.confidence:8.2f}", f"snr        {r.snr:8.1f}",
-            f"psf sigma  {r.sigma:8.2f} px", "",
-            f"pan        {r.cam_pan_deg:+8.3f} deg", f"tilt       {r.cam_tilt_deg:+8.3f} deg",
-            f"cmd pan    {r.cmd_pan_rate:+8.3f} deg/s", f"cmd tilt   {r.cmd_tilt_rate:+8.3f} deg/s",
-            f"saturated  {'pan ' if r.sat_pan else ''}{'tilt' if r.sat_tilt else ''}{'no' if not (r.sat_pan or r.sat_tilt) else ''}", "",
-            f"detection  {r.det_x:8.2f} {r.det_y:8.2f}", f"estimate   {r.est_x:8.2f} {r.est_y:8.2f}",
-            f"velocity   {r.vel_x:+8.1f} {r.vel_y:+8.1f} px/s", f"uncert.    {r.uncertainty_px:8.2f} px",
-            f"models     cv {r.p_cv:.2f} ca {r.p_ca:.2f} ct {r.p_ct:.2f}",
-            (f"shift      {r.ego_dx:+6.2f} {r.ego_dy:+6.2f} px" if max(abs(r.ego_dx), abs(r.ego_dy)) <= 60 else "shift      unreliable, ignored"), "",
-            f"truth      {r.true_x:8.2f} {r.true_y:8.2f}", f"in window  {'yes' if r.in_window else 'no'}",
-            f"track err  {r.tracking_err_px:8.2f} px", f"centroid   {r.centroid_err_px:8.3f} px", "",
-            f"proc       {r.proc_ms:8.2f} ms", f"fps inst   {r.fps_inst:8.1f}",
-        ]
-        self.tele.setPlainText("\n".join(lines))
+        self.tele.setPlainText(telemetry_lines(r))
 
     def _update_tiles(self, r):
-        T = self.tiles
-        state_col = "pass" if r.mode == "TRACK" and r.locked else ("warn" if r.mode in ("COAST", "REACQUIRE") else None)
-        T["state"].set(r.mode, state_col, "locked" if r.locked else "not locked")
-        if self._acq_t is not None:
-            T["acq"].set(f"{self._acq_t:.2f} s", "pass" if self._acq_t <= SPEC["acquisition_time_s"][1] else "fail")
-            after = [(e, l) for tt, e, l in zip(self.b_t, self.b_terr, self.b_lock) if tt >= self._acq_t]
-            te = np.array([e for e, _ in after]); te = te[np.isfinite(te)]
-            if len(te):
-                m = float(te.mean()); T["terr"].set(f"{m:.1f} px", "pass" if m <= 10 else "fail")
-            else:
-                T["terr"].set("n/a", None, "no truth in video")
-            lk = 100 * np.mean([l for _, l in after]) if after else 0.0
-            modes_after = [m for tt, m in zip(self.b_t, self.b_mode) if tt >= self._acq_t]
-            trk = 100 * np.mean([m == 2 for m in modes_after]) if modes_after else 0.0
-            T["lock"].set(f"{lk:.1f} %", "pass" if 100 - lk < 5 else "fail", f"tracked {trk:.0f}%")
-        else:
-            T["acq"].set("searching", "warn")
-        ce = np.array(self.b_cerr); ce = ce[np.isfinite(ce)]
-        if len(ce):
-            T["cerr"].set(f"{ce.mean():.3f} px", "pass" if ce.mean() < 2 else "warn")
-        else:
-            T["cerr"].set("n/a", None, "no truth in video")
-        fps = 1000.0 / max(np.mean(self.b_proc[-60:]), 1e-3)
-        T["fps"].set(f"{fps:.0f} FPS", "pass" if fps >= 20 else "fail")
+        for k, d in self.live.tiles().items():
+            self.tiles[k].show(d)
 
     @QtCore.pyqtSlot(object)
     def on_finished(self, sim: Simulation):
@@ -854,26 +709,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Report", f"Report generation failed:\n{e}")
         v = sim.summary.values if sim.summary else {}
         p = sim.summary.passed if sim.summary else {}
-        def f(k, fmt="{:.2f}"):
-            x = v.get(k)
-            return "n/a" if x is None or (isinstance(x, float) and np.isnan(x)) else fmt.format(x)
-        def pf(k):
-            return {True: "PASS", False: "FAIL", None: "n/a"}[p.get(k)]
-        msg = (f"Frames {v.get('frames')}    duration {f('duration_s')} s\n"
-               f"FPS mean {f('fps_mean', '{:.1f}')}  ({pf('fps_mean')})\n"
-               f"Acquisition {f('acquisition_time_s')} s  ({pf('acquisition_time_s')})\n"
-               f"Tracking error mean {f('tracking_err_mean_px')} px, max {f('tracking_err_max_px')} px  ({pf('tracking_err_mean_px')})\n"
-               f"  with vibration removed: {f('tracking_err_stab_mean_px')} px\n"
-               f"Centroiding error mean {f('centroid_err_mean_px', '{:.3f}')} px, RMSE {f('centroid_err_rmse_px', '{:.3f}')} px\n"
-               f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
-               f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
-               f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99\n\n"
-               f"Log: {sim.files['frames']}\nReport: {report}")
-        sat = v.get("slew_saturation_pct", 0.0)
-        if sat > 20:
-            msg += (f"\n\nNote: the gimbal was at its rate limit in {sat:.0f}% of frames, so the target moved faster than the camera can turn. "
-                    f"Raise Max pan / Max tilt (the PS allows 5 to 10 deg/s) or widen the FOV and run again.")
-        self.lbl_status.setText(f"Finished. Report written to {self.out_dir}")
+        msg = summary_text(v, p, str(sim.files["frames"]), str(report))
+        self.lbl_status.setText(status_text("finished", out=self.out_dir))
         self.last_summary_text = msg
         if self.headless:
             return
@@ -888,25 +725,8 @@ class MainWindow(QtWidgets.QMainWindow):
         box.exec()
 
     def _tiles_from_summary(self, v: dict, passed: dict):
-        """After a run the tiles show the report's numbers, not the last live estimate."""
-        T = self.tiles
-        def ok(k):
-            return {True: "pass", False: "fail"}.get(passed.get(k))
-        def num(k):
-            x = v.get(k)
-            return None if x is None or (isinstance(x, float) and not np.isfinite(x)) else x
-        T["state"].set("finished", None, f"{v.get('frames', 0)} frames")
-        a = num("acquisition_time_s")
-        T["acq"].set(f"{a:.2f} s" if a is not None else "not acquired", ok("acquisition_time_s") if a is not None else "fail")
-        te = num("tracking_err_mean_px")
-        T["terr"].set(f"{te:.1f} px" if te is not None else "n/a", ok("tracking_err_mean_px"), None if te is not None else "no truth in video")
-        ce = num("centroid_err_mean_px")
-        T["cerr"].set(f"{ce:.3f} px" if ce is not None else "n/a", ("pass" if ce < 2 else "warn") if ce is not None else None, None if ce is not None else "no truth in video")
-        lk, trk = num("lock_retention_pct"), num("tracked_pct")
-        T["lock"].set(f"{lk:.1f} %" if lk is not None else "n/a", ok("target_loss_pct"),
-                      f"tracked {trk:.0f}%" if trk is not None else None)
-        fps = num("fps_mean")
-        T["fps"].set(f"{fps:.0f} FPS" if fps is not None else "n/a", ok("fps_mean"))
+        for k, d in final_tiles(v, passed).items():
+            self.tiles[k].show(d)
 
     @QtCore.pyqtSlot(str)
     def on_failed(self, tb: str):
@@ -960,9 +780,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pnt.setPen(QtGui.QColor(C["good"])); pnt.setFont(mono(9.5, bold=True))
         pnt.drawText(8, 16, "VIDEO LOADED")
         pnt.setPen(QtGui.QColor(C["ink"])); pnt.setFont(mono(8.5))
-        rot = f"   rotated {self.video_info['rotation']:.0f} deg" if self.video_info["rotation"] else ""
-        vfr = "   variable rate" if self.video_info["variable"] else ""
-        pnt.drawText(130, 16, f"{w} x {h} px   {fps:.2f} fps{vfr}   {n} frames   {self.video_info['seconds']:.2f} s{rot}")
+        pnt.drawText(130, 16, video_preview_header(info))
         # the camera window at its start position, for scale
         cw, ch = min(self.cfg.camera.width, w), min(self.cfg.camera.height, h)
         pnt.setPen(_pen(C["accent"], 2)); pnt.drawRect(int((w - cw) / 2 * s), int((h - ch) / 2 * s), int(cw * s), int(ch * s))
@@ -973,20 +791,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for t in self.tiles.values():
             t.set("-")
         self.tiles["state"].set("video ready", None, "press Start")
-        cam = self.forms["camera"].read()
-        lines = ["Video loaded, settings calibrated", "", f"file    {Path(path).name}", f"size    {w} x {h} px as displayed"]
-        if self.video_info["rotation"]:
-            lines.append(f"turn    {self.video_info['rotation']:.0f} deg tag applied")
-        lines += [f"rate    {fps:.2f} fps average"]
-        if self.video_info["variable"]:
-            lines.append(f"        variable rate, {self.video_info['fps_ts']:.1f} fps by timestamps")
-        lines += [f"frames  {n} counted", f"length  {self.video_info['seconds']:.2f} s", "",
-                  "Calibrated into the panel:", f"  screen {w} x {h}, update rate {fps:.2f} Hz", "",
-                  "Not in the file, set by you:", f"  camera window {cam.width} x {cam.height} px",
-                  f"  FOV {cam.fov_w_deg:g} x {cam.fov_h_deg:g} deg, so 1 px =", f"  {cam.ifov_deg*3600:.1f} arcsec; degree readouts", "  depend on this setting.", "",
-                  "Target and disturbance settings are", "locked: the video already contains", "them. No ground truth exists, so", "tracking and centroiding error read", "n/a; lock, acquisition, re-acquisition", "and FPS are measured.", "",
-                  "Press Start (Space) to run."]
-        self.tele.setPlainText("\n".join(lines))
+        self.tele.setPlainText(video_loaded_lines(Path(path).name, info, self.forms["camera"].read()))
 
     def clear_video(self):
         self.video_path = None; self.video_info = None
@@ -1000,14 +805,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def _set_video_mode(self, on: bool):
         """With a video loaded the scene, beacons and disturbances come from the file, so
         those sections are locked; the camera window, its FOV and rate limits still apply."""
-        for key in ("target", "disturbance"):
-            self.forms[key].setEnabled(not on)
-        for name in ("width", "height", "background", "background_level", "star_density"):
-            w = self.forms["screen"].widgets.get(name)
-            if w is not None:
-                w.setEnabled(not on)
-        self.forms["camera"].widgets["update_rate_hz"].setEnabled(not on)
-        self.sp_extra.setEnabled(not on); self.sp_dur.setEnabled(not on)
+        for key, names in VIDEO_LOCKED.items():
+            if key == "run":
+                self.sp_extra.setEnabled(not on); self.sp_dur.setEnabled(not on)
+            elif names == "*":
+                self.forms[key].setEnabled(not on)
+            else:
+                for name in names:
+                    w = self.forms[key].widgets.get(name)
+                    if w is not None:
+                        w.setEnabled(not on)
         self.act_clear_video.setEnabled(on)
 
     def screenshot(self):
@@ -1025,16 +832,7 @@ class MainWindow(QtWidgets.QMainWindow):
         d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)
 
     def help(self):
-        QtWidgets.QMessageBox.information(self, "FSOC Tracker", (
-            f"FSOC Tracker v{__version__}  (SIH26169, Department of Space / ISRO SAC)\n\n"
-            "WHAT YOU SEE\n"
-            "Left picture: the whole scene. Cyan box = camera window. Orange circle = true beacon. Green cross = tracker estimate. Grey circles = other targets.\n"
-            "Right picture: what the camera window sees. Dashed ring = capture radius (green when locked). "
-            "Green box = this frame's detection. Orange dot = prediction with uncertainty ring. Line from centre = pointing error.\n"
-            "Tiles: live specification check while running, the report's final numbers after. Tracked = share of frames in TRACK; lock also needs the beacon centred.\n"
-            "Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n\n"
-            "OUTPUT\nEvery run writes a folder results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/ holding <label>_frames.csv, _summary.json, _report.pdf and _scenario.yaml.\n\n"
-            "See docs/USER_MANUAL.md for parameters and metric definitions."))
+        QtWidgets.QMessageBox.information(self, "About FSOC Tracker", about_text())
 
 
 def _open_path(p: Path):
