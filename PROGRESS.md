@@ -221,7 +221,7 @@ The web app is the architecture-neutral path.
 |---|---|
 | Source with documentation | 🟩 |
 | Standalone executable for the evaluators' machines | 🟩 four archives on the project site |
-| Technical report 10 to 15 pages, exported | 🟩 14-page PDF |
+| Technical report 10 to 15 pages, exported | 🟩 12-page PDF |
 | User manual, exported | 🟩 PDF, per-platform installation |
 | Web app for review without installation | 🟩 project site, login protected |
 | Demo video (optional) | ⬜ |
