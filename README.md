@@ -1,4 +1,7 @@
-# FSOC Tracker
+# FSOC Tracker (LAKSHYA)
+
+Team Blank Point. The submission name of the project is **LAKSHYA**; the software and its builds are
+called FSOC Tracker.
 
 AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
 Communication (FSOC) terminals. Smart India Hackathon problem statement **SIH26169**,
@@ -23,6 +26,7 @@ CSV log and an automatic PDF performance report.
 | `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them) |
 | `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
 | `26169.pdf` | The problem statement itself |
+| `docs/submission/LAKSHYA_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
 
 ## Quick start
 
