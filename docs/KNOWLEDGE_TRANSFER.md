@@ -30,6 +30,7 @@ Other documents go deeper on one topic: `docs/HANDOVER.md` (working on the code)
 | YouTube / video link | NA (none given) |
 | Dataset link | NA (none given): no data is supplied, so we must create our own test data |
 | Length | 3 pages. The PDF was produced on 27 August 2026 |
+| Our team and project name | Team Blank Point; project name LAKSHYA (the software is called FSOC Tracker) |
 
 The mentors listed on the SIH portal for this statement are Pranav Kumar Pandey, Koushik Basak and
 Abhishek Khanna. They are not named in the PDF itself.
@@ -570,6 +571,13 @@ published. Nothing needs installing, and it works offline.
 ---
 
 # Part E. Presenting it
+
+## E0. The presentation
+
+Our SIH idea-submission deck is `docs/submission/LAKSHYA_SIH2026_26169.pdf`. It follows the SIH
+template: title (PS ID, title, theme, category, team ID, team name), proposed solution, technical
+approach (methodology and architecture), working prototype, feasibility and viability, impact and
+benefits, research and references. Its numbers are the measured ones in Part D.
 
 ## E1. The demonstration (Functional Verification, 20%)
 

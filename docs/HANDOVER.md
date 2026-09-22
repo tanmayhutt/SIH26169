@@ -29,6 +29,7 @@ released. Remaining work is preparation for the event (section 13).
 9. `docs/TESTING_GUIDE.md`: how to exercise every input by hand, with expected results.
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
+12. `docs/submission/LAKSHYA_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
 
 `PROGRESS.md` and `web/progress.json` are the running status record; the second drives the
 progress page on the site.
@@ -291,6 +292,7 @@ files downloaded instead of opened.
 
 | Item | Owner | How |
 |---|---|---|
+| Presentation: fill in the Team ID (slide 1) and the demo video link (slide 5); reference [18] should read 12 pp., not 14 | team | edit the source deck, export again to `docs/submission/` |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
 | Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |

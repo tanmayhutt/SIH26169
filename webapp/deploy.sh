@@ -32,6 +32,7 @@ cp "$HERE/docs/plan.html" "$STAGE/about/plan.html"
 cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/about/content/"
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
+cp "$HERE/docs/submission/LAKSHYA_SIH2026_26169.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/demo/FSOC-Tracker-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$HERE/docs/HANDOVER.md" "$HERE/docs/KNOWLEDGE_TRANSFER.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
@@ -48,6 +49,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <h2>Documents</h2><ul>
 <li><a href="USER_MANUAL.pdf">USER_MANUAL.pdf</a> <small>installation on each platform, operation, every parameter, Benchmark 2, metric definitions</small></li>
 <li><a href="TECHNICAL_REPORT.pdf">TECHNICAL_REPORT.pdf</a> <small>problem understanding, architecture, methods, tests, measured performance, appendices</small></li>
+<li><a href="LAKSHYA_SIH2026_26169.pdf">LAKSHYA_SIH2026_26169.pdf</a> <small>SIH idea-submission presentation, 8 slides</small></li>
 <li><a href="FSOC-Tracker-demo.mp4">FSOC-Tracker-demo.mp4</a> <small>demonstration video, about four minutes: eight scenarios and Benchmark 2, composed from the engine's own frames with live specification tiles</small></li>
 </ul>
 <p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>

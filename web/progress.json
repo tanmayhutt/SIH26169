@@ -1,8 +1,8 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 13 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
-  "updated": "2026-09-22",
+  "stats": "PS rows 25 · shall items 8 · deliverables 6 · scenarios 13 · tests 22 · 2 PDFs · 4 platform builds · web app",
+  "updated": "2026-09-23",
   "verification": {
     "title": "Build verification: September 22, 2026",
     "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
@@ -1050,6 +1050,14 @@
             {
               "name": "10 to 15 minute demo script (docs/DEMO_SCRIPT.md)",
               "status": "done"
+            },
+            {
+              "name": "SIH idea-submission presentation, 8 slides (docs/submission/)",
+              "status": "done"
+            },
+            {
+              "name": "Team ID and demo video link to fill in on the presentation",
+              "status": "blocked"
             }
           ]
         }
