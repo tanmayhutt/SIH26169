@@ -2,7 +2,8 @@
 
 These rules apply to every contributor and every AI agent working in this repository. Start with
 `docs/HANDOVER.md`: it holds the full project context (design reasons, tried-and-rejected ideas,
-verification and release steps). On the project owner's machine the workspace rules in
+verification and release steps), and `docs/KNOWLEDGE_TRANSFER.md` explains the problem statement
+and the solution completely. On the project owner's machine the workspace rules in
 `/Users/tanmay/Developer/CLAUDE.md` and the local `context.md` also apply.
 
 ## The problem statement is the only source of truth

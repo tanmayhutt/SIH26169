@@ -11,9 +11,18 @@ motion and steers a rate-limited virtual pan-tilt camera to keep it centred. It 
 `.mp4` files in place of the simulated scene (Benchmark 2). Every run writes a per-frame
 CSV log and an automatic PDF performance report.
 
-New to the project? Read `docs/HANDOVER.md` first: it is the complete context for teammates
-(design reasons, what was tried, how to verify and release). Rules for contributors and AI agents
-are in `CLAUDE.md`.
+## Start here
+
+| Document | For |
+|---|---|
+| `docs/KNOWLEDGE_TRANSFER.md` | The problem statement and our solution explained completely, in plain language |
+| `docs/HANDOVER.md` | Working on the code: setup, commands, code map, verification, release, server |
+| `CONTRIBUTING.md` | How teammates make and submit changes |
+| `CLAUDE.md` | Rules for every contributor and AI agent |
+| `COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
+| `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them) |
+| `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
+| `26169.pdf` | The problem statement itself |
 
 ## Quick start
 

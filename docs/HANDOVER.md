@@ -17,16 +17,18 @@ released. Remaining work is preparation for the event (section 13).
 ## 1. Read in this order
 
 1. `26169.pdf`: the problem statement. It is the only source of truth for what to build.
-2. This file.
-3. `CLAUDE.md`: the rules every contributor (human or AI agent) follows in this repository.
-4. `COMPLIANCE.md`: every PS row, "shall" item, deliverable and evaluation stage, with where it is
+2. `docs/KNOWLEDGE_TRANSFER.md`: the problem statement and our solution explained completely, in
+   plain language, for someone new.
+3. This file.
+4. `CLAUDE.md`: the rules every contributor (human or AI agent) follows in this repository.
+5. `COMPLIANCE.md`: every PS row, "shall" item, deliverable and evaluation stage, with where it is
    implemented and how it is verified.
-5. `ARCHITECTURE.md`: the design baseline and the reading of the PS it rests on.
-6. `docs/TECHNICAL_REPORT.md`: methods, tests, measured performance (the submitted report).
-7. `docs/USER_MANUAL.md`: installation and use (the submitted manual).
-8. `docs/TESTING_GUIDE.md`: how to exercise every input by hand, with expected results.
-9. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
-10. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
+6. `ARCHITECTURE.md`: the design baseline and the reading of the PS it rests on.
+7. `docs/TECHNICAL_REPORT.md`: methods, tests, measured performance (the submitted report).
+8. `docs/USER_MANUAL.md`: installation and use (the submitted manual).
+9. `docs/TESTING_GUIDE.md`: how to exercise every input by hand, with expected results.
+10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
+11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
 
 `PROGRESS.md` and `web/progress.json` are the running status record; the second drives the
 progress page on the site.
