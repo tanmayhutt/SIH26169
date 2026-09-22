@@ -13,3 +13,6 @@ models/*_v2.*
 
 # demonstration video: built by tools/make_demo_video.py, delivered from the site
 docs/demo/
+
+# macOS folder metadata
+.DS_Store

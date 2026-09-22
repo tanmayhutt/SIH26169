@@ -11,6 +11,10 @@ motion and steers a rate-limited virtual pan-tilt camera to keep it centred. It 
 `.mp4` files in place of the simulated scene (Benchmark 2). Every run writes a per-frame
 CSV log and an automatic PDF performance report.
 
+New to the project? Read `docs/HANDOVER.md` first: it is the complete context for teammates
+(design reasons, what was tried, how to verify and release). Rules for contributors and AI agents
+are in `CLAUDE.md`.
+
 ## Quick start
 
 ```
