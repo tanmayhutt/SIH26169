@@ -15,7 +15,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 2 | Camera Type | Monochrome FPA, colour optional | monochrome; colour renders a three-channel frame, tracker uses luminance | `ScreenConfig.colour`, `World._colourise` | `test_rows_1_to_6` | 🟩 |
 | 3 | Camera Resolution | 640 x 480, user-defined | 640 x 480, editable | `CameraConfig.width/height` | `test_rows_1_to_6` | 🟩 |
 | 4 | Camera FOV | user-defined, default 4 x 3 deg | 4 x 3 deg, editable; IFOV derived | `CameraConfig.fov_*`, `ifov_deg` | `test_rows_1_to_6`, `test_ifov_and_conversions` | 🟩 |
-| 5 | Camera update rate | 30 Hz min | 30 Hz, editable upward | `CameraConfig.update_rate_hz` | `test_rows_1_to_6` | 🟩 |
+| 5 | Camera update rate | 30 Hz min | 30 Hz, editable upward; lag compensation scales with the rate | `CameraConfig.update_rate_hz`, `Controller.step` | `test_rows_1_to_6`, 60 Hz runs of the pack | 🟩 |
 | 6 | Initial camera position | centre of the screen | centre | `Gimbal.window_centre_px()` at pose 0 | `test_rows_1_to_6` | 🟩 |
 | 7 | Target type | beacon spot | rendered spot with PSF | `World._sprite` | visual, `test_centroid_accuracy_on_clean_frame` | 🟩 |
 | 8 | Number of targets | 1 mandatory, multiple optional | 1; N via list or "Extra targets" | `RunConfig.targets` | `test_rows_7_to_12`, `test_multi_target_identity_held` | 🟩 |

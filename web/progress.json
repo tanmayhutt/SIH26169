@@ -2,9 +2,9 @@
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
   "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 13 \u00b7 tests 22 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
-  "updated": "2026-09-21",
+  "updated": "2026-09-22",
   "verification": {
-    "title": "Build verification: September 21, 2026",
+    "title": "Build verification: September 22, 2026",
     "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
@@ -62,6 +62,21 @@
         "name": "PS re-read",
         "status": "pass",
         "text": "26169.pdf re-read on September 20: rows 1 to 25, the eight shall items, five deliverables, four evaluation stages. All mandatory items implemented and tested. Optional items: colour camera, multiple targets, spiral, sinusoidal and user-defined (waypoint) paths, all disturbance kinds. Only the optional demo video is not produced."
+      },
+      {
+        "name": "Frame-rate independence",
+        "status": "pass",
+        "text": "The estimator-lag compensation was set in seconds but the filter delay is a number of frames, so at camera rates above 30 Hz (the PS makes the rate user-defined, 30 Hz minimum) the controller over-led the target. It now scales with the update rate. At 60 Hz the stress scenario went from 15% to 94% lock; at 30 Hz every scenario reproduces its previous numbers exactly. Confirmed on the full pack: 36 of 36 runs unchanged against the previous batch, none worse."
+      },
+      {
+        "name": "Tracked rate metric",
+        "status": "pass",
+        "text": "Every report, results dialog, web finish panel and command-line summary now prints the tracked rate (share of frames in TRACK) beside lock retention (TRACK and centred within 30 px). High tracked with low lock tells a reader the camera could not keep up, not that the beacon was lost. No definition changed."
+      },
+      {
+        "name": "Desktop interface pass",
+        "status": "pass",
+        "text": "Interface reviewed from screenshots at 1600 x 1000 and 1366 x 768. Fixed: camera view turning the sky white near the screen edge (contrast stretch counted the off-screen area), overlapping legend and cut-off HUD lines, plot legends over the data, meaningless idle axes, misaligned form columns, tiles keeping live values after a run instead of the report's numbers, spurious picture-shift readout, a stray scrollbar artefact, a font warning on start, the simulator button active with no video, and an empty-legend warning in video reports. Native system fonts and one widget style on every platform."
       }
     ]
   },
@@ -711,6 +726,10 @@
             {
               "name": "Saturation reported every frame",
               "status": "done"
+            },
+            {
+              "name": "Lag compensation scales with the camera update rate (30 Hz reference)",
+              "status": "done"
             }
           ]
         }
@@ -741,6 +760,10 @@
             },
             {
               "name": "Batch runner with multi-seed envelope",
+              "status": "done"
+            },
+            {
+              "name": "Tracked rate beside lock retention in every output",
               "status": "done"
             }
           ]
@@ -844,7 +867,7 @@
       "blurb": "Tests that fail if the system drifts from the problem statement.",
       "groups": [
         {
-          "caption": "tests, 21 passing",
+          "caption": "tests, 22 passing",
           "items": [
             {
               "name": "Geometry and gimbal limits",

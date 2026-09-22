@@ -19,7 +19,7 @@ from ..engine.metrics import SPEC
 from ..engine.naming import run_label
 from ..engine.report import write_report
 from ..engine.simulation import Simulation, StepResult
-from .theme import STYLESHEET, C
+from .theme import STYLESHEET, C, mono, ui_font
 
 SCENARIO_DIR = Path("configs/scenarios")
 
@@ -35,18 +35,18 @@ CHOICES = {
 LABELS = {
     "width": "Width (px)", "height": "Height (px)", "fov_w_deg": "FOV width (deg)", "fov_h_deg": "FOV height (deg)",
     "update_rate_hz": "Update rate (Hz)", "max_pan_rate_deg_s": "Max pan (deg/s)", "max_tilt_rate_deg_s": "Max tilt (deg/s)",
-    "max_accel_deg_s2": "Max accel (deg/s2)", "command_latency_frames": "Command latency (frames)",
+    "max_accel_deg_s2": "Max accel (deg/s2)", "command_latency_frames": "Latency (frames)",
     "window_only": "Hard mode: see window only", "size_px": "Size (px)", "intensity": "Peak intensity",
     "speed_px_s": "Speed (px/s)", "radius_px": "Radius (px)", "period_s": "Period (s)", "heading_deg": "Heading (deg)",
-    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper fraction", "gaussian_sigma": "Gaussian sigma",
+    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper", "gaussian_sigma": "Gaussian sigma",
     "poisson": "Poisson shot noise", "jitter_px": "Camera jitter (px/frame)", "atmosphere": "Atmosphere preset",
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
-    "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform speed (px/frame)",
+    "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
     "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
     "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
-    "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Min confidence to acquire",
-    "faint_snr_min": "Faint path: min chain SNR", "faint_threshold_k": "Faint path: threshold (sigma)",
+    "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
+    "faint_snr_min": "Faint: min chain SNR", "faint_threshold_k": "Faint: threshold (sigma)",
 }
 TIPS = {
     "width": "PS row 1 (screen) or row 3 (camera). The screen is the whole scene the tracker observes; the camera window is what the terminal points at.",
@@ -97,6 +97,7 @@ RANGES = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "intens
           "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10), "blink_hz": (0, 15),
           "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1)}
 MODES = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
+LABEL_W = 140          # one label column width for every form, so all sections line up
 SPEEDS = [("0.25x", 0.25), ("0.5x", 0.5), ("1x real time", 1.0), ("2x", 2.0), ("4x", 4.0), ("Max speed", 0.0)]
 
 
@@ -111,8 +112,10 @@ class DataclassForm(QtWidgets.QWidget):
         self.widgets: dict[str, QtWidgets.QWidget] = {}
         lay = QtWidgets.QFormLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setVerticalSpacing(4)
-        lay.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        lay.setVerticalSpacing(6)
+        lay.setHorizontalSpacing(10)
+        lay.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        lay.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         for f in dataclasses.fields(obj):
             if f.name in HIDDEN:
                 continue
@@ -122,7 +125,7 @@ class DataclassForm(QtWidgets.QWidget):
                 continue
             self.widgets[f.name] = w
             lab = QtWidgets.QLabel(LABELS.get(f.name, f.name.replace("_", " ").capitalize()))
-            lab.setProperty("class", "fieldlabel")
+            lab.setProperty("class", "fieldlabel"); lab.setFixedWidth(LABEL_W); lab.setWordWrap(True)
             tip = TIPS.get(f.name)
             if tip:
                 lab.setToolTip(tip); w.setToolTip(tip)
@@ -176,11 +179,14 @@ class DataclassForm(QtWidgets.QWidget):
             w.blockSignals(False)
 
 
-def section(title: str, inner: QtWidgets.QWidget, hint: str = "") -> QtWidgets.QWidget:
+def section(title: str, inner: QtWidgets.QWidget, hint: str = "", ref: str = "") -> QtWidgets.QWidget:
     box = QtWidgets.QWidget()
     lay = QtWidgets.QVBoxLayout(box)
-    lay.setContentsMargins(0, 6, 0, 10)
-    lab = QtWidgets.QLabel(title.upper())
+    lay.setContentsMargins(0, 8, 0, 12)
+    lay.setSpacing(6)
+    text = title if not ref else f"{title}&nbsp;&nbsp;<span style='color:{C['faint']}; font-weight:400'>{ref}</span>"
+    lab = QtWidgets.QLabel(text)
+    lab.setTextFormat(Qt.TextFormat.RichText)
     lab.setProperty("class", "section")
     lay.addWidget(lab)
     if hint:
@@ -194,18 +200,22 @@ class Tile(QtWidgets.QFrame):
     def __init__(self, title: str, unit: str = ""):
         super().__init__()
         self.setProperty("class", "tile")
-        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(12, 8, 12, 8); lay.setSpacing(2)
-        self.t = QtWidgets.QLabel(title.upper()); self.t.setProperty("class", "tiletitle")
-        self.v = QtWidgets.QLabel("-"); self.v.setProperty("class", "tilevalue")
-        self.u = QtWidgets.QLabel(unit); self.u.setProperty("class", "tileunit")
+        lay = QtWidgets.QVBoxLayout(self); lay.setContentsMargins(10, 8, 10, 8); lay.setSpacing(1)
+        self.t = QtWidgets.QLabel(title); self.t.setProperty("class", "tiletitle"); self.t.setFont(ui_font(9.5))
+        self.v = QtWidgets.QLabel("\u2013"); self.v.setProperty("class", "tilevalue")
+        vf = ui_font(17); vf.setWeight(QtGui.QFont.Weight.DemiBold); self.v.setFont(vf)
+        self.u = QtWidgets.QLabel(unit); self.u.setProperty("class", "tileunit"); self.u.setFont(ui_font(9.5))
+        self.base_unit = unit
         lay.addWidget(self.t); lay.addWidget(self.v); lay.addWidget(self.u)
+        self.setMinimumWidth(110)
+        for lab in (self.t, self.v, self.u):
+            lab.setMinimumWidth(1)          # let a narrow tile shrink instead of pushing its neighbours
 
     def set(self, text: str, state: str | None = None, unit: str | None = None):
         self.v.setText(text)
         col = {"pass": C["good"], "fail": C["signal"], "warn": C["signal"], None: C["ink"]}.get(state, C["ink"])
-        self.v.setStyleSheet(f"color: {col}; font-size: 20px; font-weight: 600;")
-        if unit is not None:
-            self.u.setText(unit)
+        self.v.setStyleSheet(f"color: {col};")
+        self.u.setText(unit if unit is not None else self.base_unit)
 
 
 # ----------------------------------------------------------------------------- worker
@@ -263,6 +273,19 @@ def _pen(col, w=1.0, style=Qt.PenStyle.SolidLine):
     p = QtGui.QPen(QtGui.QColor(col)); p.setWidthF(w); p.setStyle(style); return p
 
 
+def _bar(p: QtGui.QPainter, y: int, h: int, width: int):
+    p.fillRect(0, y, width, h, QtGui.QColor(0, 0, 0, 165))
+
+
+def _text(p: QtGui.QPainter, x: float, y: float, text: str, col: str, font: QtGui.QFont, max_w: float) -> float:
+    """Draw text elided to max_w; returns the x just after it, so strips never overlap."""
+    p.setFont(font); p.setPen(QtGui.QColor(col))
+    fm = QtGui.QFontMetrics(font)
+    t = fm.elidedText(text, Qt.TextElideMode.ElideRight, int(max(max_w, 0)))
+    p.drawText(QtCore.QPointF(x, y), t)
+    return x + fm.horizontalAdvance(t)
+
+
 class SceneView(QtWidgets.QLabel):
     """The whole screen, downscaled, with the camera window, truth, estimate and trails."""
 
@@ -318,13 +341,16 @@ class SceneView(QtWidgets.QLabel):
             ex, ey = res.track.estimate
             p.setPen(_pen(C["good"], 1.2))
             p.drawLine(int(ex * s - 8), int(ey * s), int(ex * s + 8), int(ey * s)); p.drawLine(int(ex * s), int(ey * s - 8), int(ex * s), int(ey * s + 8))
-        p.fillRect(0, 0, pm.width(), 20, QtGui.QColor(0, 0, 0, 150))
-        p.setPen(QtGui.QColor(C["muted"])); p.setFont(QtGui.QFont("Menlo", 9))
-        p.drawText(6, 14, f"SCREEN {w} x {h} px   {w * ifov_deg:.1f} x {h * ifov_deg:.1f} deg   frame {res.frame.idx}   t {res.frame.t:6.2f} s   grid 2 deg")
-        y = pm.height() - 7
-        p.fillRect(0, pm.height() - 20, pm.width(), 20, QtGui.QColor(0, 0, 0, 150))
-        for col, txt, dx in ((C["accent"], "camera window", 6), (C["signal"], "true beacon", 120), (C["good"], "tracker estimate", 215), (C["muted"], "other targets", 340)):
-            p.setPen(QtGui.QColor(col)); p.drawText(dx, y, txt)
+        f = mono(8.5); W = pm.width()
+        _bar(p, 0, 20, W)
+        _text(p, 8, 14, f"Screen {w} x {h} px  |  {w * ifov_deg:.1f} x {h * ifov_deg:.1f} deg  |  t {res.frame.t:6.2f} s  |  grid 2 deg", C["muted"], f, W - 16)
+        _bar(p, pm.height() - 20, 20, W)
+        x = 8.0
+        for col, txt in ((C["accent"], "camera window"), (C["signal"], "true beacon"), (C["good"], "estimate"), (C["muted"], "other targets")):
+            if x > W - 40:
+                break
+            p.fillRect(QtCore.QRectF(x, pm.height() - 13, 8, 3), QtGui.QColor(col))
+            x = _text(p, x + 12, pm.height() - 7, txt, col, f, W - x - 20) + 16
         p.end()
         self.setPixmap(pm)
 
@@ -349,12 +375,15 @@ class CameraView(QtWidgets.QLabel):
         xa, ya = max(x0, 0), max(y0, 0)
         xb, yb = min(x0 + w, W), min(y0 + h, H)
         crop = np.zeros((h, w) if img.ndim == 2 else (h, w, 3), np.uint8)
-        if xb > xa and yb > ya:
-            crop[ya - y0:yb - y0, xa - x0:xb - x0] = img[ya:yb, xa:xb]
-        # display-only contrast stretch so faint scenes stay visible
-        lo, hi = np.percentile(crop[::4, ::4], (1, 99.8))
-        if hi - lo > 8:
-            crop = np.clip((crop.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
+        inside = img[ya:yb, xa:xb] if (xb > xa and yb > ya) else None
+        if inside is not None:
+            # display-only contrast stretch so faint scenes stay visible. Measured on the part
+            # of the window that is on the screen (the area beyond the edge is black and would
+            # drag the low end down), and never stretched more than 4x so an empty sky stays dark.
+            lo, hi = np.percentile(inside[::4, ::4], (1, 99.8))
+            hi = max(hi, lo + 64.0)
+            view = np.clip((inside.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
+            crop[ya - y0:yb - y0, xa - x0:xb - x0] = view
         qi = to_qimage(crop)
         avail_w, avail_h = self.width() - 8, self.height() - 8
         s = min(avail_w / w, avail_h / h, 1.6)
@@ -392,21 +421,21 @@ class CameraView(QtWidgets.QLabel):
         bar = s / ifov_deg
         if bar < pm.width() * 0.6:
             bx = pm.width() - 16 - bar; by = pm.height() - 30
-            p.setPen(_pen(C["ink"], 1.5)); p.drawLine(int(bx), by, int(bx + bar), by)
-            p.setFont(QtGui.QFont("Menlo", 8)); p.drawText(int(bx), by - 4, "1 deg")
+            p.setPen(_pen(C["ink2"], 1.5)); p.drawLine(int(bx), by, int(bx + bar), by)
+            p.setFont(mono(8)); p.drawText(int(bx), by - 5, "1 deg")
         col = {"TRACK": C["good"], "COAST": C["signal"], "REACQUIRE": C["signal"]}.get(tr.mode.value, C["accent"])
-        p.fillRect(0, 0, pm.width(), 22, QtGui.QColor(0, 0, 0, 160))
-        p.setPen(QtGui.QColor(col)); p.setFont(QtGui.QFont("Menlo", 10, QtGui.QFont.Weight.Bold))
-        p.drawText(8, 16, f"{tr.mode.value}{'  LOCKED' if locked else ''}")
-        p.setPen(QtGui.QColor(C["ink"])); p.setFont(QtGui.QFont("Menlo", 9))
+        W, Hh = pm.width(), pm.height()
+        _bar(p, 0, 22, W)
+        x = _text(p, 8, 15, f"{tr.mode.value}{'  locked' if locked else ''}", col, mono(9, bold=True), W - 16) + 16
         err = res.record.tracking_err_px
-        err_s = f"err {err:6.2f} px  {err * ifov_deg * 3600:6.0f} arcsec" if np.isfinite(err) else "err n/a (video: no truth)"
-        p.drawText(150, 16, f"{err_s}   conf {tr.confidence:.2f}   {tr.tier}")
-        p.fillRect(0, pm.height() - 20, pm.width(), 20, QtGui.QColor(0, 0, 0, 160))
-        p.setPen(QtGui.QColor(C["muted"]))
-        sat = "  SATURATED" if (res.cmd.saturated_pan or res.cmd.saturated_tilt) else ""
-        p.drawText(8, pm.height() - 6, f"pan {res.record.cam_pan_deg:+6.2f}  tilt {res.record.cam_tilt_deg:+6.2f} deg   "
-                   f"cmd {res.cmd.pan_rate:+5.2f} {res.cmd.tilt_rate:+5.2f} deg/s{sat}   {res.record.proc_ms:5.1f} ms")
+        err_s = f"err {err:.1f} px ({err * ifov_deg * 3600:.0f} arcsec)" if np.isfinite(err) else "err n/a (no truth in a video)"
+        _text(p, x, 15, f"{err_s}   conf {tr.confidence:.2f}   {tr.tier}", C["ink2"], mono(8.5), W - x - 8)
+        _bar(p, Hh - 20, 20, W)
+        sat = res.cmd.saturated_pan or res.cmd.saturated_tilt
+        x = _text(p, 8, Hh - 6, f"pan {res.record.cam_pan_deg:+.2f}  tilt {res.record.cam_tilt_deg:+.2f} deg   cmd {res.cmd.pan_rate:+.2f} {res.cmd.tilt_rate:+.2f} deg/s",
+                  C["muted"], mono(8.5), W - 16)
+        if sat:
+            _text(p, x + 10, Hh - 6, "rate limit", C["signal"], mono(8.5, bold=True), W - x - 18)
         p.end()
         self.setPixmap(pm)
 
@@ -426,15 +455,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.out_dir: Path | None = None
         self.headless = False
         self._last_draw = 0.0
+        self._last_res = None
         self._build()
         self.apply_cfg(self.cfg)
         self._shortcuts()
 
     # ------------------------------------------------------------- layout
     def _build(self):
-        tb = self.addToolBar("Run"); tb.setMovable(False)
-        tb.addWidget(QtWidgets.QLabel("  Scenario "))
-        self.cmb_scn = QtWidgets.QComboBox(); self.cmb_scn.setMinimumWidth(190)
+        tb = self.addToolBar("Run"); tb.setMovable(False); tb.setFloatable(False)
+        tb.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
+        tb.addWidget(QtWidgets.QLabel("Scenario"))
+        self.cmb_scn = QtWidgets.QComboBox(); self.cmb_scn.setMinimumWidth(170)
         self._fill_scenarios()
         self.cmb_scn.currentIndexChanged.connect(self._scenario_picked)
         self.cmb_scn.setToolTip("Ready-made test cases from configs/scenarios. Pick one, then Start. Edit any value on the left before starting.")
@@ -444,7 +475,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_pause = tb.addAction("Pause", self.pause); self.act_pause.setToolTip("Space while running")
         self.act_step = tb.addAction("Step", self.step_once); self.act_step.setToolTip("N: advance one frame while paused")
         self.act_stop = tb.addAction("Stop", self.stop); self.act_stop.setToolTip("Esc")
-        tb.addWidget(QtWidgets.QLabel("  Speed "))
+        tb.widgetForAction(self.act_start).setObjectName("primary")
+        tb.widgetForAction(self.act_stop).setObjectName("danger")
+        tb.addSeparator()
+        tb.addWidget(QtWidgets.QLabel("Speed"))
         self.cmb_speed = QtWidgets.QComboBox()
         for name, _ in SPEEDS:
             self.cmb_speed.addItem(name)
@@ -452,14 +486,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cmb_speed.setToolTip("Playback pacing. Max speed shows the true processing rate.")
         tb.addWidget(self.cmb_speed)
         tb.addSeparator()
-        tb.addAction("Open video (Benchmark 2)", self.open_video).setToolTip("Ctrl+O: use an .mp4 as the scene; the simulator is bypassed")
-        self.act_clear_video = tb.addAction("Use simulator", self.clear_video)
+        tb.addAction("Open video", self.open_video).setToolTip("Benchmark 2 (Ctrl+O): use a video file as the scene; the simulator is bypassed")
+        self.act_clear_video = tb.addAction("Simulator", self.clear_video)
+        self.act_clear_video.setToolTip("Leave video mode and use the simulated scene again")
+        self.act_clear_video.setEnabled(False)
+        spacer = QtWidgets.QWidget(); spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        spacer.setStyleSheet("background: transparent;")
+        tb.addWidget(spacer)
         tb.addSeparator()
-        tb.addAction("Save scenario", self.save_scenario).setToolTip("Ctrl+S")
+        tb.addAction("Save scenario", self.save_scenario).setToolTip("Ctrl+S: save the current settings as a scenario file")
         tb.addAction("Screenshot", self.screenshot).setToolTip("Ctrl+P: save a PNG of this window into results/")
-        tb.addAction("Results folder", self.open_results)
-        tb.addAction("User manual", self.open_manual).setToolTip("Opens the user manual (PDF if present, otherwise the Markdown)")
-        tb.addAction("Help", self.help)
+        tb.addAction("Results", self.open_results).setToolTip("Open the results folder")
+        tb.addAction("Manual", self.open_manual).setToolTip("Open the user manual")
+        tb.addAction("About", self.help).setToolTip("What each view shows, and where the output goes")
 
         central = QtWidgets.QWidget(); self.setCentralWidget(central)
         root = QtWidgets.QHBoxLayout(central); root.setContentsMargins(8, 8, 8, 8); root.setSpacing(8)
@@ -470,85 +509,110 @@ class MainWindow(QtWidgets.QMainWindow):
             "tracker": DataclassForm(self.cfg.tracker),
         }
         self.forms["disturbance"].widgets["atmosphere"].currentTextChanged.connect(self._preset_changed)
-        run_w = QtWidgets.QWidget(); rl = QtWidgets.QFormLayout(run_w); rl.setContentsMargins(0, 0, 0, 0); rl.setVerticalSpacing(4)
+        run_w = QtWidgets.QWidget(); rl = QtWidgets.QFormLayout(run_w); rl.setContentsMargins(0, 0, 0, 0); rl.setVerticalSpacing(6); rl.setHorizontalSpacing(10)
+        rl.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.ed_name = QtWidgets.QLineEdit(self.cfg.name)
         self.sp_seed = QtWidgets.QSpinBox(); self.sp_seed.setRange(0, 10 ** 6); self.sp_seed.setValue(self.cfg.seed)
         self.sp_seed.setToolTip("Same seed and settings give exactly the same run.")
         self.sp_dur = QtWidgets.QDoubleSpinBox(); self.sp_dur.setRange(1, 3600); self.sp_dur.setValue(self.cfg.duration_s)
         self.sp_extra = QtWidgets.QSpinBox(); self.sp_extra.setRange(0, 8); self.sp_extra.setValue(len(self.cfg.targets) - 1)
         self.sp_extra.setToolTip("Decoy beacons with random paths. The tracker must keep following the designated one.")
-        self.chk_random = QtWidgets.QCheckBox("New random seed and heading every run"); self.chk_random.setChecked(True)
+        self.chk_random = QtWidgets.QCheckBox("New seed each run"); self.chk_random.setChecked(True)
         self.chk_random.setToolTip("On: each Start draws a new seed (start position, noise, decoys) and a new heading for line paths, so every run is different. "
                                    "Off: the seed shown is used, so a run can be repeated exactly. The seed used is always shown in the status bar and saved with the results.")
         for lab, w in (("Name", self.ed_name), ("Seed", self.sp_seed), ("", self.chk_random), ("Duration (s)", self.sp_dur), ("Extra targets", self.sp_extra)):
-            l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); rl.addRow(l, w)
-        panel = QtWidgets.QWidget(); pl = QtWidgets.QVBoxLayout(panel); pl.setContentsMargins(0, 0, 8, 0)
+            l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); rl.addRow(l, w)
+        panel = QtWidgets.QWidget(); pl = QtWidgets.QVBoxLayout(panel); pl.setContentsMargins(4, 0, 10, 0); pl.setSpacing(0)
         pl.addWidget(section("Run", run_w))
-        pl.addWidget(section("Screen (PS rows 1-2)", self.forms["screen"], "The whole scene the tracker observes."))
-        pl.addWidget(section("Camera (PS rows 3-6, 13-15)", self.forms["camera"], "The window the terminal points at, and how fast it can turn."))
-        pl.addWidget(section("Designated target (PS rows 7-12)", self.forms["target"], "The beacon to follow."))
-        pl.addWidget(section("Disturbances (PS rows 21-25)", self.forms["disturbance"], "Everything that makes the picture worse. All off = clear sky."))
-        pl.addWidget(section("Tracker", self.forms["tracker"], "How the software finds and follows. Defaults are tuned; change with care."))
+        pl.addWidget(section("Screen", self.forms["screen"], "The whole scene the tracker observes.", "PS rows 1-2"))
+        pl.addWidget(section("Camera", self.forms["camera"], "The window the terminal points at, and how fast it can turn.", "PS rows 3-6, 13-15"))
+        pl.addWidget(section("Designated target", self.forms["target"], "The beacon to follow.", "PS rows 7-12"))
+        pl.addWidget(section("Disturbances", self.forms["disturbance"], "Everything that degrades the picture. All zero is a clear sky.", "PS rows 21-25"))
+        pl.addWidget(section("Tracker", self.forms["tracker"], "How the software finds and follows the beacon. The defaults are tuned; change with care."))
         pl.addStretch(1)
         scroll = QtWidgets.QScrollArea(); scroll.setWidget(panel); scroll.setWidgetResizable(True)
-        scroll.setFixedWidth(340); scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFixedWidth(330); scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         root.addWidget(scroll)
 
         centre = QtWidgets.QVBoxLayout(); centre.setSpacing(8)
         tiles = QtWidgets.QHBoxLayout(); tiles.setSpacing(8)
         self.tiles = {
-            "state": Tile("State"), "acq": Tile("Acquisition", "spec: 2 s or less"), "terr": Tile("Tracking error, mean", "spec: 10 px or less"),
-            "cerr": Tile("Centroiding error, mean", "measured to true"), "lock": Tile("Lock retention", "spec: loss under 5%"),
-            "fps": Tile("Processing", "spec: 20 FPS or more"),
+            "state": Tile("State", "waiting"), "acq": Tile("Acquisition", "spec \u2264 2 s"), "terr": Tile("Tracking error", "mean, spec \u2264 10 px"),
+            "cerr": Tile("Centroid error", "mean, vs truth"), "lock": Tile("Lock retention", "spec: loss < 5%"),
+            "fps": Tile("Processing", "spec \u2265 20 FPS"),
         }
         for t in self.tiles.values():
             tiles.addWidget(t)
         centre.addLayout(tiles)
         views = QtWidgets.QHBoxLayout(); views.setSpacing(8)
         self.scene_view = SceneView(); self.cam_view = CameraView()
+        self._placeholders()
         views.addWidget(self.scene_view, 1); views.addWidget(self.cam_view, 1)
         centre.addLayout(views, 3)
         pg.setConfigOptions(antialias=False, background=C["surface"], foreground=C["muted"])
         self.plots = QtWidgets.QWidget(); gl = QtWidgets.QGridLayout(self.plots); gl.setContentsMargins(0, 0, 0, 0); gl.setSpacing(6)
-        self.p_err = self._plot("Errors (px)"); self.p_cmd = self._plot("Gimbal command (deg/s)")
-        self.p_fps = self._plot("Processing time per frame (ms)"); self.p_mode = self._plot("Tracker state")
+        key = lambda col, name: f"<span style='color:{col}'>&#9632;</span>&nbsp;<span style='color:{C['muted']}'>{name}</span>"
+        self.p_err = self._plot(f"<span style='color:{C['ink2']}'>Error (px)</span>&nbsp;&nbsp;&nbsp;{key(C['accent'], 'tracking')}&nbsp;&nbsp;{key(C['signal'], 'centroiding')}")
+        self.p_cmd = self._plot(f"<span style='color:{C['ink2']}'>Gimbal rate (deg/s)</span>&nbsp;&nbsp;&nbsp;{key(C['accent'], 'pan')}&nbsp;&nbsp;{key(C['signal'], 'tilt')}")
+        self.p_fps = self._plot(f"<span style='color:{C['ink2']}'>Processing time per frame (ms)</span>&nbsp;&nbsp;&nbsp;{key(C['signal'], '50 ms = 20 FPS budget')}")
+        self.p_mode = self._plot(f"<span style='color:{C['ink2']}'>Tracker state</span>")
         gl.addWidget(self.p_err, 0, 0); gl.addWidget(self.p_cmd, 0, 1); gl.addWidget(self.p_fps, 1, 0); gl.addWidget(self.p_mode, 1, 1)
-        self.p_err.addLegend(offset=(-10, 5), labelTextSize="8pt")
-        self.c_terr = self.p_err.plot(pen=pg.mkPen(C["accent"], width=1.2), name="tracking: window centre to beacon")
-        self.c_cerr = self.p_err.plot(pen=pg.mkPen(C["signal"], width=1.2), name="centroiding: measured to true")
-        self.p_err.addLine(y=10, pen=pg.mkPen(C["line"], style=Qt.PenStyle.DashLine))
-        self.p_cmd.addLegend(offset=(-10, 5), labelTextSize="8pt")
-        self.c_pan = self.p_cmd.plot(pen=pg.mkPen(C["accent"], width=1.2), name="pan")
-        self.c_tilt = self.p_cmd.plot(pen=pg.mkPen(C["signal"], width=1.2), name="tilt")
-        self.lim_lines = [self.p_cmd.addLine(y=v, pen=pg.mkPen(C["line"], style=Qt.PenStyle.DashLine)) for v in (5, -5)]
+        self.c_terr = self.p_err.plot(pen=pg.mkPen(C["accent"], width=1.2))
+        self.c_cerr = self.p_err.plot(pen=pg.mkPen(C["signal"], width=1.2))
+        self.p_err.addLine(y=10, pen=pg.mkPen(C["faint"], style=Qt.PenStyle.DashLine))
+        self.c_pan = self.p_cmd.plot(pen=pg.mkPen(C["accent"], width=1.2))
+        self.c_tilt = self.p_cmd.plot(pen=pg.mkPen(C["signal"], width=1.2))
+        self.lim_lines = [self.p_cmd.addLine(y=v, pen=pg.mkPen(C["faint"], style=Qt.PenStyle.DashLine)) for v in (5, -5)]
         self.c_proc = self.p_fps.plot(pen=pg.mkPen(C["ink"], width=1.2))
         self.p_fps.addLine(y=50, pen=pg.mkPen(C["signal"], style=Qt.PenStyle.DashLine))
         self.c_mode = self.p_mode.plot(pen=pg.mkPen(C["accent"], width=1.4), stepMode="right")
         self.p_mode.getAxis("left").setTicks([[(i, m) for i, m in enumerate(MODES)]])
         self.p_mode.setYRange(-0.3, 4.3)
+        self._idle_ranges()
+        self.plots.setMinimumHeight(300)
         centre.addWidget(self.plots, 2)
         root.addLayout(centre, 1)
 
-        self.tele = QtWidgets.QPlainTextEdit(); self.tele.setReadOnly(True); self.tele.setFixedWidth(300)
-        self.tele.setProperty("class", "tele")
+        self.tele = QtWidgets.QPlainTextEdit(); self.tele.setReadOnly(True); self.tele.setFixedWidth(250)
+        self.tele.setProperty("class", "tele"); self.tele.setFont(mono(9.5))
+        self.tele.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tele.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.WidgetWidth)
         self.tele.setPlainText(self._welcome())
         root.addWidget(self.tele)
 
         self.status = self.statusBar()
         self.lbl_status = QtWidgets.QLabel("Ready. Pick a scenario and press Start, or open a video for Benchmark 2.")
         self.status.addWidget(self.lbl_status, 1)
-        self.progress = QtWidgets.QProgressBar(); self.progress.setFixedWidth(220); self.progress.setTextVisible(False)
+        self.progress = QtWidgets.QProgressBar(); self.progress.setFixedWidth(220); self.progress.setTextVisible(False); self.progress.setValue(0)
         self.status.addPermanentWidget(self.progress)
         self._set_running(False)
         self._buf_reset()
 
     def _plot(self, title):
-        pw = pg.PlotWidget(title=title)
-        pw.showGrid(x=True, y=True, alpha=0.2)
-        pw.getPlotItem().titleLabel.setAttr("size", "9pt")
-        pw.getPlotItem().titleLabel.setAttr("color", C["muted"])
-        pw.setLabel("bottom", "time (s)")
+        pw = pg.PlotWidget()
+        pw.setTitle(title, size="9pt", justify="left")
+        pw.showGrid(x=True, y=True, alpha=0.15)
+        pw.setMenuEnabled(False)
+        pw.setMouseEnabled(x=False, y=False)
+        pw.hideButtons()
+        for ax in ("left", "bottom"):
+            a = pw.getAxis(ax); a.setTextPen(pg.mkPen(C["muted"])); a.setPen(pg.mkPen(C["line"])); a.setStyle(tickFont=ui_font(8.5))
+        pw.setLabel("bottom", "time (s)", color=C["faint"])
         return pw
+
+    def _idle_ranges(self):
+        """Axes that mean something before any data arrives."""
+        for pw in (self.p_err, self.p_cmd, self.p_fps, self.p_mode):
+            pw.setXRange(0, 10, padding=0)
+        self.p_err.setYRange(0, 40, padding=0)
+        self.p_cmd.setYRange(-8, 8, padding=0)
+        self.p_fps.setYRange(0, 60, padding=0)
+
+    def _placeholders(self):
+        self.scene_view.setPixmap(QtGui.QPixmap()); self.cam_view.setPixmap(QtGui.QPixmap())
+        self.scene_view.setText("The whole scene appears here when a run starts.")
+        self.cam_view.setText("The camera window appears here.")
 
     def _shortcuts(self):
         QtGui.QShortcut(QtGui.QKeySequence("Space"), self, activated=self._space)
@@ -566,16 +630,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _welcome(self) -> str:
         return "\n".join([
-            "HOW TO USE", "",
-            "1. Pick a scenario in the toolbar,", "   or set values on the left.",
-            "2. Press Start (or Space).", "3. Watch the tiles above the views:",
-            "   green = meets the spec,", "   amber = does not (yet).",
-            "4. When the run ends a report", "   opens; results/ holds the CSV,",
-            "   JSON, PDF and scenario file.", "",
-            "BENCHMARK 2", "Open video, then Start. The video", "replaces the simulated scene.", "",
-            "KEYS", "Space  start / pause", "N      step one frame", "Esc    stop",
-            "Ctrl+S save scenario", "Ctrl+P screenshot", "Ctrl+O open video", "",
-            "Hover any setting for its meaning", "and the problem statement row.",
+            "Getting started", "",
+            "1  Pick a scenario in the toolbar,", "   or set values on the left.",
+            "2  Press Start, or Space.", "3  Watch the tiles: green meets", "   the specification, amber not", "   yet.",
+            "4  When the run ends the report", "   opens. The results folder holds", "   the CSV, summary, PDF and the", "   scenario file of every run.", "",
+            "Benchmark 2", "", "Open video, then Start. The video", "replaces the simulated scene.", "",
+            "Keys", "", "Space   start or pause", "N       one frame while paused", "Esc     stop",
+            "Ctrl+S  save scenario", "Ctrl+P  screenshot", "Ctrl+O  open video", "",
+            "Hover any setting to see what it", "does and which PS row it covers.",
         ])
 
     # ------------------------------------------------------------- scenarios
@@ -663,12 +725,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.sim = Simulation(cfg, self.out_dir)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Cannot start", str(e)); return
-        self._buf_reset(); self.scene_view.reset(); self.cam_view.reset()
+        self._buf_reset(); self.scene_view.reset(); self.cam_view.reset(); self._last_res = None
         for t in self.tiles.values():
-            t.set("-")
-        for ln, v in zip(self.lim_lines, (cfg.camera.max_pan_rate_deg_s, -cfg.camera.max_pan_rate_deg_s)):
+            t.set("\u2013")
+        self.tiles["state"].set("starting", None, "")
+        lim = cfg.camera.max_pan_rate_deg_s
+        for ln, v in zip(self.lim_lines, (lim, -lim)):
             ln.setValue(v)
-        self.progress.setRange(0, getattr(self.sim.source, "n_frames", 0) or 0)
+        self.p_cmd.setYRange(-1.5 * lim, 1.5 * lim, padding=0)
+        self.p_err.enableAutoRange(axis="y"); self.p_fps.enableAutoRange(axis="y")
+        for pw in (self.p_err, self.p_cmd, self.p_fps, self.p_mode):
+            pw.enableAutoRange(axis="x")
+        n_total = getattr(self.sim.source, "n_frames", 0) or int(round(cfg.duration_s * cfg.camera.update_rate_hz))
+        self.progress.setRange(0, max(n_total, 1)); self.progress.setValue(0)
         speed = SPEEDS[self.cmb_speed.currentIndex()][1]
         self.thread = QtCore.QThread(); self.worker = Worker(self.sim, speed)
         self.worker.moveToThread(self.thread)
@@ -708,6 +777,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.b_t.append(r.t_sim); self.b_terr.append(r.tracking_err_px); self.b_cerr.append(r.centroid_err_px)
         self.b_pan.append(r.cmd_pan_rate); self.b_tilt.append(r.cmd_tilt_rate); self.b_proc.append(r.proc_ms)
         self.b_mode.append(MODES.index(r.mode)); self.b_lock.append(r.locked)
+        self._last_res = res
         if self._acq_t is None and r.locked:
             self._acq_t = r.t_sim
         now = time.perf_counter()
@@ -734,7 +804,8 @@ class MainWindow(QtWidgets.QMainWindow):
             f"saturated  {'pan ' if r.sat_pan else ''}{'tilt' if r.sat_tilt else ''}{'no' if not (r.sat_pan or r.sat_tilt) else ''}", "",
             f"detection  {r.det_x:8.2f} {r.det_y:8.2f}", f"estimate   {r.est_x:8.2f} {r.est_y:8.2f}",
             f"velocity   {r.vel_x:+8.1f} {r.vel_y:+8.1f} px/s", f"uncert.    {r.uncertainty_px:8.2f} px",
-            f"models     cv {r.p_cv:.2f} ca {r.p_ca:.2f} ct {r.p_ct:.2f}", f"ego shift  {r.ego_dx:+6.2f} {r.ego_dy:+6.2f} px", "",
+            f"models     cv {r.p_cv:.2f} ca {r.p_ca:.2f} ct {r.p_ct:.2f}",
+            (f"shift      {r.ego_dx:+6.2f} {r.ego_dy:+6.2f} px" if max(abs(r.ego_dx), abs(r.ego_dy)) <= 60 else "shift      unreliable, ignored"), "",
             f"truth      {r.true_x:8.2f} {r.true_y:8.2f}", f"in window  {'yes' if r.in_window else 'no'}",
             f"track err  {r.tracking_err_px:8.2f} px", f"centroid   {r.centroid_err_px:8.3f} px", "",
             f"proc       {r.proc_ms:8.2f} ms", f"fps inst   {r.fps_inst:8.1f}",
@@ -744,7 +815,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_tiles(self, r):
         T = self.tiles
         state_col = "pass" if r.mode == "TRACK" and r.locked else ("warn" if r.mode in ("COAST", "REACQUIRE") else None)
-        T["state"].set(r.mode + (" locked" if r.locked else ""), state_col)
+        T["state"].set(r.mode, state_col, "locked" if r.locked else "not locked")
         if self._acq_t is not None:
             T["acq"].set(f"{self._acq_t:.2f} s", "pass" if self._acq_t <= SPEC["acquisition_time_s"][1] else "fail")
             after = [(e, l) for tt, e, l in zip(self.b_t, self.b_terr, self.b_lock) if tt >= self._acq_t]
@@ -752,22 +823,30 @@ class MainWindow(QtWidgets.QMainWindow):
             if len(te):
                 m = float(te.mean()); T["terr"].set(f"{m:.1f} px", "pass" if m <= 10 else "fail")
             else:
-                T["terr"].set("n/a", None, "no truth (video)")
+                T["terr"].set("n/a", None, "no truth in video")
             lk = 100 * np.mean([l for _, l in after]) if after else 0.0
-            T["lock"].set(f"{lk:.1f} %", "pass" if 100 - lk < 5 else "fail")
+            modes_after = [m for tt, m in zip(self.b_t, self.b_mode) if tt >= self._acq_t]
+            trk = 100 * np.mean([m == 2 for m in modes_after]) if modes_after else 0.0
+            T["lock"].set(f"{lk:.1f} %", "pass" if 100 - lk < 5 else "fail", f"tracked {trk:.0f}%")
         else:
             T["acq"].set("searching", "warn")
         ce = np.array(self.b_cerr); ce = ce[np.isfinite(ce)]
         if len(ce):
             T["cerr"].set(f"{ce.mean():.3f} px", "pass" if ce.mean() < 2 else "warn")
         else:
-            T["cerr"].set("n/a", None, "no truth (video)")
+            T["cerr"].set("n/a", None, "no truth in video")
         fps = 1000.0 / max(np.mean(self.b_proc[-60:]), 1e-3)
         T["fps"].set(f"{fps:.0f} FPS", "pass" if fps >= 20 else "fail")
 
     @QtCore.pyqtSlot(object)
     def on_finished(self, sim: Simulation):
         self._teardown()
+        if getattr(self, "_last_res", None) is not None:
+            ifov = sim.cfg.camera.ifov_deg
+            self.scene_view.update_view(self._last_res, ifov)
+            self.cam_view.update_view(self._last_res, ifov, sim.cfg.tracker.capture_radius_px)
+        if sim.summary:
+            self._tiles_from_summary(sim.summary.values, sim.summary.passed)
         try:
             report = write_report(sim.cfg, sim.telemetry.records, sim.summary, sim.files["report"])
         except Exception as e:
@@ -799,7 +878,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.headless:
             return
         box = QtWidgets.QMessageBox(self); box.setWindowTitle("Run complete"); box.setText(msg)
-        box.setFont(QtGui.QFont("Menlo", 10))
+        box.setFont(mono(10))
         if report:
             b = box.addButton("Open report", QtWidgets.QMessageBox.ButtonRole.ActionRole)
             b.clicked.connect(lambda: _open_path(report))
@@ -807,6 +886,27 @@ class MainWindow(QtWidgets.QMainWindow):
         b2.clicked.connect(lambda: _open_path(self.out_dir))
         box.addButton(QtWidgets.QMessageBox.StandardButton.Ok)
         box.exec()
+
+    def _tiles_from_summary(self, v: dict, passed: dict):
+        """After a run the tiles show the report's numbers, not the last live estimate."""
+        T = self.tiles
+        def ok(k):
+            return {True: "pass", False: "fail"}.get(passed.get(k))
+        def num(k):
+            x = v.get(k)
+            return None if x is None or (isinstance(x, float) and not np.isfinite(x)) else x
+        T["state"].set("finished", None, f"{v.get('frames', 0)} frames")
+        a = num("acquisition_time_s")
+        T["acq"].set(f"{a:.2f} s" if a is not None else "not acquired", ok("acquisition_time_s") if a is not None else "fail")
+        te = num("tracking_err_mean_px")
+        T["terr"].set(f"{te:.1f} px" if te is not None else "n/a", ok("tracking_err_mean_px"), None if te is not None else "no truth in video")
+        ce = num("centroid_err_mean_px")
+        T["cerr"].set(f"{ce:.3f} px" if ce is not None else "n/a", ("pass" if ce < 2 else "warn") if ce is not None else None, None if ce is not None else "no truth in video")
+        lk, trk = num("lock_retention_pct"), num("tracked_pct")
+        T["lock"].set(f"{lk:.1f} %" if lk is not None else "n/a", ok("target_loss_pct"),
+                      f"tracked {trk:.0f}%" if trk is not None else None)
+        fps = num("fps_mean")
+        T["fps"].set(f"{fps:.0f} FPS" if fps is not None else "n/a", ok("fps_mean"))
 
     @QtCore.pyqtSlot(str)
     def on_failed(self, tb: str):
@@ -857,9 +957,9 @@ class MainWindow(QtWidgets.QMainWindow):
         pm = QtGui.QPixmap.fromImage(to_qimage(gray).scaled(int(w * s), int(h * s), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation))
         pnt = QtGui.QPainter(pm)
         pnt.fillRect(0, 0, pm.width(), 22, QtGui.QColor(0, 0, 0, 170))
-        pnt.setPen(QtGui.QColor(C["good"])); pnt.setFont(QtGui.QFont("Menlo", 10, QtGui.QFont.Weight.Bold))
+        pnt.setPen(QtGui.QColor(C["good"])); pnt.setFont(mono(9.5, bold=True))
         pnt.drawText(8, 16, "VIDEO LOADED")
-        pnt.setPen(QtGui.QColor(C["ink"])); pnt.setFont(QtGui.QFont("Menlo", 9))
+        pnt.setPen(QtGui.QColor(C["ink"])); pnt.setFont(mono(8.5))
         rot = f"   rotated {self.video_info['rotation']:.0f} deg" if self.video_info["rotation"] else ""
         vfr = "   variable rate" if self.video_info["variable"] else ""
         pnt.drawText(130, 16, f"{w} x {h} px   {fps:.2f} fps{vfr}   {n} frames   {self.video_info['seconds']:.2f} s{rot}")
@@ -872,15 +972,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cam_view.setText("Press Start to run the tracker on this video")
         for t in self.tiles.values():
             t.set("-")
-        self.tiles["state"].set("video ready", None)
+        self.tiles["state"].set("video ready", None, "press Start")
         cam = self.forms["camera"].read()
-        lines = ["VIDEO LOADED, SETTINGS CALIBRATED", "", f"file      {Path(path).name}", f"size      {w} x {h} px (as displayed)"]
+        lines = ["Video loaded, settings calibrated", "", f"file    {Path(path).name}", f"size    {w} x {h} px as displayed"]
         if self.video_info["rotation"]:
-            lines.append(f"rotation  {self.video_info['rotation']:.0f} deg tag applied")
-        lines += [f"rate      {fps:.2f} fps (container average)"]
+            lines.append(f"turn    {self.video_info['rotation']:.0f} deg tag applied")
+        lines += [f"rate    {fps:.2f} fps average"]
         if self.video_info["variable"]:
-            lines.append(f"          variable-rate file; timestamps {self.video_info['fps_ts']:.1f} fps")
-        lines += [f"frames    {n} (counted)", f"length    {self.video_info['seconds']:.2f} s", "",
+            lines.append(f"        variable rate, {self.video_info['fps_ts']:.1f} fps by timestamps")
+        lines += [f"frames  {n} counted", f"length  {self.video_info['seconds']:.2f} s", "",
                   "Calibrated into the panel:", f"  screen {w} x {h}, update rate {fps:.2f} Hz", "",
                   "Not in the file, set by you:", f"  camera window {cam.width} x {cam.height} px",
                   f"  FOV {cam.fov_w_deg:g} x {cam.fov_h_deg:g} deg, so 1 px =", f"  {cam.ifov_deg*3600:.1f} arcsec; degree readouts", "  depend on this setting.", "",
@@ -891,6 +991,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def clear_video(self):
         self.video_path = None; self.video_info = None
         self._set_video_mode(False)
+        self._placeholders()
+        for t in self.tiles.values():
+            t.set("\u2013")
+        self.tele.setPlainText(self._welcome())
         self._video_label()
 
     def _set_video_mode(self, on: bool):
@@ -904,9 +1008,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 w.setEnabled(not on)
         self.forms["camera"].widgets["update_rate_hz"].setEnabled(not on)
         self.sp_extra.setEnabled(not on); self.sp_dur.setEnabled(not on)
+        self.act_clear_video.setEnabled(on)
 
     def screenshot(self):
-        Path(self.cfg.output_dir).mkdir(exist_ok=True)
+        Path(self.cfg.output_dir).mkdir(parents=True, exist_ok=True)
         p = Path(self.cfg.output_dir) / f"screenshot_{time.strftime('%Y%m%d_%H%M%S')}.png"
         self.grab().save(str(p)); self.lbl_status.setText(f"Screenshot saved: {p}")
 
@@ -917,16 +1022,17 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.information(self, "User manual", "The manual was not found next to the application. It is docs/USER_MANUAL.md in the repository.")
 
     def open_results(self):
-        d = Path(self.cfg.output_dir); d.mkdir(exist_ok=True); _open_path(d)
+        d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)
 
     def help(self):
         QtWidgets.QMessageBox.information(self, "FSOC Tracker", (
             f"FSOC Tracker v{__version__}  (SIH26169, Department of Space / ISRO SAC)\n\n"
             "WHAT YOU SEE\n"
-            "Left picture: the whole scene. Cyan box = camera window. Orange circle = true beacon. Green cross = tracker estimate.\n"
+            "Left picture: the whole scene. Cyan box = camera window. Orange circle = true beacon. Green cross = tracker estimate. Grey circles = other targets.\n"
             "Right picture: what the camera window sees. Dashed ring = capture radius (green when locked). "
             "Green box = this frame's detection. Orange dot = prediction with uncertainty ring. Line from centre = pointing error.\n"
-            "Tiles: live specification check. Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n\n"
+            "Tiles: live specification check while running, the report's final numbers after. Tracked = share of frames in TRACK; lock also needs the beacon centred.\n"
+            "Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n\n"
             "OUTPUT\nEvery run writes a folder results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/ holding <label>_frames.csv, _summary.json, _report.pdf and _scenario.yaml.\n\n"
             "See docs/USER_MANUAL.md for parameters and metric definitions."))
 
@@ -945,6 +1051,7 @@ def main():
     QtCore.QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("FSOC Tracker")
+    app.setStyle("Fusion")          # the same widget look on Windows, Linux and macOS
     app.setStyleSheet(STYLESHEET)
     w = MainWindow(); w.show()
     return app.exec()
