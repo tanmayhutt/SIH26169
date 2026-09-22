@@ -292,6 +292,7 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Tracking error | Distance from the true beacon to the window centre, over frames after acquisition. Spec: 10 px or less (mean). |
 | Tracking error, vibration removed | The same with the per-frame camera vibration subtracted from the truth: the part a rate-limited gimbal can physically follow. |
 | Centroiding error | Distance from the measured beacon centre to the true centre. |
+| Tracked | Percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. A high tracked rate with a low lock rate means the camera, not the tracker, could not keep up. |
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
 | Re-acquisition time | Time from losing lock to regaining it. Spec: 1 s or less. |
 | FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |

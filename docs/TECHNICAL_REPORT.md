@@ -318,6 +318,9 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
   same simulator.
 - Dual-sensor PAT: a wide field acquisition camera feeding a narrow field tracking camera.
 - Learned denoiser for extreme scintillation.
+- Note on frame rate: the estimator-lag compensation is defined at the 30 Hz reference and
+  scales with the camera rate, because the filter delay is a number of frames. Found on a
+  60 fps phone video, where the unscaled value over-led the target; at 30 Hz nothing changes.
 - Track-before-detect for a static faint beacon: the moving-target residual removes anything
   static, so a beacon that does not move must still be found by the single-frame path.
 - Beacon modulation with lock-in detection for identity in dense clutter.
@@ -355,6 +358,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Tracking error, mean and maximum | Distance from the true beacon to the window centre over frames after acquisition. Row 17. |
 | Tracking error, vibration removed | The same with the per-frame vibration subtracted from the truth. |
 | Centroiding error | Distance from the measured centroid to the true centroid over frames with a detection; mean, maximum, RMSE. |
+| Tracked rate | Percentage of frames after acquisition in state TRACK, regardless of centring; separates tracker failure from gimbal limits. |
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
 | Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |

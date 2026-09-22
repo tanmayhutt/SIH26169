@@ -28,7 +28,8 @@ statement (PS) rows they implement.
 Lock means: state TRACK and the estimate within 30 px of the window centre. Acquisition time
 is the first frame with lock. Tracking error is the true beacon to the window centre.
 Centroiding error is the measured centre to the true centre. Target loss is 100 minus lock
-retention.
+retention. Tracked rate is the share of frames in TRACK regardless of centring: high tracked
+with low lock means the camera could not keep up, not that the beacon was lost.
 
 ## 2. Five-minute smoke test
 

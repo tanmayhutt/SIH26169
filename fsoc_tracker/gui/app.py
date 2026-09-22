@@ -786,7 +786,7 @@ class MainWindow(QtWidgets.QMainWindow):
                f"Tracking error mean {f('tracking_err_mean_px')} px, max {f('tracking_err_max_px')} px  ({pf('tracking_err_mean_px')})\n"
                f"  with vibration removed: {f('tracking_err_stab_mean_px')} px\n"
                f"Centroiding error mean {f('centroid_err_mean_px', '{:.3f}')} px, RMSE {f('centroid_err_rmse_px', '{:.3f}')} px\n"
-               f"Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
+               f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
                f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
                f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99\n\n"
                f"Log: {sim.files['frames']}\nReport: {report}")

@@ -73,7 +73,9 @@ class Controller:
         # feed forward the velocity it will have then
         tx, ty = tx + vx * lead + 0.5 * ax * lead ** 2, ty + vy * lead + 0.5 * ay * lead ** 2
         # the estimated velocity is itself late by the filter delay; advance it too
-        ff_lead = lead + cfg.estimator_lag_s
+        # the estimator's delay is a number of frames, so the compensation set in seconds at
+        # the 30 Hz reference scales with the frame rate (a 60 fps video halves it)
+        ff_lead = lead + cfg.estimator_lag_s * (30.0 / max(g.cfg.update_rate_hz, 1.0))
         vx, vy = vx + ax * ff_lead, vy + ay * ff_lead
         # the window also moves during the latency; lead it by its current rate so a
         # constant-velocity target is followed with zero steady-state offset
