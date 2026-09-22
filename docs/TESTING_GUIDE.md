@@ -173,11 +173,15 @@ for a given seed.
 
 ## 8. Web app specifics
 
+The web page is the desktop window in a browser: every section of this guide applies to it
+unchanged, including Pause, Step, Save scenario, Screenshot, Results, Manual, About and the keys.
+Differences that come from the server:
+
+- Views update about 15 times a second; plots, log and report cover every frame.
 - One run at a time per server; a second visitor sees the run in progress and can watch it.
 - The address carries `#run=<id>` while a run is active; anyone with the link can watch.
-- Speed: 1x real time by default; 0.5x, 2x, 4x and max (as fast as the server can).
-- Download desktop app, top right: the archive for the visitor's platform, with install notes.
-- Downloads page: all four archives, both PDFs, the demo video.
+- Results lists the runs on the server with their files; nothing opens on your disk.
+- Desktop app, top right: the archive for the visitor's platform, with install notes.
 
 ## 9. Automated checks, for completeness
 

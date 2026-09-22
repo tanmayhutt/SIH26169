@@ -48,7 +48,9 @@ models/              beacon_heatmap.onnx
 
 ## Web app
 
-The same engine served to a browser (`webapp/`): `.venv/bin/uvicorn webapp.server:app --port 8095`,
+The same program served to a browser (`webapp/`). The desktop window and the web page are built
+from one interface definition, `fsoc_tracker/ui_shared.py` (panel, tiles, text, summary), so they
+cannot drift apart. Run it with `.venv/bin/uvicorn webapp.server:app --port 8095`,
 then open http://127.0.0.1:8095/. `bash webapp/deploy.sh` deploys the repository, the web app (site root),
 the progress record and the downloads to the server behind Caddy. `python webapp/smoke.py` is the
 cross-platform smoke test the build workflow runs.

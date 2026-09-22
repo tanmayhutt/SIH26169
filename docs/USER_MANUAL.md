@@ -57,14 +57,22 @@ executable on that platform before publishing it.
 
 ### 2.3 Web application
 
-The same engine is also served as a web application, so no installation at all is needed on
+The same program is also served as a web application, so no installation at all is needed on
 any platform: the project site opens it directly in a current browser (Chrome, Edge, Firefox or
-Safari, on Windows, Linux, macOS, or a tablet). Pick a scenario or set the parameters, press
-Start, and watch the scene, the camera window and the live specification tiles. Benchmark 2
-videos can be uploaded from the page. The report, per-frame CSV and summary are downloadable
-when the run ends. One run is executed at a time per server; a second visitor sees the run in
-progress and can watch it. The Download desktop app button at the top right of the page
-recommends the archive for the visitor's computer and lists the others.
+Safari, on Windows, Linux, macOS, or a tablet). The web page and the desktop window are the same
+interface: the same toolbar (Start, Pause, Step, Stop, Speed, Open video, Simulator, Save
+scenario, Screenshot, Results, Manual, About), the same parameter panel with every field, the
+same six tiles, views, four plots, telemetry column and end-of-run summary, and the same
+keyboard keys. Both are generated from one definition in the code (`fsoc_tracker/ui_shared.py`)
+and run the same engine, so a given scenario and seed give the same numbers and the same report.
+
+What differs follows from running on a server, not from the program:
+
+- The views in the browser are sent as snapshots about 15 times a second; the log, the plots and
+  the report still cover every frame.
+- One run executes at a time per server; a second visitor watches the run in progress.
+- Files are downloaded from the browser instead of opened in a folder (Results lists them).
+- The page also offers the desktop application for download (the Desktop app button).
 
 ### 2.2 From source
 

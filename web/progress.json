@@ -77,6 +77,11 @@
         "name": "Desktop interface pass",
         "status": "pass",
         "text": "Interface reviewed from screenshots at 1600 x 1000 and 1366 x 768. Fixed: camera view turning the sky white near the screen edge (contrast stretch counted the off-screen area), overlapping legend and cut-off HUD lines, plot legends over the data, meaningless idle axes, misaligned form columns, tiles keeping live values after a run instead of the report's numbers, spurious picture-shift readout, a stray scrollbar artefact, a font warning on start, the simulator button active with no video, and an empty-legend warning in video reports. Native system fonts and one widget style on every platform."
+      },
+      {
+        "name": "Desktop and web are one interface",
+        "status": "pass",
+        "text": "Both front ends are generated from fsoc_tracker/ui_shared.py: the panel (all 52 fields in the same sections, labels, tooltips and ranges), the six tiles and their pass rules, the telemetry lines, the view captions, the end-of-run summary, help and welcome text, decoy generation and the camera contrast stretch. The web page has the desktop toolbar with Pause, Step, Save scenario, Screenshot, Results, Manual and About, all four plots and the same keys. Verified in Chrome: a full run with pause, one-frame step, resume and stop, a video run, and the return to the simulator. Remaining differences are the server's: views sent at about 15 fps, one run per server, files downloaded rather than opened."
       }
     ]
   },

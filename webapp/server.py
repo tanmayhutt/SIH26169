@@ -7,6 +7,10 @@ Endpoints
     GET  /api/scenarios            names and contents of configs/scenarios/*.yaml
     POST /api/run                  start a run: {"scenario": name|null, "overrides": {...}, "video": upload id|null}
     POST /api/stop/{run_id}        stop early (the report is still written)
+    POST /api/pause/{run_id}       pause or resume;  POST /api/step/{run_id}  one frame while paused
+    GET  /api/ui                   the shared interface definition (panel, tiles, texts), identical to the desktop app
+    POST /api/scenario_yaml        the scenario file for the current panel (Save scenario)
+    GET  /api/runs                 recent runs on this server with their files (Results)
     WS   /ws/{run_id}              live frames (scene, camera) and per-frame telemetry
     POST /api/video                upload an .mp4 for Benchmark 2; returns its probed facts
     GET  /runs/{run_id}/{report|frames|summary|scenario}   the run's files, named FSOC_<kind>_<name>_seed<N>_<time>_<file>
@@ -27,7 +31,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -36,6 +40,9 @@ from fsoc_tracker.engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConf
 from fsoc_tracker.engine.report import write_report
 from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.engine.sources import probe_video
+from fsoc_tracker.ui_shared import (DURATION_RANGE, SPEEDS, LiveTiles, camera_bottom, camera_crop, camera_top, extra_targets,
+                                    final_tiles, front_end_bundle, new_random_seed, scene_header, status_text, summary_text,
+                                    telemetry_lines, video_loaded_lines, video_preview_header)
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
@@ -60,6 +67,8 @@ class Run:
         self.subs_lock = threading.Lock()
         self.last: dict | None = None            # latest message, sent first to a late viewer
         self.stop = threading.Event()
+        self.pause = False
+        self.step_once = False
         self.done = threading.Event()
         self.summary = None
         self.error = None
@@ -72,7 +81,14 @@ class Run:
             self.sim = sim
             last_frame = 0.0
             next_t = time.perf_counter()
+            live = LiveTiles()
+            ifov = self.cfg.camera.ifov_deg
+            total = getattr(sim.source, "n_frames", 0) or int(round(self.cfg.duration_s * self.cfg.camera.update_rate_hz))
             for res in sim.steps():
+                while self.pause and not self.stop.is_set() and not self.step_once:
+                    time.sleep(0.01)
+                    next_t = time.perf_counter()
+                self.step_once = False
                 if self.stop.is_set():
                     break
                 if self.speed > 0:            # pace to real time so the browser sees a video, not a blur
@@ -88,11 +104,22 @@ class Run:
                        "sat": int(r.sat_pan or r.sat_tilt), "det": [r.det_x, r.det_y], "est": [r.est_x, r.est_y], "vel": [r.vel_x, r.vel_y],
                        "true": [r.true_x, r.true_y], "terr": r.tracking_err_px, "cerr": r.centroid_err_px, "proc_ms": r.proc_ms,
                        "win": list(res.window), "probs": [r.p_cv, r.p_ca, r.p_ct], "unc": r.uncertainty_px,
-                       "screen_w": self.cfg.screen.width, "screen_h": self.cfg.screen.height}
+                       "screen_w": self.cfg.screen.width, "screen_h": self.cfg.screen.height, "total": total, "ifov": ifov,
+                       "capture": self.cfg.tracker.capture_radius_px, "lim": self.cfg.camera.max_pan_rate_deg_s}
+                live.push(r)
                 now = time.perf_counter()
-                if now - last_frame >= 1 / 12:          # picture at ~12 fps, telemetry every frame
+                if now - last_frame >= 1 / 15 or self.pause:     # picture and panel at ~15 fps, plot data every frame
                     last_frame = now
                     msg["scene"], msg["cam"] = self._pictures(res)
+                    tr = res.track
+                    msg["pred"] = list(tr.prediction) if tr.prediction is not None else [None, None]
+                    msg["decoys"] = [list(b) for b in (res.frame.truth.beacons[1:] if (res.frame.truth and res.frame.truth.beacons) else [])]
+                    msg["tiles"] = live.tiles()
+                    msg["tele"] = telemetry_lines(r)
+                    top_state, top_detail = camera_top(r, ifov)
+                    bottom, sat = camera_bottom(r)
+                    msg["hud"] = {"scene": scene_header(res.observed.shape[1], res.observed.shape[0], ifov, r.t_sim),
+                                  "top_state": top_state, "top_detail": top_detail, "bottom": bottom, "sat": sat}
                 for k, v in list(msg.items()):
                     if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
                         msg[k] = None
@@ -147,14 +174,7 @@ class Run:
         H, W = gray.shape[:2]
         s = 640 / max(H, W)
         small = cv2.resize(gray, (int(W * s), int(H * s)), interpolation=cv2.INTER_AREA)
-        x0, y0, w, h = res.window
-        xa, ya = max(x0, 0), max(y0, 0); xb, yb = min(x0 + w, W), min(y0 + h, H)
-        crop = np.zeros((h, w) if gray.ndim == 2 else (h, w, 3), np.uint8)
-        if xb > xa and yb > ya:
-            crop[ya - y0:yb - y0, xa - x0:xb - x0] = gray[ya:yb, xa:xb]
-        lo, hi = np.percentile(crop[::4, ::4], (1, 99.8))
-        if hi - lo > 8:
-            crop = np.clip((crop.astype(np.float32) - lo) * (255.0 / (hi - lo)), 0, 255).astype(np.uint8)
+        crop = camera_crop(gray, res.window)          # the same display stretch as the desktop camera view
         ok1, j1 = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
         ok2, j2 = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
         return base64.b64encode(j1.tobytes()).decode(), base64.b64encode(j2.tobytes()).decode()
@@ -174,6 +194,11 @@ def _active() -> Run | None:
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (STATIC / "index.html").read_text(encoding="utf-8")
+
+
+@app.get("/api/ui")
+def ui():
+    return front_end_bundle()
 
 
 @app.get("/api/scenarios")
@@ -201,17 +226,8 @@ def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
                 cur = getattr(t0, k)
                 setattr(t0, k, type(cur)(v))
     extra = int(ov.get("extra_targets", len(cfg.targets) - 1))
-    rng = np.random.default_rng(int(ov.get("seed", cfg.seed)) + 99)
-    motions = ["circular", "line", "figure8", "random", "sinusoidal"]
-    targets = [cfg.targets[0]]
-    for i in range(extra):
-        if i + 1 < len(cfg.targets):
-            targets.append(cfg.targets[i + 1])
-        else:
-            targets.append(TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)), intensity=int(rng.integers(150, 235)),
-                                        motion=motions[i % len(motions)], speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
-                                        period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre"))
-    cfg.targets = targets
+    seed = int(ov.get("seed", cfg.seed))
+    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed)
     if "seed" in ov:
         cfg.seed = int(ov["seed"])
     if "duration_s" in ov:
@@ -228,22 +244,18 @@ async def start_run(body: dict):
             raise HTTPException(409, "a run is already in progress on this server; stop it or wait for it to finish")
         name = body.get("scenario")
         cfg = RunConfig.load(SCENARIOS / f"{name}.yaml") if name and (SCENARIOS / f"{name}.yaml").exists() else RunConfig()
-        cfg = _apply_overrides(cfg, body.get("overrides") or {})
-        if body.get("random_seed", True):
-            cfg.seed = int(np.random.default_rng().integers(0, 10 ** 6))
-            if cfg.targets[0].motion in ("line", "sinusoidal"):
-                cfg.targets[0].heading_deg = float(np.random.default_rng(cfg.seed).uniform(0, 360))
+        cfg = _config_from(body)
         vid = body.get("video")
         if vid:
             p = UPLOADS / Path(vid).name
             if not p.exists():
                 raise HTTPException(404, "uploaded video not found; upload it again")
             cfg.video = str(p); cfg.duration_s = 0.0; cfg.name = p.stem[:40]
-        cfg.duration_s = min(cfg.duration_s, 120.0) if not cfg.video else 0.0
+        cfg.duration_s = min(max(cfg.duration_s, DURATION_RANGE[0]), DURATION_RANGE[1]) if not cfg.video else 0.0
         cfg.output_dir = str(RUNS)
         run_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
         speed = float(body.get("speed", 1.0))
-        RUN[run_id] = Run(cfg, run_id, speed if speed in (0.0, 0.5, 1.0, 2.0, 4.0) else 1.0)
+        RUN[run_id] = Run(cfg, run_id, speed if speed in [v for _, v in SPEEDS] else 1.0)
         # keep only the last 30 runs and the last 10 uploaded videos on disk
         for old in sorted(RUNS.iterdir())[:-30]:
             shutil.rmtree(old, ignore_errors=True)
@@ -251,7 +263,62 @@ async def start_run(body: dict):
         for old in ups[:-10]:
             if str(old) != cfg.video:
                 old.unlink(missing_ok=True)
-        return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict()}
+        return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict(), "label": run_label_of(cfg),
+                "status": status_text("running", name=cfg.name, seed=cfg.seed, out=f"results/{run_label_of(cfg)}")}
+
+
+def _config_from(body: dict) -> RunConfig:
+    """Scenario plus panel values, with the same seed and decoy rules as the desktop app."""
+    name = body.get("scenario")
+    cfg = RunConfig.load(SCENARIOS / f"{name}.yaml") if name and (SCENARIOS / f"{name}.yaml").exists() else RunConfig()
+    cfg = _apply_overrides(cfg, body.get("overrides") or {})
+    if body.get("random_seed", True):
+        new_random_seed(cfg)
+    return cfg
+
+
+def run_label_of(cfg: RunConfig) -> str:
+    from fsoc_tracker.engine.naming import run_label
+    return run_label(cfg)
+
+
+@app.post("/api/pause/{run_id}")
+def pause_run(run_id: str):
+    r = RUN.get(run_id)
+    if not r:
+        raise HTTPException(404, "unknown run")
+    r.pause = not r.pause
+    return {"paused": r.pause}
+
+
+@app.post("/api/step/{run_id}")
+def step_run(run_id: str):
+    r = RUN.get(run_id)
+    if not r:
+        raise HTTPException(404, "unknown run")
+    r.pause = True; r.step_once = True
+    return {"paused": True}
+
+
+@app.post("/api/scenario_yaml")
+def scenario_yaml(body: dict):
+    import yaml
+    cfg = _config_from(dict(body, random_seed=False))
+    text = yaml.safe_dump(cfg.to_dict(), sort_keys=False)
+    safe = "".join(c for c in cfg.name if c.isalnum() or c in "-_") or "custom"
+    from fastapi.responses import Response
+    return Response(text, media_type="application/x-yaml", headers={"Content-Disposition": f'attachment; filename="{safe}.yaml"'})
+
+
+@app.get("/api/runs")
+def runs():
+    out = []
+    for rid in sorted(RUN.keys(), reverse=True)[:20]:
+        r = RUN[rid]
+        files = getattr(r.sim, "files", {}) if hasattr(r, "sim") else {}
+        out.append({"run_id": rid, "label": getattr(r.sim, "label", rid) if hasattr(r, "sim") else rid, "done": r.done.is_set(),
+                    "files": {k: f"/runs/{rid}/{k}" for k in ("report", "frames", "summary", "scenario") if k in files and files[k].exists()}})
+    return {"runs": out}
 
 
 @app.post("/api/stop/{run_id}")
@@ -264,7 +331,8 @@ def stop_run(run_id: str):
 
 
 @app.post("/api/video")
-async def upload_video(file: UploadFile = File(...)):
+async def upload_video(request: Request, file: UploadFile = File(...)):
+    query = dict(request.query_params)
     suffix = Path(file.filename or "video.mp4").suffix.lower()
     if suffix not in (".mp4", ".avi", ".mov", ".mkv"):
         raise HTTPException(400, "please upload an .mp4, .avi, .mov or .mkv file")
@@ -292,6 +360,14 @@ async def upload_video(file: UploadFile = File(...)):
     ok2, j = cv2.imencode(".jpg", cv2.resize(gray, (int(W * s), int(H * s))), [cv2.IMWRITE_JPEG_QUALITY, 70])
     info["upload"] = name; info["first_frame"] = base64.b64encode(j.tobytes()).decode()
     info["original_name"] = file.filename
+    cam = RunConfig().camera
+    for k, cast in (("cam_w", int), ("cam_h", int), ("fov_w", float), ("fov_h", float)):
+        v = query.get(k)
+        if v not in (None, ""):
+            setattr(cam, {"cam_w": "width", "cam_h": "height", "fov_w": "fov_w_deg", "fov_h": "fov_h_deg"}[k], cast(v))
+    info["loaded_text"] = video_loaded_lines(file.filename or name, info, cam)
+    info["preview_header"] = video_preview_header(info)
+    info["status"] = status_text("video", path=file.filename or name)
     return info
 
 
@@ -317,6 +393,12 @@ def run_status(run_id: str):
         files = getattr(r.sim, "files", {}) if hasattr(r, "sim") else {}
         out["files"] = {k: f"/runs/{run_id}/{k}" for k in ("report", "frames", "summary", "scenario") if k in files and files[k].exists()}
         out["label"] = getattr(r.sim, "label", None) if hasattr(r, "sim") else None
+        sv = out["summary"]
+        vals, passed = sv.get("values", {}), sv.get("passed", {})
+        lab = out["label"] or run_id
+        out["tiles"] = final_tiles(vals, passed)
+        out["summary_text"] = summary_text(vals, passed, f"results/{lab}/{lab}_frames.csv", f"results/{lab}/{lab}_report.pdf")
+        out["status"] = status_text("finished", out=f"results/{lab}")
     return out
 
 
