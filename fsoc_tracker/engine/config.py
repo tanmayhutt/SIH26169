@@ -102,7 +102,7 @@ class TrackerConfig:
     kd: float = 0.3
     ki: float = 0.8
     feedforward: float = 1.0             # weight on predicted target angular rate
-    estimator_lag_s: float = 0.25        # estimated filter delay, compensated with acceleration feedforward
+    estimator_lag_s: float = 0.25        # filter delay at the 30 Hz reference rate (about 7 frames), compensated with acceleration feedforward; scales with the frame rate
     ego_motion: bool = True              # size measurement noise from the measured picture shift (jitter)
     cnn_model: str = "models/beacon_heatmap.onnx"
     cnn_confidence_floor: float = 0.55   # engage the CNN when classical confidence is below this

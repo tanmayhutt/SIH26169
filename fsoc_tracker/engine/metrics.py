@@ -40,6 +40,7 @@ DEFINITIONS = {
     "centroid_err_max_px": "Maximum centroiding error.",
     "centroid_err_rmse_px": "RMSE of centroiding error.",
     "lock_retention_pct": "Lock retention rate: percentage of frames after acquisition in which the tracker was in TRACK with the beacon within the capture radius of the window centre.",
+    "tracked_pct": "Tracked rate: percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. Lock retention adds the centring condition.",
     "target_loss_pct": "Target loss: 100 minus lock retention. Spec row 18: < 5%.",
     "slew_saturation_pct": "Percentage of frames in which the commanded rate exceeded the gimbal limit on either axis.",
     "cnn_frames_pct": "Percentage of frames in which the AI detector provided the accepted measurement.",
@@ -105,6 +106,7 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
         v["reacq_time_max_s"] = float(np.max(re_times)) if re_times else 0.0
         v["lock_retention_pct"] = float(100 * good[after].mean())
         v["target_loss_pct"] = 100 - v["lock_retention_pct"]
+        v["tracked_pct"] = float(100 * np.mean([r.mode == "TRACK" for r in records[first:]]))
         if truth_ok:
             te = np.array([r.tracking_err_px for r in records])[after]
             te = te[np.isfinite(te)]
@@ -122,6 +124,7 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
         v["acquisition_time_s"] = float("nan")
         v["lock_retention_pct"] = 0.0
         v["target_loss_pct"] = 100.0
+        v["tracked_pct"] = 0.0
     if truth_ok:
         ce = np.array([r.centroid_err_px for r in records])
         ce = ce[np.isfinite(ce)]

@@ -383,7 +383,8 @@ with it can watch the same run.`;
       <tr><td>FPS mean</td><td>${g("fps_mean")} ${b("fps_mean")}</td><td>Acquisition</td><td>${g("acquisition_time_s")} s ${b("acquisition_time_s")}</td></tr>
       <tr><td>Tracking error mean</td><td>${g("tracking_err_mean_px")} px ${b("tracking_err_mean_px")}</td><td>with vibration removed</td><td>${g("tracking_err_stab_mean_px")} px</td></tr>
       <tr><td>Centroiding error mean</td><td>${g("centroid_err_mean_px")} px</td><td>RMSE</td><td>${g("centroid_err_rmse_px")} px</td></tr>
-      <tr><td>Lock retention</td><td>${g("lock_retention_pct")} % ${b("target_loss_pct")}</td><td>Re-acquisitions</td><td>${v.reacq_count ?? 0}, max ${g("reacq_time_max_s")} s ${b("reacq_time_max_s")}</td></tr>
+      <tr><td>Tracked (TRACK state)</td><td>${g("tracked_pct")} %</td><td>Lock retention (centred)</td><td>${g("lock_retention_pct")} % ${b("target_loss_pct")}</td></tr>
+      <tr><td></td><td></td><td>Re-acquisitions</td><td>${v.reacq_count ?? 0}, max ${g("reacq_time_max_s")} s ${b("reacq_time_max_s")}</td></tr>
       </table>
       ${v.slew_saturation_pct > 20 ? `<div class="note warn">The gimbal was at its rate limit in ${v.slew_saturation_pct.toFixed(0)}% of frames: the target moved faster than the camera can turn. Raise Max pan and Max tilt (PS allows 5 to 10 deg/s) or widen the FOV and run again.</div>` : ""}
       <div class="links">${Object.entries(st.files || {}).map(([k, u]) => `<a href="${u}" target="_blank">${names[k] || k}</a>`).join("")}<button id="again">Run again</button></div>`;

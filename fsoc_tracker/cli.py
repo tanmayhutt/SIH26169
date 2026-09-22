@@ -40,7 +40,7 @@ def _run_one(cfg: RunConfig, out: Path, quiet: bool = False) -> dict:
     if not quiet:
         print(f"  frames {v.get('frames')}  fps {v.get('fps_mean', 0):.1f}  acq {v.get('acquisition_time_s', float('nan')):.2f}s  "
               f"track err {v.get('tracking_err_mean_px', float('nan')):.2f}px  centroid err {v.get('centroid_err_mean_px', float('nan')):.3f}px  "
-              f"lock {v.get('lock_retention_pct', 0):.1f}%  wall {time.perf_counter()-t0:.1f}s")
+              f"tracked {v.get('tracked_pct', 0):.1f}%  lock {v.get('lock_retention_pct', 0):.1f}%  wall {time.perf_counter()-t0:.1f}s")
         print(f"  -> {out}")
     return {"name": cfg.name, "seed": cfg.seed, **v, "passed": summary.passed}
 
