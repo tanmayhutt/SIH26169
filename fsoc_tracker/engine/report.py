@@ -102,7 +102,11 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             if np.isfinite(ce).any():
                 ax.plot(t, ce, color=SIGNAL, lw=0.9, label="centroiding error (measured to true)")
             ax.axhline(10, color=LINE, ls="--", lw=0.8)
-            ax.set_ylabel("pixels"); ax.legend(fontsize=7, loc="upper right"); ax.set_title("Errors", fontsize=10, loc="left")
+            ax.set_ylabel("pixels"); ax.set_title("Errors", fontsize=10, loc="left")
+            if ax.get_legend_handles_labels()[0]:
+                ax.legend(fontsize=7, loc="upper right")
+            else:
+                ax.text(0.5, 0.5, "no ground truth in a video: errors are not computed", transform=ax.transAxes, ha="center", va="center", fontsize=8, color=MUTED)
             ax = axes[1]
             modes = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
             mv = np.array([modes.index(r.mode) for r in records])
