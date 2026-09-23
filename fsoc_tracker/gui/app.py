@@ -28,7 +28,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
                          new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
-                         TRUTH_TIP, truth_sidecar)
+                         TRUTH_TIP, truth_sidecar)  # noqa: F401
 from ..engine.config import target_name, parse_xy
 
 
@@ -490,23 +490,26 @@ class MainWindow(QtWidgets.QMainWindow):
         # targets: how many, which one is followed, how it is designated, which one the panel edits
         self.sp_extra.setToolTip(RUN_TIPS["extra"])
         self.chk_identical = QtWidgets.QCheckBox("Identical look"); self.chk_identical.setToolTip(RUN_TIPS["identical"])
-        self.cmb_desig = QtWidgets.QComboBox(); self.cmb_desig.setToolTip(RUN_TIPS["designated"])
-        self.cmb_mode = QtWidgets.QComboBox(); self.cmb_mode.addItems(_CH["designation"]); self.cmb_mode.setToolTip(RUN_TIPS["designation"])
-        self.ed_cue = QtWidgets.QLineEdit(); self.ed_cue.setPlaceholderText("x,y (click the scene)"); self.ed_cue.setToolTip(RUN_TIPS["cue"])
-        self.cmb_edit = QtWidgets.QComboBox(); self.cmb_edit.setToolTip(RUN_TIPS["edit"])
-        self.edit_idx = 0
         for lab, w in (("Name", self.ed_name), ("Seed", self.sp_seed), ("", self.chk_random), ("Duration (s)", self.sp_dur), ("Extra targets", self.sp_extra),
-                       ("", self.chk_identical), ("Designated", self.cmb_desig), ("Designation", self.cmb_mode), ("Cue (x,y)", self.ed_cue),
-                       ("Edit target", self.cmb_edit)):
+                       ("", self.chk_identical)):
             l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); rl.addRow(l, w)
+        # the Target section: pick a target to edit, tick the one to follow
+        self.cmb_edit = QtWidgets.QComboBox(); self.cmb_edit.setToolTip(RUN_TIPS["edit"])
+        self.chk_desig = QtWidgets.QCheckBox("Designated"); self.chk_desig.setToolTip(RUN_TIPS["designated"])
+        self.edit_idx = 0; self.designated_idx = 0
+        self.designation_mode = "auto"; self.designation_cue = ""
+        tw = QtWidgets.QWidget(); tl = QtWidgets.QFormLayout(tw); tl.setContentsMargins(0, 0, 0, 0); tl.setVerticalSpacing(6); tl.setHorizontalSpacing(10)
+        tl.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        for lab, w in (("Target", self.cmb_edit), ("", self.chk_desig)):
+            l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); tl.addRow(l, w)
+        self.target_box = QtWidgets.QWidget(); tb_l = QtWidgets.QVBoxLayout(self.target_box); tb_l.setContentsMargins(0, 0, 0, 0); tb_l.setSpacing(8)
+        tb_l.addWidget(tw); tb_l.addWidget(self.forms["target"])
         self.lbl_check = QtWidgets.QLabel(""); self.lbl_check.setWordWrap(True); self.lbl_check.setProperty("class", "hint")
         self.lbl_check.setToolTip("Scenario check: values beyond the problem statement, values the camera cannot physically follow, and values that were corrected.")
         rl.addRow(self.lbl_check)
         self.sp_extra.valueChanged.connect(self._targets_changed); self.chk_identical.toggled.connect(self._targets_changed)
         self.cmb_edit.currentIndexChanged.connect(self._edit_changed)
-        self.cmb_desig.currentIndexChanged.connect(lambda _i: self._schedule_check())
-        self.cmb_mode.currentTextChanged.connect(lambda _t: self._schedule_check())
-        self.ed_cue.textChanged.connect(lambda _t: self._schedule_check())
+        self.chk_desig.clicked.connect(self._designate_current)
         self.sp_seed.valueChanged.connect(lambda _v: self._schedule_check())
         self.forms["target"].widgets["name"].textChanged.connect(self._name_edited)
         for f in self.forms.values():
@@ -516,7 +519,7 @@ class MainWindow(QtWidgets.QMainWindow):
         panel = QtWidgets.QWidget(); pl = QtWidgets.QVBoxLayout(panel); pl.setContentsMargins(4, 0, 10, 0); pl.setSpacing(0)
         pl.addWidget(section("Run", run_w))
         for key, title, ref, hint in SECTIONS:
-            pl.addWidget(section(title, self.forms[key], hint, ref))
+            pl.addWidget(section(title, self.target_box if key == "target" else self.forms[key], hint, ref))
         pl.addStretch(1)
         scroll = QtWidgets.QScrollArea(); scroll.setWidget(panel); scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -647,9 +650,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.forms["tracker"].write(cfg.tracker)
         self.ed_name.setText(cfg.name); self.sp_seed.setValue(cfg.seed); self.sp_dur.setValue(cfg.duration_s)
         self.sp_extra.blockSignals(True); self.sp_extra.setValue(max(len(cfg.targets) - 1, 0)); self.sp_extra.blockSignals(False)
-        self.cmb_mode.setCurrentText(cfg.designation); self.ed_cue.setText(cfg.designation_cue)
+        self.designation_mode = cfg.designation; self.designation_cue = cfg.designation_cue
+        self.designated_idx = cfg.designated_index()
         self.video_path = cfg.video
-        self._refresh_target_lists(designated=cfg.designated_index())
+        self._refresh_target_lists()
         self._video_label()
 
     def _read_targets(self):
@@ -671,9 +675,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.forms["target"].write(cfg.targets[self.edit_idx])
         else:
             cfg.seed = self.sp_seed.value()
-        cfg.designated = max(self.cmb_desig.currentIndex(), 0)
-        cfg.designation = self.cmb_mode.currentText()
-        cfg.designation_cue = self.ed_cue.text().strip()
+        cfg.designated = min(self.designated_idx, len(cfg.targets) - 1)
+        cfg.designation = "cue" if (self.video_path and self.designation_cue) else self.designation_mode
+        cfg.designation_cue = self.designation_cue if self.video_path else ""
         cfg.video = self.video_path
         cfg.video_truth = self.video_truth if self.video_path else ""
         if cfg.video and for_run:
@@ -683,15 +687,27 @@ class MainWindow(QtWidgets.QMainWindow):
         return cfg
 
     # ------------------------------------------------------------- targets
-    def _refresh_target_lists(self, designated: int | None = None):
+    def _refresh_target_lists(self):
         names = target_labels(self.cfg)
-        di = self.cmb_desig.currentIndex() if designated is None else designated
-        for cmb, idx in ((self.cmb_desig, di), (self.cmb_edit, self.edit_idx)):
-            cmb.blockSignals(True); cmb.clear(); cmb.addItems(names)
-            cmb.setCurrentIndex(min(max(idx, 0), len(names) - 1)); cmb.blockSignals(False)
+        self.designated_idx = min(max(self.designated_idx, 0), len(names) - 1)
+        self.cmb_edit.blockSignals(True); self.cmb_edit.clear()
+        self.cmb_edit.addItems([("* " if i == self.designated_idx else "") + n for i, n in enumerate(names)])
+        self.cmb_edit.setCurrentIndex(min(max(self.edit_idx, 0), len(names) - 1)); self.cmb_edit.blockSignals(False)
         self.edit_idx = self.cmb_edit.currentIndex()
-        self.scene_view.set_targets(names, self.cmb_desig.currentIndex())
+        self._sync_desig_box()
+        self.scene_view.set_targets(names, self.designated_idx)
         self._schedule_check()
+
+    def _sync_desig_box(self):
+        """The tick box shows whether the target being edited is the designated one. One target
+        is always designated, so the box cannot be unticked: tick it on another target instead."""
+        on = self.edit_idx == self.designated_idx
+        self.chk_desig.blockSignals(True); self.chk_desig.setChecked(on); self.chk_desig.setEnabled(not on); self.chk_desig.blockSignals(False)
+
+    def _designate_current(self, *_):
+        self.designated_idx = self.edit_idx
+        self._refresh_target_lists()
+        self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]}: the tracker follows it and the report scores it.")
 
     def _targets_changed(self, *_):
         self._read_targets()
@@ -703,16 +719,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.forms["target"].read()                  # keep the edits of the target being left
         self.edit_idx = idx
         self.forms["target"].write(self.cfg.targets[idx])
+        self._sync_desig_box()
         self._schedule_check()
 
     def _name_edited(self, text: str):
         i = self.edit_idx
         if 0 <= i < len(self.cfg.targets):
             self.cfg.targets[i].name = text
-            label = target_name(self.cfg.targets[i], i)
-            for cmb in (self.cmb_desig, self.cmb_edit):
-                cmb.setItemText(i, label)
-            self.scene_view.set_targets(target_labels(self.cfg), self.cmb_desig.currentIndex())
+            label = ("* " if i == self.designated_idx else "") + target_name(self.cfg.targets[i], i)
+            self.cmb_edit.setItemText(i, label)
+            self.scene_view.set_targets(target_labels(self.cfg), self.designated_idx)
 
     def _scene_clicked(self, x: float, y: float):
         """A click before a run designates: on a video, the clicked point becomes the cue; on
@@ -720,16 +736,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.thread is not None:
             return
         if self.video_path:
-            self.cmb_mode.setCurrentText("cue"); self.ed_cue.setText(f"{x:.0f},{y:.0f}")
-            self.lbl_status.setText(f"Designation cue set at {x:.0f},{y:.0f}: the tracker takes the beacon nearest this point.")
+            self.designation_cue = f"{x:.0f},{y:.0f}"
+            self.lbl_status.setText(f"Beacon marked at {x:.0f},{y:.0f} on the first frame: the tracker takes the spot nearest this point.")
             self._preview_video(self.video_path)
+            self._schedule_check()
             return
         pos = getattr(self, "_preview_pos", None)
         if pos:
-            i = int(np.argmin([np.hypot(px - x, py - y) for px, py in pos]))
-            self.cmb_desig.setCurrentIndex(i)
-            self.scene_view.set_targets(target_labels(self.cfg), i)
-            self.lbl_status.setText(f"Designated {self.cmb_desig.currentText()}.")
+            self.designated_idx = int(np.argmin([np.hypot(px - x, py - y) for px, py in pos]))
+            self._refresh_target_lists()
+            self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]}: the tracker follows it and the report scores it.")
             self._preview_sim()
 
     # ------------------------------------------------------------- scenario check and preview
@@ -943,7 +959,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_video(self):
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open video for Benchmark 2", "", "Video (*.mp4 *.avi *.mov *.mkv)")
         if p:
-            self.video_path = p; self.ed_name.setText(Path(p).stem); self.video_truth = ""
+            self.video_path = p; self.ed_name.setText(Path(p).stem); self.video_truth = ""; self.designation_cue = ""
             self._preview_video(p)
             self._video_label()
             side = truth_sidecar(p)
@@ -1018,10 +1034,13 @@ class MainWindow(QtWidgets.QMainWindow):
         those sections are locked; the camera window, its FOV and rate limits still apply."""
         for key, names in VIDEO_LOCKED.items():
             if key == "run":
-                for w in (self.sp_extra, self.sp_dur, self.chk_identical, self.cmb_desig, self.cmb_edit):
+                for w in (self.sp_extra, self.sp_dur, self.chk_identical, self.cmb_edit, self.chk_desig):
                     w.setEnabled(not on)
                 if on:
                     self.cmb_edit.setCurrentIndex(0)
+                else:
+                    self.designation_cue = ""
+                    self._sync_desig_box()
             elif names == "*":
                 self.forms[key].setEnabled(not on)
             else:

@@ -95,16 +95,17 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 - Hard mode (window only): the tracker sees only the window. Expect SEARCH with a square
   spiral, then TRACK. Acquisition depends on where the beacon started, 3 to 12 s.
 
-### Run section: designation (row 8)
+### Designation (row 8)
 - Extra targets, Identical look: tick Identical look and set 3 extra targets. The scenario check
-  shows "Cannot be met: ... look the same as the designated ..." while Designation is
-  appearance. Switch Designation to start: the note goes and the designated target is followed.
-- Designated: pick another target by name. The scene view marks it "(designated)"; the report
-  line "Followed" and the error tiles refer to it.
+  stays clear: with look-alikes the tracker is told the designated target's start position
+  automatically. The end-of-run dialog says "designation: start (auto)".
+- Target picker and Designated tick box (Target section): pick another target and tick
+  Designated. The picker marks it with `*`, the scene view with "(designated)", and the report
+  line "Followed" and the error tiles refer to it. The box cannot be unticked: one target is
+  always designated.
 - Click to designate: before Start, click a target on the preview; it becomes the designated one.
-- Designation cue: choose cue and click near a beacon, or type x,y in Cue (x,y). Cue without a
-  point gives a "Cannot be met" note.
-- Edit target: choose which target the Target section shows and edits.
+- Video: click the beacon on the first frame; the status bar confirms the point and the tracker
+  takes the spot nearest it.
 
 ### Target (rows 7 to 12)
 - Name: appears on the scene view, the telemetry first line ("following <name>") and the report.
@@ -190,7 +191,7 @@ and in the summary `checks`.
 Things to try: a phone video (variable frame rate is handled and flagged), a video with the
 beacon leaving and re-entering the frame (watch COAST, REACQUIRE, then TRACK), and a video
 with several bright spots (set Width and Height and the shape to the real beacon's, which stay
-editable in video mode, or click the beacon on the first frame to set a designation cue).
+editable in video mode, or click the beacon on the first frame to mark it).
 
 ## 6. Things that should fail, and how they fail
 

@@ -177,17 +177,8 @@ clamped to its accepted range in the engine, for both applications, and the scen
 - Name, Seed: the seed makes a run exactly repeatable.
 - Duration (s): length of a simulator run. Ignored for video input (the whole video runs).
 - Extra targets: number of additional beacons (decoys) added with random paths.
-- Identical look: the generated extra targets copy target 1's shape, size and brightness. Only a
-  start or click cue can then tell the designated one apart.
-- Designated: the target the tracker must follow (PS: "a designated moving target"). The report
-  scores this one. The list shows the target names.
-- Designation: how the tracker is told which one it is. `appearance`: by its configured shape,
-  size and brightness. `start`: also told where it starts, as an operator or GPS cue would.
-  `cue`: a point you give.
-- Cue (x,y): the point for designation `cue`, in screen pixels. Clicking the scene sets it; you
-  can also type it. While searching, the tracker takes the strong candidate nearest the cue;
-  after a loss its last estimate becomes the cue.
-- Edit target: which target the Target section below shows and edits.
+- Identical look: the generated extra targets copy target 1's shape, size and brightness. The
+  tracker is then told the designated one's start position as well (see Target).
 
 ### Screen (rows 1 to 2)
 - Width, Height: scene size in pixels. Default 2000 x 2000.
@@ -203,7 +194,13 @@ clamped to its accepted range in the engine, for both applications, and the scen
 - Hard mode: the tracker sees only the pixels inside the window and must search.
 
 ### Target (rows 7 to 12)
-Shows the target chosen in Edit target.
+- Target: pick the target this section shows and edits; `*` marks the designated one.
+- Designated: tick it on the target the tracker must follow (PS: "a designated moving target").
+  The report scores this one. One target is always designated, so the box cannot be unticked:
+  tick it on another target instead. Before a run, clicking a target on the preview does the same.
+  How the tracker finds it is automatic: by its configured shape, size and brightness, and when
+  another target looks the same, by its start position as well (as an operator or a GPS cue
+  would). A scenario file can force a mode with `designation: appearance | start | cue`.
 - Name: shown on the views, in the telemetry and in the report. Empty means "Target N".
 - Shape: square (default), circle, gaussian, cross, ring, diamond, custom. Width and Height in
   pixels, set separately (default 10 x 10; the PS range is 5-20 x 5-20). A square with unequal
@@ -265,7 +262,7 @@ Values inside the PS envelope give no note.
    The target's appearance (name, shape, width, height, mask, intensity) stays editable: for a
    video it is the statement of what to look for. Set it to the beacon in the video. Only the
    designated target's look is used.
-   To point the tracker at one beacon, click it on the first frame: this sets a designation cue
+   To point the tracker at one beacon, click it on the first frame: the tracker then takes the spot nearest that point
    and Designation switches to `cue`.
 2. Set the camera window size, FOV and rate limits if the graders specify them; these are
    not in the file. Degree readouts depend on the FOV you set.

@@ -500,8 +500,8 @@ order, identical results), so the 99th-percentile frame time on the faint beacon
   speed; Open video; Save scenario; Screenshot; Results; Manual; About. Left: every setting,
   grouped by PS row, with the row number in each tooltip. Top: six live tiles (state, acquisition,
   tracking error, centroid error, lock retention with tracked rate, processing), green when the
-  specification is met. Run section: the designated target by name, the designation mode and
-  cue, and the scenario check notes. Centre: the whole scene (before a run, a preview at t = 0
+  specification is met. Target section: a target picker with a Designated tick box (how the tracker finds it is automatic) and
+  the scenario check notes. Centre: the whole scene (before a run, a preview at t = 0
   with every target named; click one to designate it) and the camera view with overlays. Below: four
   plots (errors, gimbal rates with the limit, processing time with the 20 FPS budget, tracker
   state). Right: telemetry. At the end: a summary dialog and the report.
@@ -758,7 +758,7 @@ web app. Keep the report PDF ready to open.
 | Track-before-detect | linking weak detections across frames before deciding one is real |
 | Feed-forward / PID | steering by prediction / correcting by the remaining error |
 | ONNX | a standard file format for trained neural networks |
-| Designation cue | a point near the designated target (a click or typed x,y) that the search starts from |
+| Designation cue | a point near the designated target (its start, or a click on a video's first frame) that the search starts from; chosen automatically unless a scenario file forces a mode |
 | Scenario check | the notes on corrected, beyond-the-PS, near-the-limit and impossible settings shown before and after a run |
 | Ground-truth CSV | for a video: the evaluators' beacon position per frame, so errors and true lock can be computed |
 | Turn-limited lead | the feed-forward lead shortened so the beacon's path turns at most 0.1 rad over it |

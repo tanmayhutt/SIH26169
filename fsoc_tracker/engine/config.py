@@ -132,12 +132,12 @@ class RunConfig:
     disturbance: DisturbanceConfig = field(default_factory=DisturbanceConfig)
     tracker: TrackerConfig = field(default_factory=TrackerConfig)
     # which target is the beacon to follow, and how the tracker is told (PS: "a designated
-    # moving target"). appearance: by the designated target's configured size, shape and
-    # brightness. start: the tracker is also told where it starts (as an operator or a
-    # GPS/ephemeris cue would). cue: the tracker is told a point near it, for example a
-    # click on the scene or on the first frame of a video.
+    # moving target"). auto (default): by its configured size, shape and brightness, and when
+    # another target looks the same, by its start position as well (as an operator or a
+    # GPS/ephemeris cue would). appearance and start force one of those. cue: a point near
+    # it, for example a click on the first frame of a video.
     designated: int = 0
-    designation: str = "appearance"      # appearance | start | cue
+    designation: str = "auto"            # auto | appearance | start | cue
     designation_cue: str = ""            # "x,y" in screen (video) px, used when designation == "cue"
     video: str | None = None             # set for Benchmark 2 runs: path to an .mp4
     video_truth: str = ""                # optional ground truth for a video: CSV of frame (or t), x, y in video px
@@ -149,6 +149,21 @@ class RunConfig:
 
     def designated_target(self) -> "TargetConfig | None":
         return self.targets[self.designated_index()] if self.targets else None
+
+    def look_alikes(self) -> list[int]:
+        """Indices of the other targets that look the same as the designated one (same shape,
+        size and about the same brightness): by appearance alone they cannot be told apart."""
+        t0 = self.designated_target()
+        if t0 is None:
+            return []
+        return [i for i, t in enumerate(self.targets)
+                if i != self.designated_index() and t.shape == t0.shape and t.dims == t0.dims and abs(t.intensity - t0.intensity) < 25]
+
+    def resolved_designation(self) -> str:
+        """The designation mode a run uses: auto becomes start when look-alikes exist."""
+        if self.designation == "auto":
+            return "start" if (self.look_alikes() and not self.video) else "appearance"
+        return self.designation
 
     def target_names(self) -> list[str]:
         return [target_name(t, i) for i, t in enumerate(self.targets)]

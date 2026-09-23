@@ -172,7 +172,7 @@ time (1000 / mean ms); the mean of per-frame rates is kept as `fps_inst_mean` fo
 | Benchmark 2 video ingest, with first-frame preview and file facts on load | 🟩 |
 | New random seed and heading each run, with a pin option; a loaded scenario keeps its own | 🟩 |
 | Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
-| Run section: Identical look, Designated, Designation, Cue (x,y), Edit target; preview at t = 0 with named targets, click to designate; click a video's first frame to cue | 🟩 |
+| Run section: Identical look. Target section: target picker and a Designated tick box, designation mode automatic; preview at t = 0 with named targets, click to designate; click a video's first frame to cue | 🟩 |
 | Scenario check shown live, at Start, in the end dialog, in the report and the summary: Corrected, Beyond the PS, Near the limit, Cannot be met | 🟩 |
 | Truth CSV toolbar button in video mode (desktop and web) | 🟩 |
 | Salt and pepper in percent on both panels; every numeric input clamped in the engine (the web page had taken 13 as a fraction) | 🟩 |

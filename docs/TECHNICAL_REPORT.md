@@ -291,13 +291,13 @@ whole screen with the camera window, trails, a 2 degree grid and a legend; a cam
 what the window sees with the capture ring, the pointing-error vector, the detection box, the
 prediction with its uncertainty ring and a 1 degree scale bar; four live plots; and a telemetry
 column with every internal quantity. The Run section chooses the designated target by name, the
-designation mode and cue, an identical look for extra targets, and which target the Target
+a Designated tick box (the mode is automatic: appearance, plus the start position when look-alikes exist), an identical look for extra targets, and which target the Target
 section edits; below it the scenario check is shown live. Before a run the scene view previews
 t = 0 with every target named, and a click makes a target the designated one. A scenario picker, playback speed control and keyboard
 shortcuts support the ten to fifteen minute functional demonstration. "Open video" bypasses
 the simulator for Benchmark 2 and previews the file's first frame and facts before the run; the
 target's appearance stays editable as the description of what to look for, and a click on the
-first frame sets a designation cue. "Truth CSV" loads a ground-truth file for the video (a
+first frame marks the beacon to follow. "Truth CSV" loads a ground-truth file for the video (a
 `<video>_truth.csv` beside it is picked up automatically); the report's source line names it. On
 a noisy_line clip rendered to .mp4 with its truth: tracking error 4.85 px, centroiding error
 0.188 px; without the file, n/a.

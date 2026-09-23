@@ -258,7 +258,7 @@ def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
     cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed, bool(ov.get("identical", False)))
     if "designated" in ov:
         cfg.designated = int(ov["designated"])
-    if ov.get("designation") in ("appearance", "start", "cue"):
+    if ov.get("designation") in ("auto", "appearance", "start", "cue"):
         cfg.designation = ov["designation"]
     if "designation_cue" in ov:
         cfg.designation_cue = str(ov["designation_cue"])[:40]
