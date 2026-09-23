@@ -46,9 +46,13 @@ class CameraConfig:
 
 @dataclass
 class TargetConfig:
-    """Rows 7 to 12: one beacon. Several may be listed; the first is the designated one."""
-    shape: str = "square"            # square | circle | gaussian
-    size_px: int = 10
+    """Rows 7 to 12: one beacon. Several may be listed; `RunConfig.designated` says which one
+    the tracker must follow (the first by default)."""
+    name: str = ""                   # shown in the panel, the views and the report; empty = "Target N"
+    shape: str = "square"            # square | circle | gaussian | cross | ring | diamond | custom
+    size_px: int = 10                # row 10: width in px
+    height_px: int = 0               # row 10: height in px; 0 = same as the width (a square spot)
+    mask: str = ""                   # shape "custom": rows of 0/1 separated by ";" (e.g. "010;111;010"), or a PNG path
     intensity: int = 235             # peak grey level 0..255
     motion: str = "line"             # line | circular | figure8 | random | spiral | sinusoidal | waypoints | static
     speed_px_s: float = 120.0        # along-track speed for line, random, sinusoidal
@@ -58,6 +62,15 @@ class TargetConfig:
     heading_deg: float = 30.0        # line, sinusoidal
     blink_hz: float = 0.0            # 0 = steady; >0 modulates intensity (optional realism)
     waypoints: str = ""              # user-defined path for motion "waypoints": "x,y; x,y; ..." in screen px, looped at speed_px_s
+
+    def __post_init__(self):
+        if not self.height_px or self.height_px <= 0:
+            self.height_px = self.size_px
+
+    @property
+    def dims(self) -> tuple[int, int]:
+        """(width, height) of the spot in px."""
+        return int(self.size_px), int(self.height_px or self.size_px)
 
 
 @dataclass
@@ -118,8 +131,26 @@ class RunConfig:
     targets: list[TargetConfig] = field(default_factory=lambda: [TargetConfig()])
     disturbance: DisturbanceConfig = field(default_factory=DisturbanceConfig)
     tracker: TrackerConfig = field(default_factory=TrackerConfig)
+    # which target is the beacon to follow, and how the tracker is told (PS: "a designated
+    # moving target"). appearance: by the designated target's configured size, shape and
+    # brightness. start: the tracker is also told where it starts (as an operator or a
+    # GPS/ephemeris cue would). cue: the tracker is told a point near it, for example a
+    # click on the scene or on the first frame of a video.
+    designated: int = 0
+    designation: str = "appearance"      # appearance | start | cue
+    designation_cue: str = ""            # "x,y" in screen (video) px, used when designation == "cue"
     video: str | None = None             # set for Benchmark 2 runs: path to an .mp4
     output_dir: str = "results"
+
+    # ------------------------------------------------------------ targets
+    def designated_index(self) -> int:
+        return int(min(max(self.designated, 0), max(len(self.targets) - 1, 0)))
+
+    def designated_target(self) -> "TargetConfig | None":
+        return self.targets[self.designated_index()] if self.targets else None
+
+    def target_names(self) -> list[str]:
+        return [target_name(t, i) for i, t in enumerate(self.targets)]
 
     # ------------------------------------------------------------------ IO
     def to_dict(self) -> dict[str, Any]:
@@ -155,6 +186,34 @@ def _build(cls, d: dict[str, Any]):
         else:
             kwargs[f.name] = v
     return cls(**kwargs)
+
+
+def target_name(t: TargetConfig, i: int) -> str:
+    return (t.name or "").strip() or f"Target {i + 1}"
+
+
+def parse_xy(text: str) -> tuple[float, float] | None:
+    """"x,y" -> (x, y), or None when empty or malformed."""
+    try:
+        sx, sy = str(text).split(",")
+        return float(sx), float(sy)
+    except (ValueError, AttributeError):
+        return None
+
+
+# Accepted input range of every numeric setting, in the units of this file. Values outside are
+# clamped before a run (engine/checks.py) whatever the front end, so a typing slip can never
+# produce an impossible picture. The PS envelope (what the problem statement specifies) is
+# narrower and is checked separately, as warnings.
+LIMITS = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "height_px": (0, 60), "intensity": (20, 255),
+          "salt_pepper_frac": (0, 0.5), "gaussian_sigma": (0, 60), "jitter_px": (0, 60), "platform_px_frame": (0, 60),
+          "contrast": (0.05, 2.0), "brightness": (-120, 120), "turbulence": (0, 1), "blur_sigma": (0, 8), "fov_w_deg": (0.2, 60),
+          "fov_h_deg": (0.2, 60), "update_rate_hz": (5, 120), "max_pan_rate_deg_s": (0.5, 60), "max_tilt_rate_deg_s": (0.5, 60),
+          "speed_px_s": (0, 2000), "radius_px": (10, 3000), "period_s": (1, 600), "heading_deg": (-360, 360),
+          "background_level": (0, 120), "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2),
+          "deadband_px": (0, 20), "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10),
+          "blink_hz": (0, 15), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
+          "faint_snr_min": (0, 20), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
 
 
 ATMOSPHERE_PRESETS: dict[str, dict[str, float]] = {

@@ -12,6 +12,7 @@ Endpoints
     POST /api/scenario_yaml        the scenario file for the current panel (Save scenario)
     GET  /api/runs                 recent runs on this server with their files (Results)
     WS   /ws/{run_id}              live frames (scene, camera) and per-frame telemetry
+    POST /api/check                scenario check and a named preview of the scene at t = 0
     POST /api/video                upload an .mp4 for Benchmark 2; returns its probed facts
     GET  /runs/{run_id}/{report|frames|summary|scenario}   the run's files, named FSOC_<kind>_<name>_seed<N>_<time>_<file>
 One run at a time per server; a second request while one is live gets 409.
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import copy
 import json
 import math
 import queue
@@ -42,7 +44,8 @@ from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.engine.sources import probe_video
 from fsoc_tracker.ui_shared import (DURATION_RANGE, SPEEDS, LiveTiles, camera_bottom, camera_crop, camera_top, extra_targets,
                                     final_tiles, front_end_bundle, new_random_seed, scene_header, status_text, summary_text,
-                                    telemetry_lines, video_loaded_lines, video_preview_header)
+                                    telemetry_lines, video_loaded_lines, video_preview_header, scenario_check, target_labels)
+from fsoc_tracker.engine.checks import check_config
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC = Path(__file__).resolve().parent / "static"
@@ -83,6 +86,8 @@ class Run:
             next_t = time.perf_counter()
             live = LiveTiles()
             ifov = self.cfg.camera.ifov_deg
+            names = self.cfg.target_names()
+            following = names[sim.di] if names and not self.cfg.video else ""
             total = getattr(sim.source, "n_frames", 0) or int(round(self.cfg.duration_s * self.cfg.camera.update_rate_hz))
             for res in sim.steps():
                 while self.pause and not self.stop.is_set() and not self.step_once:
@@ -113,9 +118,11 @@ class Run:
                     msg["scene"], msg["cam"] = self._pictures(res)
                     tr = res.track
                     msg["pred"] = list(tr.prediction) if tr.prediction is not None else [None, None]
-                    msg["decoys"] = [list(b) for b in (res.frame.truth.beacons[1:] if (res.frame.truth and res.frame.truth.beacons) else [])]
+                    msg["beacons"] = [list(b) for b in (res.frame.truth.beacons if (res.frame.truth and res.frame.truth.beacons) else [])]
+                    msg["di"] = sim.di
+                    msg["names"] = names
                     msg["tiles"] = live.tiles()
-                    msg["tele"] = telemetry_lines(r)
+                    msg["tele"] = telemetry_lines(r, following)
                     top_state, top_detail = camera_top(r, ifov)
                     bottom, sat = camera_bottom(r)
                     msg["hud"] = {"scene": scene_header(res.observed.shape[1], res.observed.shape[0], ifov, r.t_sim),
@@ -210,24 +217,51 @@ def scenarios():
     return {"scenarios": out, "defaults": RunConfig().to_dict(), "atmospheres": list(ATMOSPHERE_PRESETS), "version": __version__}
 
 
+def _typed(obj, k, v):
+    """Set obj.k from browser input, keeping the field's type; unknown keys are ignored."""
+    if not hasattr(obj, k):
+        return
+    cur = getattr(obj, k)
+    try:
+        if isinstance(cur, bool):
+            setattr(obj, k, bool(v))
+        elif isinstance(cur, (int, float)):
+            setattr(obj, k, type(cur)(float(v)))
+        elif isinstance(cur, str) or cur is None:
+            setattr(obj, k, str(v))
+    except (TypeError, ValueError):
+        pass
+
+
 def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
-    """Whitelisted, typed overrides from the browser form."""
+    """Whitelisted, typed overrides from the browser form. The page sends the full target list
+    (it keeps one per 'Edit target'); older pages send one 'target' and a decoy count."""
     for sec in ("screen", "camera", "disturbance", "tracker"):
         for k, v in (ov.get(sec) or {}).items():
-            obj = getattr(cfg, sec)
-            if hasattr(obj, k):
-                cur = getattr(obj, k)
-                setattr(obj, k, type(cur)(v) if not isinstance(cur, bool) else bool(v))
-    t = ov.get("target") or {}
-    if t:
-        t0 = cfg.targets[0]
+            _typed(getattr(cfg, sec), k, v)
+    if isinstance(ov.get("targets"), list) and ov["targets"]:
+        tl = []
+        for d in ov["targets"][:1 + 8]:
+            t = TargetConfig()
+            for k, v in (d or {}).items():
+                _typed(t, k, v)
+            if not t.height_px:
+                t.height_px = t.size_px
+            tl.append(t)
+        cfg.targets = tl
+    else:
+        t = ov.get("target") or {}
         for k, v in t.items():
-            if hasattr(t0, k):
-                cur = getattr(t0, k)
-                setattr(t0, k, type(cur)(v))
+            _typed(cfg.targets[0], k, v)
     extra = int(ov.get("extra_targets", len(cfg.targets) - 1))
     seed = int(ov.get("seed", cfg.seed))
-    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed)
+    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed, bool(ov.get("identical", False)))
+    if "designated" in ov:
+        cfg.designated = int(ov["designated"])
+    if ov.get("designation") in ("appearance", "start", "cue"):
+        cfg.designation = ov["designation"]
+    if "designation_cue" in ov:
+        cfg.designation_cue = str(ov["designation_cue"])[:40]
     if "seed" in ov:
         cfg.seed = int(ov["seed"])
     if "duration_s" in ov:
@@ -235,6 +269,26 @@ def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
     if "name" in ov and str(ov["name"]).strip():
         cfg.name = "".join(c for c in str(ov["name"]) if c.isalnum() or c in "-_ ")[:40] or "run"
     return cfg
+
+
+@app.post("/api/check")
+def check(body: dict):
+    """Scenario check and a named preview of the scene at t = 0, as the desktop panel shows them."""
+    cfg = _config_from(dict(body, random_seed=False))
+    lines = scenario_check(cfg)
+    out = {"lines": lines, "names": target_labels(cfg), "designated": cfg.designated_index(), "targets": cfg.to_dict()["targets"]}
+    if not body.get("video"):
+        from fsoc_tracker.world.renderer import World
+        try:
+            c2 = copy.deepcopy(cfg); check_config(c2)
+            img, truth = World(c2).render()
+            H, W = img.shape[:2]; sc = 640 / max(H, W)
+            ok, j = cv2.imencode(".jpg", cv2.resize(img, (int(W * sc), int(H * sc)), interpolation=cv2.INTER_AREA), [cv2.IMWRITE_JPEG_QUALITY, 70])
+            out.update(preview=base64.b64encode(j.tobytes()).decode(), positions=[list(b) for b in truth.beacons],
+                       window=list(truth.window), screen_w=W, screen_h=H)
+        except Exception:
+            pass
+    return out
 
 
 @app.post("/api/run")
@@ -263,8 +317,10 @@ async def start_run(body: dict):
         for old in ups[:-10]:
             if str(old) != cfg.video:
                 old.unlink(missing_ok=True)
-        return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict(), "label": run_label_of(cfg),
-                "status": status_text("running", name=cfg.name, seed=cfg.seed, out=f"results/{run_label_of(cfg)}")}
+        chk = scenario_check(cfg)
+        return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict(), "label": run_label_of(cfg), "checks": chk,
+                "status": status_text("running", name=cfg.name, seed=cfg.seed, out=f"results/{run_label_of(cfg)}")
+                          + (f"   |   {chk[0]}" if chk else "")}
 
 
 def _config_from(body: dict) -> RunConfig:
@@ -397,7 +453,8 @@ def run_status(run_id: str):
         vals, passed = sv.get("values", {}), sv.get("passed", {})
         lab = out["label"] or run_id
         out["tiles"] = final_tiles(vals, passed)
-        out["summary_text"] = summary_text(vals, passed, f"results/{lab}/{lab}_frames.csv", f"results/{lab}/{lab}_report.pdf")
+        out["summary_text"] = summary_text(vals, passed, f"results/{lab}/{lab}_frames.csv", f"results/{lab}/{lab}_report.pdf",
+                                           sv.get("designation"), sv.get("checks"))
         out["status"] = status_text("finished", out=f"results/{lab}")
     return out
 

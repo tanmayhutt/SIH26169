@@ -13,7 +13,7 @@ and the solution completely. On the project owner's machine the workspace rules 
   parameter table, the eight "shall" functions, the deliverables and the evaluation stages.
 - Never tune the tracker, detector or controller to a video or scenario any of us feeds it. Such a
   file may reveal a defect; a change goes in only if it is a general defect inside the PS scope,
-  and only after it is proven on the 13-scenario pack with no run worse than before
+  and only after it is proven on the 15-scenario pack with no run worse than before
   (`fsoc-tracker batch -s configs/scenarios/*.yaml --seeds 0-2 --duration 15`, compare with the
   previous batch). If a file is simply harder than the PS describes, report that; do not adapt.
 - Readiness means: the evaluators' scenarios (Benchmark 1) and their 30 fps videos covering a

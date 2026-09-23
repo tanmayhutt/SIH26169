@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import platform
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +14,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
 from .. import __version__
-from .config import RunConfig
+from .checks import check_lines
+from .config import RunConfig, target_name
 from .metrics import DEFINITIONS, SPEC, Summary
 from .telemetry import Record
 
@@ -26,6 +28,16 @@ def _fmt(v):
     if isinstance(v, float):
         return "n/a" if math.isnan(v) else (f"{v:.3f}" if abs(v) < 100 else f"{v:.1f}")
     return str(v)
+
+
+def _para(fig, x: float, y: float, text: str, chars: int, size: float, color: str, step: float, **kw) -> float:
+    """Draw `text` wrapped at `chars` characters, one line per fig.text, and return the y below
+    it. Wrapping by hand keeps every block exactly as tall as it is, so nothing overlaps."""
+    lines = textwrap.wrap(text, chars) or [""]
+    for ln in lines:
+        fig.text(x, y, ln, fontsize=size, color=color, **kw)
+        y -= step
+    return y
 
 
 def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: Path) -> Path:
@@ -41,15 +53,33 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         src = (f"Source: video {cfg.video}  ({cfg.screen.width}x{cfg.screen.height} px as displayed, {cfg.camera.update_rate_hz:.2f} fps average, "
                f"{len(records)} frames, {cfg.duration_s:.2f} s)" if cfg.video else (
             f"Source: simulator, screen {cfg.screen.width}x{cfg.screen.height}, targets {len(cfg.targets)}, "
-            f"motion {cfg.targets[0].motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
+            f"motion {cfg.designated_target().motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
             f"platform {cfg.disturbance.platform_motion} {cfg.disturbance.platform_px_frame:g} px/f, jitter {cfg.disturbance.jitter_px:g} px, "
-            f"S&P {cfg.disturbance.salt_pepper_frac:g}, gauss {cfg.disturbance.gaussian_sigma:g}"))
-        fig.text(0.07, 0.905, src, fontsize=7.5, color=MUTED, wrap=True)
+            f"S&P {100 * cfg.disturbance.salt_pepper_frac:g}%, gauss {cfg.disturbance.gaussian_sigma:g}, turbulence {cfg.disturbance.turbulence:g}"))
+        _para(fig, 0.07, 0.908, src, 122, 7.5, MUTED, 0.013)
         fig.text(0.07, 0.878, f"Camera {cfg.camera.width}x{cfg.camera.height}, FOV {cfg.camera.fov_w_deg:g}x{cfg.camera.fov_h_deg:g} deg, "
                  f"IFOV {cfg.camera.ifov_deg*3600:.1f} arcsec/px, max rate {cfg.camera.max_pan_rate_deg_s:g}/{cfg.camera.max_tilt_rate_deg_s:g} deg/s, "
                  f"{cfg.camera.update_rate_hz:g} Hz", fontsize=8, color=MUTED)
+        # which target was followed, and how it was designated (PS: "a designated moving target")
+        des = getattr(summary, "designation", {}) or {}
+        y = 0.858
+        if cfg.targets and not cfg.video:
+            parts = []
+            for i, tc in enumerate(cfg.targets):
+                w, h = tc.dims
+                mark = " (designated)" if i == cfg.designated_index() else ""
+                parts.append(f"{target_name(tc, i)}{mark}: {tc.shape} {w}x{h} px, {tc.motion}")
+            y = _para(fig, 0.07, y, "Targets: " + ";  ".join(parts), 122, 7.5, MUTED, 0.013)
+        if des:
+            line = f"Followed {des.get('target', '')}, designation: {des.get('mode', 'appearance')}"
+            if des.get("cue"):
+                line += f" at {des['cue']}"
+            if des.get("ambiguous_frames"):
+                line += (f".  In {des['ambiguous_frames']} search frames another target looked just like it: by appearance alone the choice may be wrong "
+                         f"(use designation 'start' or click the beacon)")
+            y = _para(fig, 0.07, y, line, 122, 7.5, SIGNAL if des.get("ambiguous_frames") else MUTED, 0.013)
+        y -= 0.008
         # spec table
-        y = 0.85
         fig.text(0.07, y, "Specification check", fontsize=11, weight="bold", color=INK); y -= 0.022
         for k, (op, lim) in SPEC.items():
             v = summary.values.get(k)
@@ -76,18 +106,25 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         cnn = summary.values.get("cnn_frames_pct", 0.0)
         if cnn > 0:
             notes.append(f"The AI detector supplied the measurement in {cnn:.0f}% of frames (used when the classical detector found nothing near the prediction).")
+        # scenario check: values beyond the PS, values the camera cannot follow, corrected inputs
+        for line in check_lines(getattr(summary, "checks", []) or [])[:6]:
+            notes.append("Scenario check. " + line)
+        y -= 0.004
         for n_ in notes:
-            fig.text(0.07, y, n_, fontsize=7.5, color=SIGNAL, wrap=True); y -= 0.026
+            y = _para(fig, 0.07, y, n_, 122, 7.5, SIGNAL, 0.013) - 0.005
         y -= 0.012
         fig.text(0.07, y, "All metrics, with definitions", fontsize=11, weight="bold", color=INK); y -= 0.022
         for k, v in summary.values.items():
             fig.text(0.07, y, k.replace("_", " "), fontsize=8.5, color=INK)
             fig.text(0.40, y, _fmt(v), fontsize=8.5, color=INK, weight="bold")
             d = DEFINITIONS.get(k, "")
-            fig.text(0.50, y, d, fontsize=6.6, color=MUTED, wrap=True)
-            y -= 0.0195 if len(d) < 95 else 0.028
-            if y < 0.06:
-                break
+            y_end = _para(fig, 0.50, y, d, 70, 6.6, MUTED, 0.0105)
+            y = min(y - 0.0195, y_end - 0.006)
+            if y < 0.07:                      # continue on a new page rather than drop metrics
+                pdf.savefig(fig); plt.close(fig)
+                fig = plt.figure(figsize=(8.27, 11.69)); fig.patch.set_facecolor("white")
+                y = 0.955
+                fig.text(0.07, y, "All metrics, with definitions (continued)", fontsize=11, weight="bold", color=INK); y -= 0.03
         pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------- page 2
