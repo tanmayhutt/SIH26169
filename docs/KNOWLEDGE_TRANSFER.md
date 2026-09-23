@@ -515,9 +515,20 @@ order, identical results), so the 99th-percentile frame time on the faint beacon
 ## B13. Step 12: packaging for every computer
 
 The desktop app is packaged with PyInstaller into a self-contained folder for Windows x64, Linux
-x64, macOS Intel and macOS Apple silicon. Each build is made on a real machine of that kind, runs
-the tests, and then runs the packaged program on scenarios, a video and the window before it is
-published. Nothing needs installing, and it works offline.
+x64, macOS Intel and macOS Apple silicon. Each build runs the tests, and then runs the packaged
+program on scenarios, a video and the window before it is published. Nothing needs installing,
+and it works offline.
+
+Where each one is built, and why: Windows and Linux on GitHub's machines (the build workflow,
+started by hand or by a version tag; about 100 Actions minutes, roughly $0.75 at GitHub's rates).
+The two macOS builds on the team's Apple silicon Mac with `bash tools/build_macos.sh`: the Apple
+silicon one natively, the Intel one through Rosetta with an x86_64 Python that `uv` installs once
+and keeps in `.venv-intel/`. The reason is cost: GitHub charges ten Linux minutes for one macOS
+minute, and building all four on GitHub on every push used up the free 2,000 minutes in three
+days (about $4.70 per full build, $3.92 of it macOS). Our own server cannot build any of them: it
+is an ARM Linux machine and the Linux download is for x64 PCs. A teammate's fork of the
+repository has its own free minutes, so a build can also be run there and published with
+`REPO_SLUG=<fork> bash webapp/publish_builds.sh`.
 
 ## B14. Step 13: how we know it works
 
@@ -599,6 +610,18 @@ published. Nothing needs installing, and it works offline.
   the setting. The faint beacon seed 7 walked off onto noise (86 px, 78.6% lock); the refit and
   width guards and keeping the CNN off faint tracks give 2.8 px, 94.8%. Regression: 0 worse, 5
   better (platform maximum lock). The audit passes 39 of 39. The deck was renamed ARGUS.
+- **2026-09-23 night. The target panel, redone.** The owner rejected the six-control flow added
+  that morning: a Designated dropdown, a Designation mode, a Cue box and an Edit target dropdown
+  in the Run section. Replaced in both apps by one Target picker and one Designated tick box; how
+  the tracker identifies the target is automatic (its look, plus its start position when another
+  target looks the same), and a scenario file can still force a mode. On a video you click the
+  beacon on the first frame.
+- **2026-09-23 night. Builds and cost.** GitHub stopped starting build jobs: the free Actions
+  minutes were gone, because macOS minutes cost ten times Linux ones and the workflow built all
+  four apps on every push. The workflow now builds Windows and Linux only, by hand or on a tag;
+  both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
+  and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
+  monthly reset, or a build on a teammate's fork.
 - **2026-09-23 night. Disturbances during a run.** The PS asks the software to introduce
   disturbances into the camera feed; they were fixed for a whole run. Now the Disturbances
   section stays live while a run is going (the other sections are locked), a change reaches the
@@ -635,6 +658,9 @@ published. Nothing needs installing, and it works offline.
 | Derivative gain kd 0.3 | A +/-10 px limit cycle: a still beacon never settled (mean 6.4 px, peak 15.6 px) | kd 0; a still beacon is held within 4 px |
 | Motor at 10 deg/s for the platform maximum | Saturation 2 percent, lock unchanged | Limit documented as the shake |
 | Neural network as the main detector | Less accurate and slower than classical | Kept as a gap filler |
+| Six target controls in the Run section (Designated, Designation mode, Cue, Edit target, and more) | Confusing: two dropdowns of names, a mode nobody should have to pick, an empty cue box | One target picker and one Designated tick box; the mode is automatic (start position when look-alikes exist) |
+| Building all four desktop apps on GitHub on every push | Used the free Actions minutes in three days (macOS costs 10x) | Windows and Linux on GitHub, by hand; both Macs built locally by `tools/build_macos.sh` |
+| A "Cannot be met" label on the 70 percent turn-rate warning | It was met; the label was wrong | A fourth note kind, "Near the limit" |
 
 ---
 
@@ -736,6 +762,11 @@ web app. Keep the report PDF ready to open.
 - **How do you know every PS item is met?** `tools/ps_audit.py` measures each one by running the
   code (rows 1 to 25, the eight "shall" functions, the deliverables, both benchmarks) and writes
   `docs/PS_AUDIT.md`; 39 of 39 pass, and the build runs it.
+- **Can the disturbances change while it tracks?** Yes: during a run the Disturbances section
+  stays live, so noise, fog, jitter or platform sway can be switched on or off without a restart;
+  the next frame carries it, the tiles restart from the change and the report scores each setting
+  separately. The change is saved in the run's scenario, so the run replays exactly, and a
+  scenario file can script such changes with `schedule`.
 - **Can it be used with real hardware?** Yes: the frame source and the gimbal are separate
   interfaces, so a real camera and pan-tilt unit can replace the simulated ones.
 

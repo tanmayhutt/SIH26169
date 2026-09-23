@@ -39,6 +39,29 @@ and the solution completely. On the project owner's machine the workspace rules 
   label prefixed to `_report.pdf`, `_frames.csv`, `_summary.json`, `_scenario.yaml`. Keep that
   scheme; `fsoc_tracker/engine/naming.py` owns it.
 
+## Keep the record current
+
+The documents are the team's shared memory: every teammate, and every AI session a teammate runs,
+gets its context from them, not from anyone's chat. So every change that another person would
+need to know about is recorded in the same commit as the change, and pushed:
+
+- `docs/HANDOVER.md`: how it works now, why, and the history paragraph (section 14).
+- `docs/KNOWLEDGE_TRANSFER.md`: the step it changes (Part B), the timeline (Part C1), ideas tried
+  and dropped (C3), measured results and limits (Part D), the Q&A (E3).
+- `PROGRESS.md` and `web/progress.json`: status, counts, measured numbers.
+- `COMPLIANCE.md` when a PS row, shall item, deliverable or benchmark is affected.
+- `docs/USER_MANUAL.md`, `docs/TECHNICAL_REPORT.md` and their PDFs (`docs/build_pdfs.py`) when the
+  user sees the change or a method or number in the report changes.
+- `docs/submission/DECK_CHECKLIST.md` when a number the deck quotes changes.
+
+Record decisions and their reasons, what was tried and rejected, and measured numbers, in plain
+language. A change is not finished until the record says what the code does. Run
+`python tools/ps_audit.py` after engine changes; it rewrites `docs/PS_AUDIT.md`, which is committed.
+
+At the start of every substantive task, run `python tools/record_check.py`. It lists commits that
+changed the application without touching any record file (a teammate's, or yours). Write those up
+first, from the diff (`git show <sha>`), so the record never lags the code.
+
 ## Repository hygiene
 
 - Commit as your own configured git identity. Never pass a `user.email` or `user.name` override

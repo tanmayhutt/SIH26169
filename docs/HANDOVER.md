@@ -95,6 +95,7 @@ fsoc-tracker-gui                                                                
 uvicorn webapp.server:app --host 127.0.0.1 --port 8095                              # web app locally
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
+python tools/record_check.py                   # commits that changed code without updating the record
 python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
 python tools/gui_screenshot.py results/shot full_stress   # desktop screenshots without a display
 python tools/make_demo_video.py                # regenerate the demo video (docs/demo/, not in git)
@@ -410,7 +411,10 @@ frames over processing time, the turn-limited lead, the coasting guard, a vector
 Benchmark 2 ground truth, independent noise planes, the Near the limit note and fast_circular.
 That evening the new PS audit (`tools/ps_audit.py`) found the derivative limit cycle on a still
 beacon and the figure-8 sway above 20 px per frame; both were fixed, the faint path got its refit
-and width guards (seed 7), and the deck was renamed ARGUS.
+and width guards (seed 7), and the deck was renamed ARGUS. That night the target controls were
+redone as one picker and one Designated tick box with an automatic designation mode, and, with
+the free Actions minutes gone (macOS minutes cost 10x), the workflow was cut to Windows and Linux
+by hand while `tools/build_macos.sh` builds both macOS archives locally (Intel through Rosetta).
 Then disturbances were made changeable during a run (live in both apps, or a `schedule` in a
 scenario), replayed exactly from the saved scenario, with per-setting figures in the report.
 The full commit history is in git.
