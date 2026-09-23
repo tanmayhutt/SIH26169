@@ -68,14 +68,27 @@ def test_video_ground_truth_gives_errors():
     d = Path(tempfile.mkdtemp())
     c = RunConfig(); c.screen.width = c.screen.height = 800; c.duration_s = 2.0; c.targets[0].start = "centre"
     c.targets[0].motion = "circular"; c.targets[0].radius_px = 150; c.camera.width, c.camera.height = 320, 240
-    vw = cv2.VideoWriter(str(d / "clip.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), 30, (800, 800), False)
+    frames = list(SyntheticSource(c))
     with open(d / "clip_truth.csv", "w", newline="") as f:
         w = csv.writer(f); w.writerow(["frame", "x", "y"])
-        for fr in SyntheticSource(c):
-            vw.write(fr.image); w.writerow([fr.idx, *fr.truth.beacons[0]])
-    vw.release()
+        for fr in frames:
+            w.writerow([fr.idx, *fr.truth.beacons[0]])
     assert len(load_truth(d / "clip_truth.csv", 30.0)) == 60
-    v = RunConfig(); v.video = str(d / "clip.mp4"); v.video_truth = str(d / "clip_truth.csv"); v.duration_s = 0
+    # the bundled OpenCV lacks an mp4 encoder on some platforms; try the codecs the wheel may carry
+    clip = None
+    for name, fourcc in (("clip.mp4", "mp4v"), ("clip.avi", "MJPG"), ("clip.mkv", "FFV1")):
+        vw = cv2.VideoWriter(str(d / name), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), False)
+        if vw.isOpened():
+            for fr in frames:
+                vw.write(fr.image)
+            vw.release()
+            if (d / name).exists() and (d / name).stat().st_size > 0:
+                clip = d / name
+                break
+    if clip is None:
+        import pytest
+        pytest.skip("this OpenCV build has no video encoder; reading videos (the Benchmark 2 path) does not need one")
+    v = RunConfig(); v.video = str(clip); v.video_truth = str(d / "clip_truth.csv"); v.duration_s = 0
     s = _run(v, 0).summary
     assert s.truth_available and s.values["centroid_err_mean_px"] < 1.0
 
