@@ -153,7 +153,7 @@ const COL = { accent: "#52C4DE", signal: "#E08D4C", good: "#5CBE93", muted: "#8D
 const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
 const UI = getComputedStyle(document.documentElement).getPropertyValue("--ui");
 let U = null, META = null, RUN_ID = null, WS = null, VIDEO = null, WATCHING = false, PAUSED = false, LAST = null, LIM = 5, TOTAL = 1;
-let TARGETS = [], EDIT = 0, PREVIEW = null, GEOM = null, CHECK_T = null;   // targets as stored (engine units); which one the form edits
+let TARGETS = [], EDIT = 0, DESIG = 0, DMODE = "auto", CUE = "", PREVIEW = null, GEOM = null, CHECK_T = null;   // targets as stored (engine units); which one the form edits
 const B = { t: [], terr: [], cerr: [], pan: [], tilt: [], proc: [], mode: [] };
 const TRAIL = { truth: [], win: [], cam: [] };
 const sceneImg = new Image(), camImg = new Image();
@@ -177,20 +177,19 @@ function buildPanel() {
     <div class="row" id="row-duration"><span>Duration (s)</span><input type="number" id="duration" min="${U.duration_range[0]}" max="${U.duration_range[1]}" step="1"></div>
     <div class="row" id="row-extra"><span title="${esc(U.run_tips.extra)}">Extra targets</span><input type="number" id="extra" min="0" max="${U.extra_max}" step="1"></div>
     <div class="row" id="row-identical"><span></span><label class="chk" title="${esc(U.run_tips.identical)}"><input type="checkbox" id="identical"> Identical look</label></div>
-    <div class="row" id="row-desig" title="${esc(U.run_tips.designated)}"><span>Designated</span><select id="desig"></select></div>
-    <div class="row" id="row-dmode" title="${esc(U.run_tips.designation)}"><span>Designation</span><select id="dmode">${U.designations.map(c => `<option>${c}</option>`).join("")}</select></div>
-    <div class="row" id="row-cue" title="${esc(U.run_tips.cue)}"><span>Cue (x,y)</span><input type="text" id="cue" placeholder="x,y (click the scene)"></div>
-    <div class="row" id="row-edit" title="${esc(U.run_tips.edit)}"><span>Edit target</span><select id="edit"></select></div>
     <div class="hint" id="check" title="Scenario check: values beyond the problem statement, values the camera cannot physically follow, and values that were corrected."></div></div>`;
   for (const s of U.sections) {
     h += `<div class="sec" id="sec-${s.key}"><div class="h">${s.title}${s.ref ? `<span>${s.ref}</span>` : ""}</div>${s.hint ? `<div class="hint">${s.hint}</div>` : ""}`;
+    if (s.key === "target") h += `<div class="row" id="row-edit" title="${esc(U.run_tips.edit)}"><span>Target</span><select id="edit"></select></div>
+      <div class="row" id="row-desig"><span></span><label class="chk" title="${esc(U.run_tips.designated)}"><input type="checkbox" id="desig"> Designated</label></div>`;
     for (const f of s.fields) h += `<div class="row" id="row-${s.key}.${f.name}" title="${esc(f.tip)}"><span>${f.label}</span>${fieldWidget(s.key, f)}</div>`;
     h += `</div>`;
   }
   $("side").innerHTML = h;
   $("disturbance.atmosphere").addEventListener("change", e => { const p = U.presets[e.target.value]; if (p) for (const k in p) { const el = $("disturbance." + k); if (el) el.value = fmtNum(el, p[k]); } });
   $("side").addEventListener("input", scheduleCheck); $("side").addEventListener("change", scheduleCheck);
-  $("edit").addEventListener("change", () => { saveTargetForm(); EDIT = $("edit").selectedIndex; loadTargetForm(EDIT); });
+  $("edit").addEventListener("change", () => { saveTargetForm(); EDIT = $("edit").selectedIndex; loadTargetForm(EDIT); syncDesigBox(); });
+  $("desig").addEventListener("click", () => { DESIG = EDIT; refreshTargetLists(); setStatus("Designated " + nameOf(TARGETS[DESIG], DESIG) + ": the tracker follows it and the report scores it."); if (PREVIEW) drawPreview(); });
   $("target.name").addEventListener("input", () => { saveTargetForm(); refreshTargetLists(); });
 }
 const tsec = () => U.sections.find(x => x.key === "target");
@@ -200,9 +199,13 @@ function writeField(el, f, v) { if (f.kind === "bool") el.checked = !!v; else if
 function saveTargetForm() { const t = TARGETS[EDIT]; if (!t) return; for (const f of tsec().fields) { const el = $("target." + f.name); if (el) t[f.name] = readField(el, f); } }
 function loadTargetForm(i) { const t = TARGETS[i]; if (!t) return; for (const f of tsec().fields) { const el = $("target." + f.name); if (el && f.name in t) writeField(el, f, t[f.name]); } }
 function refreshTargetLists(di) {
-  const names = TARGETS.map(nameOf), d = di ?? $("desig").selectedIndex;
-  for (const [id, idx] of [["desig", d], ["edit", EDIT]]) { $(id).innerHTML = names.map(n => `<option>${n.replace(/</g, "&lt;")}</option>`).join(""); $(id).selectedIndex = Math.min(Math.max(idx, 0), names.length - 1); }
+  if (di !== undefined) DESIG = di;
+  const names = TARGETS.map(nameOf); DESIG = Math.min(Math.max(DESIG, 0), names.length - 1); EDIT = Math.min(Math.max(EDIT, 0), names.length - 1);
+  $("edit").innerHTML = names.map((n, i) => `<option>${i === DESIG ? "* " : ""}${n.replace(/</g, "&lt;")}</option>`).join(""); $("edit").selectedIndex = EDIT;
+  syncDesigBox();
 }
+// one target is always designated, so the box cannot be unticked: tick it on another target instead
+function syncDesigBox() { const on = EDIT === DESIG; $("desig").checked = on; $("desig").disabled = on || !!VIDEO; }
 function scheduleCheck() { if (RUN_ID) return; clearTimeout(CHECK_T); CHECK_T = setTimeout(runCheck, 300); }
 async function runCheck() {
   if (RUN_ID) return;
@@ -226,7 +229,7 @@ function drawPreview() {
   const s = (Math.min(W, H) - 8) / Math.max(P.screen_w, P.screen_h), pw = P.screen_w * s, ph = P.screen_h * s, ox = (W - pw) / 2, oy = (H - ph) / 2;
   GEOM = { ox, oy, s, w: P.screen_w, h: P.screen_h };
   x.save(); x.translate(ox, oy); x.drawImage(sceneImg, 0, 0, pw, ph);
-  drawBeacons(x, P.positions, TARGETS.map(nameOf), $("desig").selectedIndex, s);
+  drawBeacons(x, P.positions, TARGETS.map(nameOf), DESIG, s);
   const [x0, y0, ww, wh] = P.window; x.strokeStyle = COL.accent; x.lineWidth = 1.5; x.strokeRect(x0 * s, y0 * s, ww * s, wh * s);
   bar(x, 0, 20, pw); text(x, 8, 14, "PREVIEW t = 0   click a target to designate it", COL.muted, F(11), pw - 16); x.restore();
   $("v-scene").classList.add("live");
@@ -241,13 +244,13 @@ function fillForm(cfg) {
   }
   loadTargetForm(0);
   $("name").value = cfg.name; $("seed").value = cfg.seed; $("duration").value = cfg.duration_s; $("extra").value = Math.max(cfg.targets.length - 1, 0);
-  $("dmode").value = cfg.designation || "appearance"; $("cue").value = cfg.designation_cue || ""; $("identical").checked = false;
+  DMODE = cfg.designation || "auto"; CUE = cfg.designation_cue || ""; $("identical").checked = false;
   refreshTargetLists(cfg.designated || 0);
 }
 function readForm() {
   saveTargetForm();
   const ov = { name: $("name").value, seed: Number($("seed").value), duration_s: Number($("duration").value), extra_targets: Number($("extra").value),
-               identical: $("identical").checked, designated: Math.max($("desig").selectedIndex, 0), designation: $("dmode").value, designation_cue: $("cue").value.trim(),
+               identical: $("identical").checked, designated: DESIG, designation: VIDEO && CUE ? "cue" : DMODE, designation_cue: VIDEO ? CUE : "",
                targets: TARGETS };
   for (const s of U.sections) { if (s.key === "target") continue; ov[s.key] = {};
     for (const f of s.fields) { const el = $(s.key + "." + f.name); ov[s.key][f.name] = readField(el, f); } }
@@ -256,7 +259,7 @@ function readForm() {
 function lockForVideo(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const [key, names] of Object.entries(U.video_locked)) {
-    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); set("desig", on); set("edit", on); continue; }
+    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); set("edit", on); syncDesigBox(); continue; }
     const s = U.sections.find(x => x.key === key); if (!s) continue;
     for (const f of s.fields) if (names === "*" || names.includes(f.name)) set(key + "." + f.name, on);
   }
@@ -337,8 +340,8 @@ function showVideoPreview(info) {
   const tx = text(x, 8, 16, "VIDEO LOADED", COL.good, F(12, true), pw) + 14; text(x, tx, 16, info.preview_header, COL.ink, F(11), pw - tx - 8);
   const cw = Math.min(Number($("camera.width").value), info.width), ch = Math.min(Number($("camera.height").value), info.height);
   x.strokeStyle = COL.accent; x.lineWidth = 2; x.strokeRect((info.width - cw) / 2 * s, (info.height - ch) / 2 * s, cw * s, ch * s);
-  const cue = $("cue").value.split(",").map(Number);
-  if ($("dmode").value === "cue" && cue.length === 2 && cue.every(isFinite)) { circle(x, cue[0] * s, cue[1] * s, 9, COL.signal, 1.6); text(x, cue[0] * s + 12, cue[1] * s - 8, "designation cue", COL.signal, F(10), 300); }
+  const cue = CUE.split(",").map(Number);
+  if (CUE && cue.length === 2 && cue.every(isFinite)) { circle(x, cue[0] * s, cue[1] * s, 9, COL.signal, 1.6); text(x, cue[0] * s + 12, cue[1] * s - 8, "designated beacon", COL.signal, F(10), 300); }
   x.restore(); GEOM = { ox, oy, s, w: info.width, h: info.height };
   $("v-scene").classList.add("live"); $("v-cam").classList.remove("live"); $("cam-idle").textContent = "Press Start to run the tracker on this video";
 }
@@ -443,7 +446,7 @@ async function upload(file) {
   const q = `?cam_w=${$("camera.width").value}&cam_h=${$("camera.height").value}&fov_w=${$("camera.fov_w_deg").value}&fov_h=${$("camera.fov_h_deg").value}`;
   let r; try { r = await fetch("api/video" + q, { method: "POST", body: fd }); } catch (e) { setStatus("Upload failed: server not reachable."); return; }
   if (!r.ok) { let d = "Could not read this file."; try { d = (await r.json()).detail || d; } catch (e) {} message("Video", d); setStatus(d); return; }
-  VIDEO = await r.json(); resetRun();
+  VIDEO = await r.json(); CUE = ""; resetRun();
   $("screen.width").value = VIDEO.width; $("screen.height").value = VIDEO.height; $("camera.update_rate_hz").value = Number(VIDEO.fps).toFixed(2);
   $("camera.width").value = Math.min(Number($("camera.width").value), VIDEO.width); $("camera.height").value = Math.min(Number($("camera.height").value), VIDEO.height);
   $("name").value = (VIDEO.original_name || "video").replace(/\.[^.]+$/, "");
@@ -452,7 +455,7 @@ async function upload(file) {
   $("tele").textContent = VIDEO.loaded_text; setStatus(VIDEO.status);
   sceneImg.onload = () => showVideoPreview(VIDEO); sceneImg.src = "data:image/jpeg;base64," + VIDEO.first_frame;
 }
-function clearVideo() { VIDEO = null; lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); scheduleCheck(); }
+function clearVideo() { VIDEO = null; CUE = ""; lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); scheduleCheck(); }
 async function saveScenario() {
   const r = await fetch("api/scenario_yaml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario: $("scn").value || null, overrides: readForm() }) });
   if (!r.ok) { setStatus("Could not build the scenario file."); return; }
@@ -524,10 +527,10 @@ async function init() {
     if (RUN_ID || !GEOM) return;
     const r = $("scene").getBoundingClientRect(), px = (e.clientX - r.left - GEOM.ox) / GEOM.s, py = (e.clientY - r.top - GEOM.oy) / GEOM.s;
     if (px < 0 || py < 0 || px >= GEOM.w || py >= GEOM.h) return;
-    if (VIDEO) { $("dmode").value = "cue"; $("cue").value = `${Math.round(px)},${Math.round(py)}`; showVideoPreview(VIDEO); scheduleCheck();
-      setStatus(`Designation cue set at ${Math.round(px)},${Math.round(py)}: the tracker takes the beacon nearest this point.`); return; }
+    if (VIDEO) { CUE = `${Math.round(px)},${Math.round(py)}`; showVideoPreview(VIDEO); scheduleCheck();
+      setStatus(`Beacon marked at ${Math.round(px)},${Math.round(py)} on the first frame: the tracker takes the spot nearest this point.`); return; }
     if (PREVIEW && PREVIEW.positions) { const d = PREVIEW.positions.map(b => Math.hypot(b[0] - px, b[1] - py)); const i = d.indexOf(Math.min(...d));
-      $("desig").selectedIndex = i; drawPreview(); scheduleCheck(); setStatus("Designated " + $("desig").value + "."); }
+      refreshTargetLists(i); drawPreview(); scheduleCheck(); setStatus("Designated " + nameOf(TARGETS[i], i) + ": the tracker follows it and the report scores it."); }
   });
   $("sim").onclick = clearVideo;
   $("truth").title = U.truth_tip; $("truth").onclick = () => $("tfile").click();

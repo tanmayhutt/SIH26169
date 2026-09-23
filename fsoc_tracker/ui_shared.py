@@ -23,7 +23,7 @@ from .engine.metrics import SPEC
 CHOICES = {
     "background": ["starfield", "terrain", "gradient", "flat"],
     "shape": ["square", "circle", "gaussian", "cross", "ring", "diamond", "custom"],
-    "designation": ["appearance", "start", "cue"],
+    "designation": ["auto", "appearance", "start", "cue"],
     "motion": ["line", "circular", "figure8", "random", "spiral", "sinusoidal", "waypoints", "static"],
     "start": ["random", "centre"],
     "atmosphere": list(ATMOSPHERE_PRESETS.keys()),
@@ -107,7 +107,7 @@ EXTRA_TARGETS_MAX = 8
 SECTIONS = [
     ("screen", "Screen", "PS rows 1-2", "The whole scene the tracker observes."),
     ("camera", "Camera", "PS rows 3-6, 13-15", "The window the terminal points at, and how fast it can turn."),
-    ("target", "Target", "PS rows 7-12", "Settings of the target chosen in 'Edit target' above. Which one the tracker follows is set by 'Designated'."),
+    ("target", "Target", "PS rows 7-12", "Pick a target to edit it. Tick Designated on the one the tracker must follow."),
     ("disturbance", "Disturbances", "PS rows 21-25", "Everything that degrades the picture. All zero is a clear sky."),
     ("tracker", "Tracker", "", "How the software finds and follows the beacon. The defaults are tuned; change with care."),
 ]
@@ -204,12 +204,10 @@ def truth_sidecar(video_path: str) -> str:
 
 RUN_TIPS = {
     "extra": "More targets besides target 1 (PS row 8: multiple optional). Generated ones get random paths.",
-    "identical": "Generated targets copy target 1's shape, size and brightness. Only a start or click cue can then tell the designated one apart.",
-    "designated": "The target the tracker must follow (PS: 'a designated moving target'). The report scores this one.",
-    "designation": "How the tracker is told which one it is. appearance: by its configured shape, size and brightness. "
-                   "start: also told where it starts, as an operator or GPS cue would. cue: a point you give; click the beacon on the scene or on a video's first frame.",
-    "cue": "x,y of the designated beacon in screen pixels, for designation 'cue'. Set by clicking the scene; you can also type it.",
-    "edit": "Which target the Target section below shows and edits.",
+    "identical": "Generated targets copy target 1's shape, size and brightness. The tracker is then told the designated one's start position as well.",
+    "designated": "The tracker follows this target and the report scores it (PS: 'a designated moving target'). It finds it by its shape, size and "
+                  "brightness; when another target looks the same, by its start position as well. On a video, click the beacon on the first frame.",
+    "edit": "Which target this section shows and edits; * marks the designated one. Click a target on the preview to designate it.",
 }
 
 

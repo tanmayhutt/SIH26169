@@ -29,7 +29,7 @@ camera:                        # PS rows 3 to 6 and 13 to 15
                                # row 6 (initial camera position, centre) is fixed; row 15 (>= 20 Hz commands) follows the update rate
 
 designated: 0                  # which entry of targets is the beacon to follow (0 = the first); the report scores this one
-designation: appearance        # how the tracker is told which one: appearance | start (it is told the start) | cue (a point)
+designation: auto              # auto (by look; by start position too when another target looks the same) | appearance | start | cue
 designation_cue: ""            # "x,y" in screen px for designation cue
 
 targets:                       # PS rows 7 to 12; one entry per target, more than one is row 8 "multiple optional"

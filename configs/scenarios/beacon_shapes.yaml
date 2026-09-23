@@ -5,7 +5,7 @@ name: beacon_shapes
 seed: 4
 duration_s: 30
 designated: 0
-designation: appearance
+designation: auto
 targets:
   - {name: Remote terminal, shape: square, size_px: 8, height_px: 18, motion: circular, radius_px: 380, period_s: 12, start: centre}
   - {name: Cross, shape: cross, size_px: 16, height_px: 16, intensity: 210, motion: line, speed_px_s: 100, heading_deg: 60, start: "400,400"}

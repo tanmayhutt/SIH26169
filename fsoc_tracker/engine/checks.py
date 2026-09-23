@@ -22,7 +22,7 @@ from pathlib import Path
 from .config import LIMITS, RunConfig, parse_xy, target_name
 
 SHAPES = ("square", "circle", "gaussian", "cross", "ring", "diamond", "custom")
-DESIGNATIONS = ("appearance", "start", "cue")
+DESIGNATIONS = ("auto", "appearance", "start", "cue")
 
 
 def _note(level: str, field: str, text: str) -> dict:
@@ -85,8 +85,8 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
             notes.append(_note("clamped", "duration_s", f"Duration {cfg.duration_s:g} s is outside {lo:g} to {hi:g} s; set to {nv:g}."))
             cfg.duration_s = nv
         if cfg.designation not in DESIGNATIONS:
-            notes.append(_note("clamped", "designation", f"Unknown designation '{cfg.designation}', using appearance."))
-            cfg.designation = "appearance"
+            notes.append(_note("clamped", "designation", f"Unknown designation '{cfg.designation}', using auto."))
+            cfg.designation = "auto"
         if cfg.targets and not (0 <= cfg.designated < len(cfg.targets)):
             notes.append(_note("clamped", "designated", f"Designated target {cfg.designated + 1} does not exist; using target 1."))
             cfg.designated = 0
@@ -155,13 +155,11 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
         notes.append(_note("physical", "video_truth", f"Ground-truth file {cfg.video_truth} not found: errors cannot be computed."))
     if cfg.designation == "start" and cfg.video:
         notes.append(_note("physical", "designation", "Designation 'start' needs the simulator (a video has no configured start); click the beacon on the first frame instead."))
-    if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance":
-        same = [target_name(t, i) for i, t in enumerate(cfg.targets)
-                if i != cfg.designated_index() and t.shape == t0.shape and t.dims == t0.dims and abs(t.intensity - t0.intensity) < 25]
-        if same:
-            notes.append(_note("physical", "designation", f"{', '.join(same)} look{'s' if len(same) == 1 else ''} the same as the designated "
-                                                          f"{target_name(t0, cfg.designated_index())}: by appearance alone the tracker cannot tell them apart. "
-                                                          f"Use designation 'start' or click the beacon."))
+    if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance" and cfg.look_alikes():
+        same = [target_name(cfg.targets[i], i) for i in cfg.look_alikes()]
+        notes.append(_note("physical", "designation", f"{', '.join(same)} look{'s' if len(same) == 1 else ''} the same as the designated "
+                                                      f"{target_name(t0, cfg.designated_index())}: by appearance alone the tracker cannot tell them apart "
+                                                      f"(designation is forced to appearance in this scenario file; auto would use the start position)."))
     return notes
 
 

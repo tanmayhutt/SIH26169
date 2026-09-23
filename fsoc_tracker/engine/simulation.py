@@ -53,10 +53,11 @@ class Simulation:
         self.tracker = Tracker(cfg, self.dt, (self.h, self.w))
         # designation cue: where the designated beacon starts (simulator), or a point the user
         # gave (a click on the scene or on a video's first frame)
-        if cfg.designation == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
+        mode = cfg.resolved_designation()
+        if mode == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
             t = self.source.world.targets[self.di]
             self.tracker.set_cue(t.x0, t.y0)
-        elif cfg.designation == "cue":
+        elif mode == "cue":
             xy = parse_xy(cfg.designation_cue)
             if xy is not None:
                 self.tracker.set_cue(*xy)
@@ -120,7 +121,8 @@ class Simulation:
         """Which target was followed and how it was designated, for the summary and the report."""
         names = self.cfg.target_names()
         tr = self.tracker
-        return {"target": names[self.di] if names else "", "index": self.di, "mode": self.cfg.designation,
+        mode = self.cfg.resolved_designation()
+        return {"target": names[self.di] if names else "", "index": self.di, "mode": mode + (" (auto)" if self.cfg.designation == "auto" else ""),
                 "cue": self.cfg.designation_cue if self.cfg.designation == "cue" else "",
                 "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations)}
 
