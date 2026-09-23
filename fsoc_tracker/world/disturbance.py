@@ -97,7 +97,7 @@ class DisturbanceModel:
         w = 2 * math.pi / c.platform_period_s
         t = self.t
         # A sustained shift of v px/frame would leave the screen in seconds, so every
-        # pattern is a bounded sway: amplitude limited to 30% of the screen, and the
+        # pattern is a bounded sway: amplitude limited to 20% of the screen, and the
         # angular frequency raised if needed so that the PEAK speed is exactly v px/frame.
         amp_max = 0.2 * min(self.w, self.h)
         amp = v / (w * self.dt)
@@ -153,9 +153,16 @@ class DisturbanceModel:
             plane = np.roll(self._gauss_bank[k], (oy, ox), axis=(0, 1))
             f = out.astype(np.float32)
             if c.poisson:
-                # shot noise: std grows with sqrt of signal; scale so that a 235 peak
-                # has roughly sigma 6
-                f += plane * np.sqrt(np.maximum(f, 1.0)) * 0.4
+                # shot noise: std grows with sqrt of signal; scale so that a 235 peak has
+                # roughly sigma 6 (the Gaussian approximation of Poisson, fine at these counts).
+                # With read noise on as well, the shot noise takes its own plane, so the two
+                # are independent as in a real sensor.
+                sp_plane = plane
+                if c.gaussian_sigma > 0:
+                    k2 = (k + 1) % self._gauss_bank.shape[0]
+                    oy2, ox2 = int(self.rng.integers(0, self.h)), int(self.rng.integers(0, self.w))
+                    sp_plane = np.roll(self._gauss_bank[k2], (oy2, ox2), axis=(0, 1))
+                f += sp_plane * np.sqrt(np.maximum(f, 1.0)) * 0.4
             if c.gaussian_sigma > 0:
                 f += plane * c.gaussian_sigma
             out = np.clip(f, 0, 255).astype(np.uint8)

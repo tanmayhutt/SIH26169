@@ -40,6 +40,10 @@ Scenario: clear line. Press Start.
 Change Motion to circular, then figure8, then random. Start each for ten seconds. Mention
 that spiral, sinusoidal and a user-defined waypoint path are there too.
 
+Optional: scenario fast circular. "A 450 px circle at 4 deg/s, 80 percent of the camera's
+turn rate. The scenario check says Near the limit." The error stays at 8.4 to 9.6 px with
+100 percent lock.
+
 ## 4. Disturbances (3 min)
 
 - Scenario: noisy line. "Ten percent salt and pepper, Gaussian sigma 20 and Poisson noise,
@@ -75,9 +79,10 @@ to 10 deg/s, and raising it shortens the sweep.
 
 Open the `.mp4`. Point at the calibration line: size as displayed, frame rate read from
 the file, frame count. Press Start. "The simulator is bypassed; these frames are the scene.
-No ground truth exists, so the report carries the detection centroids per frame for
-comparison with the evaluators' predefined values, plus acquisition, re-acquisition, lock
-retention and FPS."
+The report carries the detection centroids per frame for comparison with the evaluators'
+predefined values, plus acquisition, re-acquisition, lock retention and FPS." If the
+evaluators give true positions, load them with Truth CSV before Start: the error tiles and the
+report then show tracking and centroiding error against their values.
 
 ## 8. Close (30 s)
 

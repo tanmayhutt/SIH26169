@@ -27,10 +27,10 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 14 | Max tilt speed | 5 to 10 deg/s, default 5 | 5, editable | same | same | 🟩 |
 | 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz | `Simulation.steps` | `test_rows_13_to_15` | 🟩 |
 | 16 | Acquisition time | <= 2 s | 0.6 to 1.4 s measured (full view) | `metrics.summarise` | `test_closed_loop_clear_meets_spec`, batch envelope | 🟩 |
-| 17 | Tracking error | <= 10 px | 6.6 to 7.3 px clear, noise, fog, low light | same | same | 🟩 (🟨 under 20 px/frame vibration the truth itself jumps; vibration-removed value also reported) |
-| 18 | Target loss | < 5% | 0 to 2% on full-view scenarios | same | same | 🟩 |
+| 17 | Tracking error | <= 10 px | 6.6 to 7.3 px clear, noise, fog, low light; 8.4 to 9.6 px on a 450 px circle at 4 deg/s (lead capped by the path's turn) | same, `Controller.TURN_MAX` | same, `fast_circular.yaml`, `test_review_fixes.py` | 🟩 (🟨 under 20 px/frame vibration the truth itself jumps; vibration-removed value also reported) |
+| 18 | Target loss | < 5% | 0 to 2% on full-view scenarios; 0% on the fast circle; a coasting estimate more than 160 px outside the picture falls back to a whole-scene search | same, `Tracker` | same, `test_review_fixes.py` | 🟩 |
 | 19 | Re-acquisition time | <= 1 s | 0.07 to 0.4 s measured | same | `test_closed_loop_with_disturbance_keeps_lock` | 🟩 |
-| 20 | Processing speed | >= 20 FPS | 65 to 250 FPS at 2000 x 2000 | same | all closed-loop tests | 🟩 |
+| 20 | Processing speed | >= 20 FPS | 76 to 218 FPS at 2000 x 2000 over the 16-scenario pack (2026-09-23 batch); `fps_mean` is frames over processing time (1000 / mean ms), the mean of per-frame rates is kept as `fps_inst_mean` for comparison only | same | all closed-loop tests, `test_review_fixes.py` | 🟩 |
 | 21 | Image noise | salt and pepper (~10%), Gaussian, Poisson; one or more selectable | all three, independent switches; salt and pepper shown in percent on both panels, stored as a fraction; inputs clamped, above 10% flagged by the scenario check | `DisturbanceModel.apply_image`, `engine/checks.py` | `test_rows_21_to_25`, `test_salt_and_pepper_shown_in_percent`, `test_scenario_check_clamps_and_warns`, `noisy_line.yaml` | 🟩 |
 | 22 | Max standard deviation of noise | 20 px, user-defined | `gaussian_sigma` up to any value | `DisturbanceConfig.gaussian_sigma` | `test_rows_21_to_25` | 🟩 |
 | 23 | Max camera jitter | +/- 20 px per frame, user-defined | `jitter_px`, applied to the whole picture | `DisturbanceModel.step` | `platform_jitter.yaml` | 🟩 |
@@ -67,7 +67,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 |---|---|---|---|---|
 | Functional verification | 20 | implementation of all mandatory functions, operational success, GUI | all eight functions demonstrable live; scenario picker; live tiles | 🟩 |
 | Benchmark performance 1 | 30 | execution of given scenarios; log of centroiding error; automatically generated performance logs | scenario YAML loads in one click; `centroid_err_px` per frame in `frames.csv`; report automatic | 🟩 (their file format may need a mapping) |
-| Benchmark performance 2 | 30 | video files (.mp4 @30 fps) covering a complete screen with noise and moving beacon; bypass the PTZ camera; comparison of centroiding error with predefined values; RMSE, acquisition and re-acquisition time, lock retention, FPS | Open video: simulator bypassed, frames used as the scene, `det_x/det_y` per frame, timing and lock metrics in the report | 🟩 |
+| Benchmark performance 2 | 30 | video files (.mp4 @30 fps) covering a complete screen with noise and moving beacon; bypass the PTZ camera; comparison of centroiding error with predefined values; RMSE, acquisition and re-acquisition time, lock retention, FPS | Open video: simulator bypassed, frames used as the scene, `det_x/det_y` per frame, timing and lock metrics in the report. With the evaluators' positions as a truth CSV (`--truth`, Truth CSV button, or `<video>_truth.csv` beside the video), tracking error, centroiding error, RMSE and true lock retention are computed against them | 🟩 |
 | Technical evaluation | 20 | understanding, architecture, algorithms, AI and CV, novelty, documentation, Q and A | `ARCHITECTURE.md`, `docs/TECHNICAL_REPORT.pdf` (12 pages), `docs/USER_MANUAL.pdf`, this file | 🟩 |
 
 ## Things the PS does not specify, and what we chose
@@ -80,4 +80,4 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | What "lock" means | TRACK state with the estimate within 30 px of the window centre | acquisition needs a capture criterion |
 | How the "designated" target is designated | appearance (default), start cue or point cue (click or typed); tracking every beacon at once not built | the PS says "a designated moving target" but not how; its metrics are for one target |
 | A sustained 20 px per frame platform shift | modelled as a bounded sway with that peak speed | a sustained shift leaves the screen in seconds |
-| AI role | classical detector first; CNN fills gaps and handles faint beacons; trained on the simulator's exact labels | keeps FPS and reliability independent of the model |
+| AI role | classical detector first; CNN fills gaps and handles faint beacons; trained on the simulator's exact labels; it supplies 0% of measurements in the standard scenarios | keeps FPS and reliability independent of the model |

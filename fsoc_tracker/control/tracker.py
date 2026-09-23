@@ -104,6 +104,13 @@ class Tracker:
     JITTER_CAP = 25.0   # px; the PS maximum vibration is 20 px/frame
     AMBIGUOUS_MARGIN = 0.15   # appearance scores closer than this cannot tell two spots apart
 
+    def _off_screen(self) -> float:
+        """How far (px) the current estimate lies outside the observed picture; 0 inside."""
+        if not self.imm.initialised:
+            return 0.0
+        x, y = self.imm.position()
+        return float(max(0.0, -x, x - (self.w - 1), -y, y - (self.h - 1)))
+
     def set_cue(self, x: float, y: float) -> None:
         """Tell the tracker where the designated beacon is (or starts)."""
         self.cue = (float(x), float(y))
@@ -256,6 +263,14 @@ class Tracker:
                     self._set(Mode.COAST)
                 elif self.mode == Mode.COAST and self.miss_count > self.tc.coast_frames:
                     self._set(Mode.REACQUIRE)
+                elif self.mode in (Mode.COAST, Mode.REACQUIRE) and self._off_screen() > self.tc.search_roi_px:
+                    # the prediction has run off the picture (a bad velocity carried through a
+                    # gap): the beacon is not there, so search the whole scene again at once
+                    if self._cue_mode:
+                        self.cue = (min(max(px, 0.0), self.w - 1.0), min(max(py, 0.0), self.h - 1.0))
+                    self._set(Mode.SEARCH)
+                    self.imm.initialised = False
+                    self.faint = False
                 elif self.mode == Mode.REACQUIRE and (self.imm.uncertainty_px() > 0.5 * max(self.w, self.h) or self.miss_count > 6 * self.tc.coast_frames):
                     if self._cue_mode:
                         self.cue = self.imm.position()
@@ -425,21 +440,24 @@ class Tracker:
         cands = self.classical.detect(res, roi, k=k, mf_sigma=mf, refine=0, limit=400)
         gate = 8.0 + 4.0 * self.jitter_sigma
         used = set()
+        # distances from every chain's prediction to every candidate at once (the chains still
+        # take their nearest free candidate in order, exactly as a loop would)
+        cx = np.array([c.x for c in cands], float); cy = np.array([c.y for c in cands], float)
+        free = np.ones(len(cands), bool)
         for ch in self._chains:
             px, py = ch["x"] + ch["vx"], ch["y"] + ch["vy"]
-            best, bd = None, gate * (1 + 0.5 * ch["miss"])
-            for i, c in enumerate(cands):
-                if i in used:
-                    continue
-                d = float(np.hypot(c.x - px, c.y - py))
-                if d < bd:
-                    best, bd = i, d
+            best = None
+            if len(cands):
+                d = np.where(free, np.hypot(cx - px, cy - py), np.inf)
+                i = int(np.argmin(d))
+                if d[i] < gate * (1 + 0.5 * ch["miss"]):
+                    best = i
             if best is None:
                 ch["miss"] += 1
                 ch["x"], ch["y"] = px, py
                 ch["hist"].append(False)
             else:
-                c = cands[best]; used.add(best)
+                c = cands[best]; used.add(best); free[best] = False
                 a = 0.5
                 ch["vx"] = (1 - a) * ch["vx"] + a * (c.x - ch["x"]); ch["vy"] = (1 - a) * ch["vy"] + a * (c.y - ch["y"])
                 ch["x"], ch["y"] = c.x, c.y

@@ -20,7 +20,8 @@ SPEC = {
 DEFINITIONS = {
     "duration_s": "Simulation duration: last frame time minus first, in seconds.",
     "frames": "Number of frames processed.",
-    "fps_mean": "Processing speed: mean of 1 / per-frame processing time. Spec row 20: >= 20 FPS.",
+    "fps_mean": "Processing speed: frames per second of processing time (1000 / mean processing ms). Spec row 20: >= 20 FPS.",
+    "fps_inst_mean": "Mean of the per-frame rates 1 / processing time; higher than fps_mean when frame times vary, shown for comparison only.",
     "fps_p5": "5th percentile of instantaneous processing FPS (a slow-frame indicator).",
     "fps_wall": "Frames divided by wall-clock seconds, including rendering and display.",
     "proc_ms_mean": "Mean processing time per frame in milliseconds (detection, estimation, control).",
@@ -82,7 +83,10 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
     v = s.values
     v["duration_s"] = float(t[-1] - t[0] + (t[1] - t[0] if n > 1 else 0))
     v["frames"] = n
-    v["fps_mean"] = float(np.mean(fps_i))
+    # the processing rate is frames over processing time; the mean of per-frame rates would
+    # overstate it whenever frame times vary (a few slow frames barely move that mean)
+    v["fps_mean"] = float(1000.0 / max(float(proc.mean()), 1e-6))
+    v["fps_inst_mean"] = float(np.mean(fps_i))
     v["fps_p5"] = _pct(fps_i, 5)
     v["fps_wall"] = float(n / wall_s) if wall_s > 0 else float("nan")
     v["proc_ms_mean"] = float(proc.mean())

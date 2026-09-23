@@ -105,6 +105,7 @@
   <div class="sep"></div>
   <button id="open" title="Benchmark 2 (Ctrl+O): use a video file as the scene; the simulator is bypassed">Open video</button>
   <button id="sim" title="Leave video mode and use the simulated scene again">Simulator</button>
+  <button id="truth">Truth CSV</button><input type="file" id="tfile" accept=".csv" style="display:none">
   <input type="file" id="file" accept=".mp4,.avi,.mov,.mkv" style="display:none">
   <div class="spacer"></div>
   <button id="save" title="Ctrl+S: save the current settings as a scenario file">Save scenario</button>
@@ -215,7 +216,9 @@ async function runCheck() {
 function drawBeacons(x, beacons, names, di, s) {
   beacons.forEach((b, i) => { if (!b || b[0] === null) return; const des = i === di;
     circle(x, b[0] * s, b[1] * s, des ? 7 : 5, des ? COL.signal : COL.muted, des ? 1.2 : 1);
-    if (beacons.length > 1 || names.length) text(x, b[0] * s + 9, b[1] * s - 6, (names[i] || `Target ${i + 1}`) + (des ? "  (designated)" : ""), des ? COL.signal : COL.muted, F(10), 400); });
+    if (beacons.length > 1 || names.length) { const lab = (names[i] || `Target ${i + 1}`) + (des ? "  (designated)" : ""); x.font = F(10);
+      const tw = x.measureText(lab).width, W = x.canvas.width / (window.devicePixelRatio || 1), lx = b[0] * s + 9 + tw < W - 20 ? b[0] * s + 9 : b[0] * s - 9 - tw;
+      text(x, lx, b[1] * s - 6, lab, des ? COL.signal : COL.muted, F(10), 400); } });
 }
 function drawPreview() {
   const P = PREVIEW; if (!P || LAST || VIDEO || RUN_ID) return;
@@ -257,7 +260,7 @@ function lockForVideo(on) {
     const s = U.sections.find(x => x.key === key); if (!s) continue;
     for (const f of s.fields) if (names === "*" || names.includes(f.name)) set(key + "." + f.name, on);
   }
-  $("sim").disabled = !on;
+  $("sim").disabled = !on; $("truth").disabled = !on;
 }
 
 // ------------------------------------------------------------------ tiles, telemetry, status
@@ -387,7 +390,7 @@ async function start() {
   if (RUN_ID) return;
   resetRun(); WATCHING = false;
   const t = blankTiles(); t.state = { text: "starting", state: null, unit: "" }; showTiles(t);
-  const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, speed: U.speeds[$("speed").selectedIndex][1] };
+  const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, truth: VIDEO && VIDEO.truth ? VIDEO.truth : null, speed: U.speeds[$("speed").selectedIndex][1] };
   let r; try { r = await fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch (e) { setStatus("Server not reachable."); return; }
   if (!r.ok) { let d = "Could not start."; try { d = (await r.json()).detail || d; } catch (e) {} setStatus(d); return; }
   const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; LIM = j.config.camera.max_pan_rate_deg_s;
@@ -526,7 +529,12 @@ async function init() {
     if (PREVIEW && PREVIEW.positions) { const d = PREVIEW.positions.map(b => Math.hypot(b[0] - px, b[1] - py)); const i = d.indexOf(Math.min(...d));
       $("desig").selectedIndex = i; drawPreview(); scheduleCheck(); setStatus("Designated " + $("desig").value + "."); }
   });
-  $("sim").onclick = clearVideo; $("save").onclick = saveScenario; $("shot").onclick = screenshot; $("results").onclick = resultsDialog;
+  $("sim").onclick = clearVideo;
+  $("truth").title = U.truth_tip; $("truth").onclick = () => $("tfile").click();
+  $("tfile").onchange = async () => { const f = $("tfile").files[0]; $("tfile").value = ""; if (!f || !VIDEO) return;
+    const fd = new FormData(); fd.append("file", f); let r; try { r = await fetch("api/truth?fps=" + VIDEO.fps, { method: "POST", body: fd }); } catch (e) { setStatus("Upload failed."); return; }
+    const j = await r.json().catch(() => ({})); if (!r.ok) { message("Ground truth", j.detail || "Could not read this file."); return; }
+    VIDEO.truth = j.truth; setStatus(j.status); }; $("save").onclick = saveScenario; $("shot").onclick = screenshot; $("results").onclick = resultsDialog;
   $("manual").onclick = () => window.open("/downloads/USER_MANUAL.pdf", "_blank");
   $("about").onclick = () => message("About ARGUS", U.about);
   $("dl").onclick = () => openDownloads(false);

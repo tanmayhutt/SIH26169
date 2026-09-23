@@ -41,7 +41,9 @@ that steers the camera, live statistics, and an automatically generated performa
   platform motion of 20 px per frame therefore consumes 75% of the slew budget.
 - Benchmark 2 replaces the simulated scene with the evaluators' .mp4. The tracker and
   camera control run unchanged on the video frames; the output is the per-frame centroid and
-  the timing and lock metrics.
+  the timing and lock metrics. Given the evaluators' positions as a truth CSV (frame or t, x,
+  y), tracking error, centroiding error, RMSE and a true lock retention are computed against
+  them; without it lock is judged from the tracker's own estimate, which can overstate it.
 - Two error terms appear in the specification and are both logged: tracking error (true
   beacon to window centre) and centroiding error (measured centroid to true centroid).
 
@@ -101,7 +103,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `world/scene.py` | Backgrounds: starfield, terrain, gradient, flat. |
 | `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, user-defined waypoints, static. |
 | `world/camera.py` | Gimbal: pose in degrees, rate and acceleration limits, command latency, IFOV conversions. |
-| `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, Poisson, Gaussian and salt-and-pepper noise, in physical order. |
+| `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, Poisson (a Gaussian approximation), Gaussian and salt-and-pepper noise, in physical order; read and shot noise use independent random planes. |
 | `world/renderer.py` | Draws the scene with sub-pixel beacon placement; returns ground truth. |
 | `world/sprites.py` | Beacon shapes (square, circle, gaussian, cross, ring, diamond, custom mask) at width x height, shared by the renderer and the detector's width calibration. |
 | `perception/detect.py` | Classical detector (median, background subtraction, matched filter, adaptive threshold, connected components, shape filters), sub-pixel centroid (centre of gravity plus 2D Gaussian fit), CNN heat-map detector (ONNX). |
@@ -111,7 +113,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `control/controller.py` | Feedforward plus PID rate controller with latency lead, deadband and anti-windup. |
 | `engine/simulation.py` | The run loop and telemetry record. |
 | `engine/metrics.py` | Metric definitions and specification pass/fail. |
-| `engine/checks.py` | Scenario check: clamped inputs, values beyond the PS, physical limits. |
+| `engine/checks.py` | Scenario check: clamped inputs, values beyond the PS, near-limit settings, physical limits. |
 | `engine/report.py` | PDF report. |
 | `gui/app.py` | Desktop application. |
 | `cli.py` | `run`, `video`, `batch`, `gui` commands. |
@@ -150,7 +152,10 @@ velocity and must survive a stricter verification (five of six frames). While fo
 faint target the association gate is small, the strongest response inside it wins, and a
 running quality measure drops the track back to the chain search when what it accepts is no
 better than noise. On the low-light faint scenario this raised acquisition from none to
-1.5 to 2 s with 93 to 96% lock retention on four of five seeds.
+1.5 to 2 s with 93 to 96% lock retention on four of five seeds. The chain linking was a Python
+loop over up to 400 candidates x 600 chains; it is now vectorised with NumPy, in the same greedy
+order and with identical results. On lowlight_faint (30 s) the 99th-percentile frame time fell
+from 149 to 160 ms to 26 to 33 ms and the true rate rose from 68 to 81 FPS to 95 to 96 FPS.
 
 ### 4.2 Estimation
 An IMM runs three Kalman filters (constant velocity, constant acceleration, coordinated
@@ -167,7 +172,12 @@ region around the prediction, gates candidates by Mahalanobis distance and rejec
 whose appearance signature (area, peak, PSF width) differs strongly from the beacon being
 followed, which holds identity through crossings with decoys. COAST propagates the
 prediction through short dropouts; REACQUIRE widens the search with the growing uncertainty
-and falls back to SEARCH if it exceeds the screen. In hard mode (tracker restricted to the
+and falls back to SEARCH if it exceeds the screen. A coasting guard sends the tracker back to
+a whole-scene search at once when, while coasting or re-acquiring, the estimate lies more than
+the search window (160 px) outside the picture. Without it the estimate could run away: on
+lowlight_faint seed 2 (30 s) it drifted far off the screen, with centroid error up to 1268 px,
+tracking error 158 px, lock 75.1% and a 4.53 s re-acquisition; with it, 5.9 px, 96.2% and
+0.07 s. In hard mode (tracker restricted to the
 window) SEARCH drives an outward spiral. While searching, candidates are re-measured on the
 current frame (before 2026-09-23 a stale or missing picture was used after a loss; fixed with
 the regression batch unchanged).
@@ -184,8 +194,9 @@ metrics are for one target and one camera.
 Scenario check. Every numeric input is clamped to its accepted range in the engine, so no front
 end can pass an impossible value (a web test had taken salt and pepper 13, meant as 13%, as a
 fraction and blacked out the frame). `engine/checks.py` then notes values beyond the PS, with the
-row named, and physical limits: a beacon faster than the camera turns (800 px/s at 5 deg/s),
-jitter plus platform above 26.7 px/frame, look-alikes in appearance mode. The notes appear in
+row named, near-limit settings (the designated beacon above 70% of the camera turn rate: it can
+be done, with little margin), and physical limits: a beacon faster than the camera turns
+(800 px/s at 5 deg/s), jitter plus platform above 26.7 px/frame, look-alikes in appearance mode. The notes appear in
 the panel, at Start, in the end dialog, on page 1 of the report and in the summary.
 
 Figure 1 shows both error terms on a clear circular path: the window settles within about
@@ -200,6 +211,23 @@ motion led likewise. The command is feedforward of the target angular rate plus 
 error, with a 1.5 px deadband and integrator clamping while saturated. The gimbal model
 applies rate saturation (5 to 10 deg/s), acceleration saturation and a one-frame latency,
 and reports saturation to the log.
+
+Turn-limited lead. The acceleration term advances the estimated velocity by a fixed 0.25 s, a
+straight-line extrapolation. On a tight curve this points the feed-forward off the path. The
+estimator itself was fine: its position is within 0.4 to 0.7 px of the truth at every speed, and
+its velocity lags by 1 to 2 frames. The lead is therefore capped so the path turns by at most
+0.1 rad over it (`Controller.TURN_MAX`); slow or gently curving targets keep the full lead.
+Measured on a 450 px circle (12 s, seed 0), mean tracking error:
+
+| Angular speed | Before | After |
+|---|---|---|
+| 1 deg/s | 6.3 px | 7.1 px |
+| 2 deg/s | 6.3 px | 8.4 px |
+| 3 deg/s | 16.3 px (fail) | 8.9 px |
+| 4 deg/s | 34.3 px, 14 to 19% lock | 8.4 px, 100% lock |
+
+The new `fast_circular` scenario (4 deg/s, 640 px/s, 80% of the 5 deg/s turn rate; 15 s,
+seeds 0 to 2) gives acquisition 0.80 to 0.87 s, 8.4 to 9.6 px and 100% lock.
 
 Figure 2 shows the beacon and window paths in the multi-target stress scenario (haze, salt
 and pepper, Gaussian and Poisson noise, circular platform sway, vibration, two decoys): the
@@ -223,7 +251,9 @@ The classical detector is fast and accurate in clear conditions but fails in fog
 light and heavy noise, where "the brightest compact blob" is the wrong answer. A small
 fully convolutional network then provides the measurement. It runs only when the classical
 confidence is below a floor, and only on a 128 x 128 region around the prediction, so speed
-and reliability never depend on the model.
+and reliability never depend on the model. It is a gap filler: in the standard scenarios it
+supplies 0% of the measurements. The model file is looked up in the working folder and in the
+package folder, so an installed command started from another folder still loads it.
 
 ### 5.2 Network and training
 Three-level U-Net-style encoder with skip connection, about 0.1 M parameters, input a
@@ -253,7 +283,10 @@ t = 0 with every target named, and a click makes a target the designated one. A 
 shortcuts support the ten to fifteen minute functional demonstration. "Open video" bypasses
 the simulator for Benchmark 2 and previews the file's first frame and facts before the run; the
 target's appearance stays editable as the description of what to look for, and a click on the
-first frame sets a designation cue.
+first frame sets a designation cue. "Truth CSV" loads a ground-truth file for the video (a
+`<video>_truth.csv` beside it is picked up automatically); the report's source line names it. On
+a noisy_line clip rendered to .mp4 with its truth: tracking error 8.09 px, centroiding error
+0.188 px; without the file, n/a.
 Every run ends with a dialog summarising the specification check and opens the PDF report on
 request.
 
@@ -270,12 +303,16 @@ request.
   sub-pixel refinement on a synthetic Gaussian, IMM prediction on a circle, closed-loop
   specification checks on a clear scenario and on a platform-plus-vibration scenario, a
   Benchmark 2 path that writes a synthetic video and runs the tracker on it, and target tests
-  (width and height, every shape, clamping and PS-envelope notes, designation). 37 tests.
+  (width and height, every shape, clamping and PS-envelope notes, designation), and the review
+  fixes (FPS as frames over processing time, a 4 deg/s target kept centred, a coasting estimate
+  that cannot run off the screen, video ground truth giving errors, the CNN model found from any
+  folder). 42 tests.
 - Regression rule: any change to perception, estimation or control is run on the whole pack
   (15 s, seeds 0 to 2) before and after and compared run by run; no run may be worse.
 - Scenario pack (`configs/scenarios/`): the four mandatory motions in clear conditions,
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
-  identical decoys, mixed beacon shapes and hard mode: 15 scenarios plus an evaluator template.
+  identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
+  evaluator template.
 - Batch envelope: `fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-N`
   runs every scenario over N seeds and writes `envelope.md` with mean and worst values.
 - Every metric has a printed definition (section 8 of the user manual) so the numbers can be
@@ -319,7 +356,8 @@ Discussion.
   up to 20 px every frame; the vibration-removed figure (14.6 px) is the part a rate-limited
   gimbal can physically follow. Both are printed in every report.
 - At the maximum platform motion (20 px per frame sway plus 20 px per frame vibration) lock
-  drops to 76 to 88%. The binding limit was measured, not assumed: with the gimbal at the
+  dropped to 76 to 88% in this table's batch; after the review fixes it is 88.5 to 94.8%
+  (`platform_max` and `platform_max_10degs`, 15 s, seeds 0 to 2), error about 23 to 25 px. The binding limit was measured, not assumed: with the gimbal at the
   10 deg/s the PS allows (`platform_max_10degs.yaml`) slew saturation falls from about a third
   of frames to 2%, yet lock and error do not improve. The vibration is the limit: a random
   20 px jump of the picture every frame is unknowable before the frame arrives, so each frame
@@ -336,6 +374,13 @@ Discussion.
   Limit: look-alikes that start at the same point cannot be told apart at the start; even with
   the start cue those runs held 8 to 25% lock. After these changes all 42 earlier batch runs
   are identical.
+- After the review fixes (15 s, seeds 0 to 2, against the committed merge): 38 runs the same,
+  10 better, 0 worse, 3 new. `full_stress` 11.4 to 12.1 px at 100% lock (was 13.7 to 14.4 px,
+  98.4 to 98.8%); `lowlight_faint` 96.4 to 97.8% lock (was 90.9 to 95.5%; seed 2 error 12.25 to
+  7.22 px); `platform_jitter` seed 0 lock 96.5 to 98.6%. A reported failure (a 5 px beacon in rain
+  with 10% salt and pepper, never acquired, about 3 FPS) could not be reproduced with our
+  settings: figure of 8, 30 s, seeds 0 to 2, acquisition 0.77 to 1.37 s, 6.0 to 6.5 px, 100% lock,
+  86 to 99 FPS.
 - Identity among decoys holds in four seeds of five; the failing seed loses the beacon during a
   sway excursion and re-locks a similar decoy. The designation audit recovers some cases; a
   stronger appearance model is future work.
@@ -343,12 +388,14 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 
 ![Figure 5: tracking error across scenarios and seeds](figures/fig5_envelope.png)
 
-- Processing runs at 47 to 190 FPS on a 2000 x 2000 scene on a laptop CPU, against the 20 FPS
-  requirement. Hard mode is slowest because full-window detection runs every frame during the
+- Processing runs at 76 to 218 FPS on a 2000 x 2000 scene on a laptop CPU (true rate over the 16-scenario pack), against the 20 FPS
+  requirement. FPS is frames over processing time (1000 / mean ms). The earlier mean of per-frame
+  rates overstates it when frame times vary (faint beacon seed 2, 30 s: 92.0 said, 67.8 true)
+  and is kept as `fps_inst_mean` for comparison only. Hard mode is slowest because full-window detection runs every frame during the
   sweep.
 - The AI detector reached 8 px validation localisation after retraining and is kept as a
   gap-filling fallback; it supplied about half the measurements on a real 60 fps phone video
-  and none on the simulated scenes, where the classical detector never loses the beacon.
+  and 0% in the standard scenarios, where the classical detector never loses the beacon.
 
 ## 9. Future improvements
 
@@ -357,7 +404,9 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 
 - Reinforcement-learned gain scheduling on top of the classical controller, trained in the
   same simulator.
-- Dual-sensor PAT: a wide field acquisition camera feeding a narrow field tracking camera.
+- Dual-sensor PAT: a low-resolution wide-field finder for acquisition feeding the narrow field
+  tracking camera. Still open. By default the tracker observes the whole scene, the documented
+  reading of the PS; hard mode covers the window-only reading.
 - Learned denoiser for extreme scintillation.
 - Note on frame rate: the estimator-lag compensation is defined at the 30 Hz reference and
   scales with the camera rate, because the filter delay is a number of frames. Found on a
@@ -387,6 +436,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | platform_max.yaml | rows 23 and 25 at the PS maximum | circular, centred | linear sway 20 px/frame, vibration 20 px/frame |
 | platform_max_10degs.yaml | the same with the gimbal at the allowed 10 deg/s | circular, centred | shows the motor is not the binding limit |
 | full_stress.yaml | rows 8, 21, 23, 24, 25 together | figure of 8 plus two decoys | haze, salt and pepper 5%, Gaussian 12, Poisson, circular sway, vibration 10 |
+| fast_circular.yaml | rows 13, 14, 17: a fast target | circle radius 450 px at 4 deg/s (640 px/s, 80% of the turn rate) | none |
 | hardmode_line.yaml | tracker restricted to the window | line | none |
 | decoys_identical.yaml | row 8, designation start | Remote terminal plus three identical look-alikes starting apart, paths crossing | Gaussian 6, Poisson |
 | beacon_shapes.yaml | rows 9 and 10, designation appearance | 8 x 18 px rectangle among a 16 px cross, 18 px ring, 14 px diamond, 12 px custom | none |
@@ -396,7 +446,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Metric | Definition |
 |---|---|
 | Simulation duration | Last frame time minus first. |
-| FPS | Mean of 1 / per-frame processing time (detection, estimation, control). Row 20. |
+| FPS (`fps_mean`) | Frames over processing time (detection, estimation, control): 1000 / mean processing ms. Row 20. `fps_inst_mean`, the mean of per-frame rates, is higher when frame times vary; for comparison only. |
 | Acquisition time | First frame in TRACK with the tracked beacon within the capture radius of the window centre, from t = 0. Row 16. |
 | Tracking error, mean and maximum | Distance from the true beacon to the window centre over frames after acquisition. Row 17. |
 | Tracking error, vibration removed | The same with the per-frame vibration subtracted from the truth. |
@@ -411,7 +461,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 
 ```
 fsoc-tracker run   --scenario configs/scenarios/<name>.yaml [--seed N | -1] [--duration S] [--out DIR]
-fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--out DIR]
+fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--truth truth.csv] [--out DIR]
 fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--duration S] [--out DIR]
 fsoc-tracker gui
 ```

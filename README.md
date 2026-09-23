@@ -15,7 +15,8 @@ The application is a software stand-in for an FSOC coarse-alignment test bench. 
 scene with a moving optical beacon, adds atmospheric and platform disturbances, and runs a
 tracker that finds the beacon, measures its centre to a fraction of a pixel, predicts its
 motion and steers a rate-limited virtual pan-tilt camera to keep it centred. It also accepts
-`.mp4` files in place of the simulated scene (Benchmark 2). Every run writes a per-frame
+`.mp4` files in place of the simulated scene (Benchmark 2), with an optional ground-truth CSV
+of the beacon positions for error scoring. Every run writes a per-frame
 CSV log and an automatic PDF performance report.
 
 ## Start here

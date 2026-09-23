@@ -59,9 +59,10 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 | lowlight_figure8 | low-light preset (row 24) | error 7 to 8 px, 100% lock |
 | lowlight_faint | beacon at 3 to 6 sigma per frame; track-before-detect | acquisition 1.3 to 2.8 s, error 7 to 12 px, lock over 90% |
 | platform_jitter | sway 12 px/frame plus vibration 20 px/frame (rows 23, 25) | raw error about 20 px, 14 px with vibration removed, lock 96 to 99% |
-| platform_max | both at the PS maximum, 20 + 20 px/frame | lock 76 to 88%, error 25 px: the documented physical limit |
+| platform_max | both at the PS maximum, 20 + 20 px/frame | lock 88.5 to 94.8%, error about 23 to 25 px: the documented physical limit |
 | platform_max_10degs | the same with the gimbal at 10 deg/s | the same result: the motor is not the limit, the random jump is |
-| full_stress | three beacons, haze, noise, sway, vibration (row 8) | designated beacon held, error 13 to 15 px, lock 98% |
+| full_stress | three beacons, haze, noise, sway, vibration (row 8) | designated beacon held, error 11.4 to 12.1 px, lock 100% |
+| fast_circular | 450 px circle at 4 deg/s, 80% of the camera turn rate (rows 13, 14, 17) | acquisition 0.80 to 0.87 s, error 8.4 to 9.6 px, 100% lock; the scenario check shows "Near the limit" |
 | hardmode_line | tracker sees only the window; must sweep | acquisition 3 to 12 s (spiral sweep), then as clear line |
 | decoys_identical | Remote terminal plus three identical look-alikes starting apart, paths crossing; designation start (row 8) | acquisition 0.60 to 0.73 s, error 5.9 to 7.0 px, 100% lock |
 | beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | acquisition 0.73 to 0.83 s, error 6.1 to 7.1 px, lock 99.5 to 100% |
@@ -116,7 +117,8 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   engages (watch "detector" in telemetry stay classical, acquisition 1.5 to 3 s).
 - Motion: line, circular, figure8, random, spiral, sinusoidal, waypoints, static.
 - Speed (px/s): 120 default. Above about 700 px/s (26 px per frame) the 5 deg/s gimbal
-  saturates; the report then prints a note about it.
+  saturates; the report then prints a note about it. A fast circle stays centred: fast_circular
+  (640 px/s on a 450 px radius) holds 8.4 to 9.6 px.
 - Radius (px), Period (s): size and speed of the circular, figure-8, spiral and sinusoidal
   paths. Short periods with large radii raise the acceleration and the tracking error.
 - Start: random, centre, or "x,y" typed in screen pixels (for example 400,1500).
@@ -155,7 +157,8 @@ Start from clear line and watch the notes below the Run section:
 - Camera jitter 25: "Beyond the PS" (row 23). Add linear platform motion at 10 px/frame: also
   "Cannot be met", because 35 px/frame is more than the camera's 26.7 px/frame turn.
 - Target speed 900 px/s on a line: "Cannot be met: ... moves at up to 900 px/s but the camera
-  turns at most 800 px/s". 600 px/s gives the 70 percent warning.
+  turns at most 800 px/s". 600 px/s gives "Near the limit" (above 70 percent of the turn rate:
+  it can be done, with little margin).
 - A scenario file with `salt_pepper_frac: 13`: "Corrected: ... set to 0.5".
 The same notes appear at Start in the status bar, in the end dialog, on page 1 of the report
 and in the summary `checks`.
@@ -168,12 +171,19 @@ and in the summary `checks`.
    `fsoc-tracker video path/file.mp4`.
 3. Check the calibration line: width x height as displayed (rotation applied), average fps,
    frame count, seconds. These should match the file's own properties.
-4. Start. The simulator is bypassed and the frames are the scene. No ground truth exists, so
-   the tracking and centroiding error tiles read n/a; State, Acquisition, Lock and Processing
-   still work.
+4. Start. The simulator is bypassed and the frames are the scene. Without a ground-truth file
+   the tracking and centroiding error tiles read n/a and lock comes from the tracker's own
+   estimate; State, Acquisition, Lock and Processing still work.
 5. Open `<label>_frames.csv`: `det_x`, `det_y` are the measured centroids per frame for comparison with
    the evaluators' predefined values; `est_x`, `est_y` the filtered estimate; `mode` and
    `locked` the state. The report carries acquisition, re-acquisition, lock retention and FPS.
+6. Ground truth. Make a CSV with columns frame, x, y (video pixels; `t` in seconds also works).
+   Load it with Truth CSV (desktop, enabled in video mode; web, uploads it), name it
+   `<video>_truth.csv` beside the video, or run `fsoc-tracker video clip.mp4 --truth truth.csv`.
+   Expect the error tiles to show values and the report's source line to name the file; without
+   it the line says "no ground-truth file". A noisy_line clip rendered to .mp4 with its truth
+   gave tracking error 8.09 px and centroiding error 0.188 px. A path that does not exist gives
+   a "Cannot be met" note.
 
 Things to try: a phone video (variable frame rate is handled and flagged), a video with the
 beacon leaving and re-entering the frame (watch COAST, REACQUIRE, then TRACK), and a video
@@ -220,7 +230,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 37 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation
+python -m pytest                       # 42 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path)
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

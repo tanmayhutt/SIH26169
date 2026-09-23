@@ -10,8 +10,9 @@ ISRO Space Applications Centre): an AI-based virtual camera tracking system for 
 of mobile Free Space Optical Communication terminals.
 
 Status on 2026-09-23: every mandatory item of the problem statement is implemented, tested and
-released. The 2026-09-23 changes (designation, shapes and sizes, scenario check) still need the
-four-platform build, publish and deploy. Remaining work is preparation for the event (section 13).
+released. The 2026-09-23 changes (designation, shapes and sizes, scenario check, and the fixes
+from the independent review) still need the four-platform build, publish and deploy. Remaining
+work is preparation for the event (section 13).
 
 ---
 
@@ -64,7 +65,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 37 tests, about 15 s
+.venv/bin/python -m pytest                      # 42 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -88,7 +89,7 @@ set `QT_QPA_PLATFORM=offscreen` to run without a display.
 
 ```
 fsoc-tracker run -s configs/scenarios/clear_line.yaml [--seed 3] [--duration 20]   # one scenario
-fsoc-tracker video path/to/file.mp4 [-s settings.yaml]                              # Benchmark 2
+fsoc-tracker video path/to/file.mp4 [-s settings.yaml] [--truth truth.csv]          # Benchmark 2
 fsoc-tracker batch -s configs/scenarios/*.yaml --seeds 0-2 --duration 15 --out results/b   # regression batch
 fsoc-tracker-gui                                                                    # desktop app
 uvicorn webapp.server:app --host 127.0.0.1 --port 8095                              # web app locally
@@ -116,7 +117,7 @@ fsoc_tracker/
   engine/metrics.py      the PS limits (SPEC), metric definitions, the summary computed at the end
   engine/report.py       the automatic PDF performance report
   engine/naming.py       run labels and output file names
-  engine/checks.py       the scenario check: corrected values, beyond-the-PS and cannot-be-met notes
+  engine/checks.py       the scenario check: corrected, beyond-the-PS, near-the-limit and cannot-be-met notes
   world/scene.py         backgrounds (starfield, terrain, gradient, flat)
   world/targets.py       beacon paths: line, circular, figure8, random, spiral, sinusoidal, waypoints, static
   world/camera.py        the gimbal: rate, acceleration and pose limits, one frame of latency
@@ -136,8 +137,8 @@ webapp/server.py         FastAPI web app over the same engine; static/index.html
 webapp/deploy.sh         deploy repository, web app, site and Caddy config to the server
 webapp/publish_builds.sh publish a build run's archives on the site
 webapp/fetch_builds.sh   download a build run's archives into dist/ (slow on home connections)
-configs/scenarios/       15 scenarios plus TEMPLATE_evaluator.yaml
-tests/                   test_engine.py, test_ps_compliance.py, test_targets.py, package_check.py
+configs/scenarios/       16 scenarios plus TEMPLATE_evaluator.yaml
+tests/                   test_engine.py, test_ps_compliance.py, test_targets.py, test_review_fixes.py, package_check.py
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
 web/                     the progress page (index.html) and its data (progress.json)
@@ -176,11 +177,16 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
 - Faint beacons use track-before-detect: weak detections on a moving-target residual (the frame
   minus a running mean) are linked into motion-consistent chains; a chain hit 6 of 8 frames with
   mean SNR at least 3.5 and the right width is promoted. Off in hard mode. A faint beacon that
-  never moves is not covered; the PS does not ask for one.
+  never moves is not covered; the PS does not ask for one. The chain linking is vectorised with
+  NumPy (same greedy order, identical results); it was a Python loop over up to 400 candidates x
+  600 chains, and lowlight_faint's 99th-percentile frame time fell from 149 to 160 ms to 26 to 33 ms.
+- Read noise and shot noise use independent random planes (they shared one before). Shot noise is
+  a Gaussian approximation of Poisson.
 - The neural detector (84 thousand parameter heat-map network on a 128 x 128 patch, trained on
   simulator frames, run by ONNX Runtime) only fills gaps when the classical detector finds nothing
   near the prediction, and never overrides it. It is warmed up at start so its first use does not
-  stall a run.
+  stall a run. It supplies 0 percent of measurements in the standard scenarios. The model path is
+  also looked up from the package folder, so an installed command started elsewhere still loads it.
 
 ### 6.3 Estimation, identity and control
 
@@ -207,6 +213,19 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
 - Controller: feed-forward of the estimated velocity and acceleration, led by the command latency
   plus the estimator lag; the lag is defined at 30 Hz and scales with the camera rate (a 60 fps
   video halved it). PID kp 5, kd 0.3, ki 0.8 with anti-windup.
+- The acceleration lead (0.25 s) is capped so the path turns by at most `Controller.TURN_MAX` =
+  0.1 rad over it. A straight-line extrapolation pointed a fast circling beacon off its path; the
+  estimator was fine (within 0.4 to 0.7 px of the truth at every speed, velocity lag 1 to 2
+  frames). 450 px circle, 12 s, seed 0, before and after: 1 deg/s 6.3 and 7.1 px; 2 deg/s 6.3 and
+  8.4 px; 3 deg/s 16.3 px (fail) and 8.9 px; 4 deg/s 34.3 px at 14 to 19 percent lock and 8.4 px at
+  100 percent. Slow or gently curving targets keep the full lead.
+- Coasting guard: while coasting or re-acquiring, an estimate more than the search window (160 px)
+  outside the picture sends the tracker back to a whole-scene search at once. Before, on
+  lowlight_faint seed 2 (30 s) the estimate drifted off the screen: 158 px error, 75.1 percent lock,
+  re-acquisition 4.53 s. After: 5.9 px, 96.2 percent, 0.07 s.
+- FPS (`fps_mean`) is frames over processing time, 1000 / mean processing ms. It was the mean of
+  per-frame rates, which overstates the rate when frame times vary (faint seed 2, 30 s: 92.0 said,
+  67.8 true); that value is kept as `fps_inst_mean`, for comparison only.
 - Lock means TRACK and the estimate within 30 px of the window centre. Tightening to 20 px did not
   lower error and cut lock under jitter. Tracked rate (share of frames in TRACK) is reported beside
   lock retention so tracker failure and gimbal limits can be told apart.
@@ -216,6 +235,15 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
 Applied in physical order (extinction, blur, picture shift, detector noise). Platform motion is a
 bounded sway (amplitude at most 20 percent of the screen) with the configured peak speed; a
 sustained 20 px per frame shift would leave the screen in seconds.
+
+Benchmark 2 ground truth: `video_truth` (`--truth`, the Truth CSV button on both front ends, or a
+`<video>_truth.csv` or `<video>.csv` beside the video, picked up by the command line and the
+desktop app) is a CSV of frame (or t in seconds), x, y in video pixels. Header names are matched
+loosely (frame/idx, t/time, x/true_x/cx, y/true_y/cy); without a header the columns are frame, x,
+y; frames not listed count as "beacon not visible". With it, tracking error, centroiding error,
+RMSE and a true lock retention are computed; without it, lock comes from the tracker's own
+estimate and can overstate. The report's source line names the file or says "no ground-truth
+file".
 
 ### 6.5 Tried and rejected (do not repeat without new evidence)
 
@@ -244,11 +272,11 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (37 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (42 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
-   worse. Last recorded state: all 42 earlier runs identical, 6 new runs from the two new
-   scenarios (2026-09-23).
+   worse. Last recorded state (2026-09-23, after the review fixes, against the committed merge):
+   38 same, 10 better, 0 worse, 3 new (fast_circular).
 3. For interface changes, take screenshots at 1600 x 1000 and 1366 x 768 with
    `tools/gui_screenshot.py` and look at them; check the web page in a browser too.
 4. `python webapp/smoke.py` for the web app.
@@ -289,12 +317,18 @@ files downloaded instead of opened.
 
 ## 11. Known limits (documented, not bugs)
 
-- Platform sway plus vibration at the PS maximum (20 + 20 px per frame): 76 to 88 percent lock,
-  about 25 px raw error, 23 px with vibration removed; identical at 10 deg/s. A random jump of the
+- Platform sway plus vibration at the PS maximum (20 + 20 px per frame): 88.5 to 94.8 percent lock,
+  about 23 to 25 px raw error; the same at 10 deg/s. A random jump of the
   whole picture every frame cannot be anticipated. Every PDF produced under vibration says so.
-- Full stress (decoys, haze, noise, sway and vibration together): 13 to 17 px, 93 to 99 percent
-  lock depending on the seed; it stacks disturbances the PS lists separately.
-- Faint beacon: all ten seeds 91 to 97.5 percent lock; one seed acquires in 5.5 s.
+- Full stress (decoys, haze, noise, sway and vibration together): 11.4 to 12.1 px, 100 percent
+  lock over 15 s, seeds 0 to 2; it stacks disturbances the PS lists separately.
+- Faint beacon: all ten seeds 91 to 97.5 percent lock before the review fixes; one seed acquires in
+  5.5 s. After the fixes, seeds 0 to 2 hold 96.4 to 97.8 percent over 15 s.
+- A tracker that observes the whole scene is the documented reading of the PS (section 6.1). A
+  low-resolution wide-field finder for acquisition in the window-only reading remains future work.
+- Not reproduced: a review reported a 5 px beacon in rain with 10 percent salt and pepper as never
+  acquired at about 3 FPS. Our run of that setting (figure of 8, 30 s, seeds 0 to 2): acquisition
+  0.77 to 1.37 s, 6.0 to 6.5 px, 100 percent lock, 86 to 99 FPS.
 - A hand-held phone video of a single dot: tracked about 99.6 percent, lock about 33 percent,
   because the hand's motion exceeds the gimbal's limits. It is harder than the PS describes and
   must not be tuned to (section 2).
@@ -329,8 +363,8 @@ files downloaded instead of opened.
 
 Proposed extras, none required by the PS: switching the designated target in the middle of a run
 (it would be scored in segments); changing the scenario live during a run; manual camera control;
-Benchmark 2 auto-comparison against the evaluators'
-predefined centroids; a Monte Carlo envelope over thousands of seeds on a large cloud machine;
+Benchmark 2 comparison against the evaluators'
+predefined centroids in their own file format (a truth CSV is already read); a Monte Carlo envelope over thousands of seeds on a large cloud machine;
 blink-coded beacon identification; physically based turbulence; concurrent web runs. Tracking
 every beacon at once was dropped as not required.
 
@@ -346,4 +380,7 @@ interface definition; PS row 8 designation (appearance, start or cue, click to d
 missing by the owner and added, with target names, user-defined shapes and separate width and
 height (rows 9 and 10), a typed start (row 11), the scenario check, salt and pepper in percent
 with clamped inputs (the web app had taken 13 as a fraction), editable target appearance in video
-mode and the search re-measurement fix; two new scenarios. The full commit history is in git.
+mode and the search re-measurement fix; two new scenarios. Then an independent review: FPS as
+frames over processing time, the turn-limited lead, the coasting guard, a vectorised faint path,
+Benchmark 2 ground truth, independent noise planes, the Near the limit note and fast_circular.
+The full commit history is in git.

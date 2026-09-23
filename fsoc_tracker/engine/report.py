@@ -51,7 +51,8 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         sub = f"Run '{cfg.name}'   seed {cfg.seed}   {datetime.now():%Y-%m-%d %H:%M}   v{__version__}   {platform.system()} {platform.machine()}"
         fig.text(0.07, 0.932, sub, fontsize=8.5, color=MUTED)
         src = (f"Source: video {cfg.video}  ({cfg.screen.width}x{cfg.screen.height} px as displayed, {cfg.camera.update_rate_hz:.2f} fps average, "
-               f"{len(records)} frames, {cfg.duration_s:.2f} s)" if cfg.video else (
+               f"{len(records)} frames, {cfg.duration_s:.2f} s)" + (f"; ground truth {cfg.video_truth}" if cfg.video_truth else "; no ground-truth file")
+               if cfg.video else (
             f"Source: simulator, screen {cfg.screen.width}x{cfg.screen.height}, targets {len(cfg.targets)}, "
             f"motion {cfg.designated_target().motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
             f"platform {cfg.disturbance.platform_motion} {cfg.disturbance.platform_px_frame:g} px/f, jitter {cfg.disturbance.jitter_px:g} px, "

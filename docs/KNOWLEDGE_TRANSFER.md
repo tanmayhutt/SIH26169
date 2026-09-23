@@ -173,7 +173,7 @@ picture, the camera physically cannot keep up. This single number shapes much of
 | 17 | Tracking Error | ≤ 10 pixels | While tracking, the beacon must stay within 10 px of the camera centre on average | Mean distance, true beacon to camera-window centre, after acquisition |
 | 18 | Target Loss | < 5% | The beacon may be lost in fewer than 5 percent of the frames | 100 minus lock retention |
 | 19 | Re-acquisition Time | ≤ 1 sec | If lost, it must be found again within 1 second | Longest gap between losing and regaining lock; a loss never regained counts with its length |
-| 20 | Processing Speed | ≥ 20 FPS | The software must process at least 20 frames per second | Mean of 1 / processing time per frame |
+| 20 | Processing Speed | ≥ 20 FPS | The software must process at least 20 frames per second | Frames over processing time: 1000 / mean processing ms per frame |
 
 The PDF does not define "lock", "tracking error" or "centroiding error" precisely. Our definitions
 are in section A10 and are printed inside every report.
@@ -365,6 +365,10 @@ The tracker is always in one of five states:
 | COAST | missed a frame or two | keep going on the prediction |
 | REACQUIRE | lost for longer | search a growing area around the prediction, then fall back to SEARCH |
 
+While coasting or re-acquiring, the prediction can drift. If it lies more than the search window
+(160 px) outside the picture, the tracker goes back to a whole-scene search at once instead of
+following an estimate that has run off the screen.
+
 **Designation** (row 8, multiple targets): every target has a name (default "Target N"). All are
 detected; the tracker follows the designated one and the report scores it. It is designated in
 one of three ways: **appearance** (the configured shape, size and brightness), **start** (the
@@ -390,6 +394,8 @@ page 1 of the report and in the summary file:
 - **Corrected**: an out-of-range value was clamped (for example salt and pepper 13 becomes 0.5).
 - **Beyond the PS**: a value outside the PS table, with the row named (for example jitter above
   20 px per frame, row 23).
+- **Near the limit**: the designated beacon moves above 70 percent of the camera turn rate. It can
+  be done, with little margin.
 - **Cannot be met**: a physical limit, for example a beacon faster than the camera can turn
   (800 px/s at 5 deg/s), or look-alikes of the designated target in appearance mode.
 
@@ -407,6 +413,12 @@ The command to the mount has two parts:
 The lead is defined at 30 Hz and scales with the camera rate, so a 60 fps video is handled
 correctly. Commands never exceed the speed limit; the report says when the mount was at its limit.
 
+The lead is also capped on tight curves. A fixed 0.25 s lead extrapolates in a straight line; on a
+fast circle that points the feed-forward off the path. So the lead is shortened until the path
+turns by at most 0.1 rad over it. Slow or gently curving beacons keep the full lead. On a 450 px
+circle at 4 deg/s (80 percent of the camera turn rate) the error fell from 34.3 px at 14 to 19
+percent lock to 8.4 px at 100 percent lock.
+
 ## B8. Step 7: measure and report (the performance log)
 
 Every run writes one folder `results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/` with four files:
@@ -419,7 +431,9 @@ Every run writes one folder `results/FSOC_<sim|video>_<name>_seed<N>_<date-time>
   plots, notes, definitions.
 - `..._scenario.yaml`: the exact settings, so the run can be repeated.
 
-Metrics reported: duration, frames, FPS, acquisition time, tracking error (mean, maximum, RMSE, and
+Metrics reported: duration, frames, FPS (frames over processing time; the mean of per-frame
+rates is kept beside it for comparison only, since it overstates the rate when frame times vary),
+acquisition time, tracking error (mean, maximum, RMSE, and
 with vibration removed), centroiding error (mean, maximum, RMSE), lock retention, tracked rate,
 target loss, re-acquisition count and times, processing time, gimbal saturation.
 
@@ -431,9 +445,16 @@ target loss, re-acquisition count and times, processing time, gimbal saturation.
    update rate to match. The camera window, field of view and speed limits stay as configured,
    because the video cannot tell us those.
 3. Each frame becomes the scene; the simulator and its disturbances are skipped.
-4. There is no ground truth in a video, so tracking and centroiding error read "n/a"; the log still
-   records our measured centre in every frame (`det_x`, `det_y`) for the evaluators' comparison, and
-   acquisition, re-acquisition, lock and FPS are measured as usual.
+4. A video carries no ground truth of its own. Without a truth file, tracking and centroiding
+   error read "n/a" and lock is judged from the tracker's own estimate, which can overstate it; the
+   log still records our measured centre in every frame (`det_x`, `det_y`) for the evaluators'
+   comparison, and acquisition, re-acquisition and FPS are measured as usual.
+5. With a truth file (a CSV of frame or time, x, y in video pixels; frames not listed count as
+   "beacon not visible"), tracking error, centroiding error, RMSE and a true lock retention are
+   computed against the evaluators' positions. Give it with `--truth truth.csv`, the "Truth CSV"
+   toolbar button (desktop and web), or name it `<video>_truth.csv` next to the video. On a
+   noisy_line clip rendered to .mp4 with its truth: tracking error 8.09 px, centroiding error
+   0.188 px.
 
 ## B10. Step 9: where the AI is
 
@@ -445,8 +466,9 @@ target loss, re-acquisition count and times, processing time, gimbal saturation.
   shipped.
 - It is used only when the classical detector finds nothing near the prediction, and never
   overrides it. It is loaded and warmed up at start so its first use does not freeze a run.
-- Honest assessment: on our simulated scenes the classical path almost never misses, so the network
-  rarely contributes; on a real phone video it supplied about half the measurements.
+- Honest assessment: it is a gap filler. In the standard scenarios it supplies 0 percent of the
+  measurements, because the classical path does not miss there; on a real phone video it supplied
+  about half the measurements.
 
 The computer vision (detection, centroiding, matched filtering, track-before-detect) and the
 estimation are the core; the AI is a safety net. This matches "AI-assisted" in the PS and keeps the
@@ -459,7 +481,9 @@ Noise sparkles appear and vanish at random, but a real beacon moves along a smoo
 nothing clear is found, the tracker follows many weak candidates across frames and keeps only a
 chain that moves consistently, is hit in 6 of 8 frames, and has the right size. That chain becomes
 a provisional track that must be confirmed in 5 of 6 frames. This took the faint-beacon scenario
-from never acquired to 91 to 97.5 percent lock.
+from never acquired to 91 to 97.5 percent lock. The chain linking is vectorised (same greedy
+order, identical results), so the 99th-percentile frame time on the faint beacon fell from 149 to
+160 ms to 26 to 33 ms.
 
 ## B12. Step 11: the interface (desktop and web are one program)
 
@@ -485,8 +509,8 @@ published. Nothing needs installing, and it works offline.
 
 ## B14. Step 13: how we know it works
 
-- 37 automated tests, including one per group of PS rows that pins every default to the PS.
-- A regression batch: 15 scenarios x 3 seeds, compared run by run with the previous batch before
+- 42 automated tests, including one per group of PS rows that pins every default to the PS.
+- A regression batch: 16 scenarios x 3 seeds, compared run by run with the previous batch before
   any change is accepted.
 - Package checks on each platform, and hand checks on both macOS builds.
 - Browser checks of the web app, and screenshot reviews of the desktop window at two screen sizes.
@@ -541,6 +565,16 @@ published. Nothing needs installing, and it works offline.
   every input is clamped, and the scenario check flags such values. A tracker defect was fixed too:
   while searching, candidates were re-measured on a stale picture (or none, a crash with 50% salt
   and pepper); now on the current frame. The regression batch is unchanged (42 of 42 identical).
+- **2026-09-23. An independent review.** A teammate's review found real defects, fixed and
+  measured on the whole pack. FPS was the mean of per-frame rates, which overstates the rate (faint
+  beacon seed 2, 30 s: 92.0 said, 67.8 true); it is now frames over processing time. The lead
+  pointed a fast circling beacon off its path; it is now capped by the path's turn (4 deg/s circle:
+  34.3 px to 8.4 px). A coasting estimate could run far off the screen (faint beacon seed 2: 158 px
+  error, 75.1% lock); it now falls back to a whole-scene search (5.9 px, 96.2%). The faint path
+  was vectorised. Benchmark 2 accepts a ground-truth CSV. Read and shot noise now use independent
+  random planes. One reported failure (a 5 px beacon in rain with 10% salt and pepper, never
+  acquired) could not be reproduced with our settings: 0.77 to 1.37 s, 6.0 to 6.5 px, 100% lock.
+  Regression batch against the committed merge: 38 same, 10 better, 0 worse, 3 new (fast_circular).
 
 ## C2. Principles we adopted along the way
 
@@ -583,16 +617,18 @@ published. Nothing needs installing, and it works offline.
 | Heavy noise (salt and pepper 10%, Gaussian 20, Poisson) | 0.8 to 1.1 s | 7.3 to 8.2 px | 100% | pass |
 | Fog | 0.7 to 1.4 s | 6.6 to 7.3 px | 100% | pass |
 | Low light | 0.8 to 1.7 s | 6.9 to 8.0 px | 100% | pass |
-| Faint beacon (3 to 6 sigma per frame), 10 seeds | 1.3 to 2.8 s (one seed 5.5 s) | 6.7 to 12.3 px | 91 to 97.5% | pass on most seeds |
-| Multi-target stress (decoys, haze, noise, sway, shake) | 0.7 to 1.3 s | 13.6 to 14.4 px | 98 to 99% | identity held; error above 10 px because of the shake |
+| Faint beacon (3 to 6 sigma per frame), 10 seeds | 1.3 to 2.8 s (one seed 5.5 s) | 6.7 to 12.3 px | 91 to 97.5% | pass on most seeds; after the review fixes, seeds 0 to 2 hold 96.4 to 97.8% |
+| Multi-target stress (decoys, haze, noise, sway, shake) | 0.7 to 1.3 s | 11.4 to 12.1 px | 100% | identity held; error above 10 px because of the shake |
 | Sway 12 px/frame plus shake 20 px/frame | about 0.8 s | about 20 px raw, 14 px with the shake removed | 96 to 99% | shake limit |
-| Platform at the PS maximum (20 + 20 px/frame) | about 0.8 s | about 25 px | 76 to 88% | documented physical limit |
+| Platform at the PS maximum (20 + 20 px/frame), 5 and 10 deg/s | about 0.8 s | about 23 to 25 px | 88.5 to 94.8% | documented physical limit |
+| Fast circle, 450 px at 4 deg/s (80% of the camera turn rate) | 0.80 to 0.87 s | 8.4 to 9.6 px | 100% | pass |
 | Hard mode (window only) | 3 to 12 s | 7 to 12 px | 100% after the sweep | acquisition beyond 2 s by design |
 | Identical decoys, designation start (5 seeds) | 0.60 to 0.73 s | 5.9 to 7.0 px | 100% | pass |
 | Beacon shapes, 8 x 18 px rectangle among other shapes (5 seeds) | 0.73 to 0.83 s | 6.1 to 7.1 px | 99.5 to 100% | pass |
 
 - Centroiding error: about 0.006 px in clear air, 0.1 to 0.4 px under heavy noise.
-- Processing: 80 to 250 FPS on a laptop, 41 to 176 FPS on the slower build machines; the
+- Processing (frames over processing time): 76 to 218 FPS on a laptop, 95 to 96 FPS on the faint
+  beacon over 30 s, 41 to 176 FPS on the slower build machines; the
   requirement is 20.
 - Identical tracking numbers on Windows, Linux and both Macs.
 
@@ -603,8 +639,9 @@ published. Nothing needs installing, and it works offline.
   raw error on each frame is about the size of the jump. We report the error with the shake removed
   beside it (the part the camera can physically follow). A faster motor (10 deg/s) was tested and
   does not help. Fixing it would need a larger sensor for electronic stabilisation, outside the PS.
-- **Everything at once (full stress)** stacks disturbances the PS lists separately; tracking holds,
-  error sits at 13 to 17 px.
+  Lock at this setting is 88.5 to 94.8%, error about 23 to 25 px.
+- **Everything at once (full stress)** stacks disturbances the PS lists separately; tracking holds
+  at 100% lock over 15 s, error sits at 11.4 to 12.1 px.
 - **Look-alikes that start together.** Identical targets that start at the same point as the
   designated beacon cannot be told apart at the start; even with the start cue these runs failed
   (lock 8 to 25%). Look-alikes that start apart pass with the start cue.
@@ -636,12 +673,14 @@ web app. Keep the report PDF ready to open.
   field is labelled with its PS row), save it in `configs/scenarios/`, pick it, Start. Picking it keeps its seed and paths exactly as
   written. The report and CSV appear automatically.
 - **Benchmark 2:** open each video directly. Check the calibration line (size, frame rate, frames).
-  Hand over the CSV (`det_x`, `det_y` per frame) and the report.
+  Hand over the CSV (`det_x`, `det_y` per frame) and the report. If they give positions, load
+  them with Truth CSV so errors and true lock are computed.
 
 ## E3. Likely questions and short answers
 
 - **Where is the AI?** A neural detector trained on our simulator fills gaps; the core is computer
-  vision and estimation, deliberately, so speed and reliability never depend on a model.
+  vision and estimation, deliberately, so speed and reliability never depend on a model. In the
+  standard scenarios it supplies 0% of the measurements.
 - **How do you know the tracker isn't cheating with the ground truth?** We deleted the truth before
   the tracker and got identical results.
 - **Why is error above 10 px under maximum shake?** The shake is random and arrives before the
@@ -655,7 +694,8 @@ web app. Keep the report PDF ready to open.
   is what the PS asks ("a designated moving target", row 8). The target is designated by
   appearance, by a start cue or by a click. Tracking all at once is not required: the PS metrics
   are for one target and one camera.
-- **Is it fast enough?** 80 to 250 FPS on a laptop against the required 20.
+- **Is it fast enough?** 76 to 218 FPS on a laptop against the required 20, measured as frames
+  over processing time (not the mean of per-frame rates, which overstates it).
 - **How accurate is the centre?** About 0.01 px in clear air.
 - **Can it be used with real hardware?** Yes: the frame source and the gimbal are separate
   interfaces, so a real camera and pan-tilt unit can replace the simulated ones.
@@ -691,6 +731,8 @@ web app. Keep the report PDF ready to open.
 | Feed-forward / PID | steering by prediction / correcting by the remaining error |
 | ONNX | a standard file format for trained neural networks |
 | Designation cue | a point near the designated target (a click or typed x,y) that the search starts from |
-| Scenario check | the notes on corrected, beyond-the-PS and impossible settings shown before and after a run |
+| Scenario check | the notes on corrected, beyond-the-PS, near-the-limit and impossible settings shown before and after a run |
+| Ground-truth CSV | for a video: the evaluators' beacon position per frame, so errors and true lock can be computed |
+| Turn-limited lead | the feed-forward lead shortened so the beacon's path turns at most 0.1 rad over it |
 | Scenario | a settings file describing one test |
 | Seed | the number that fixes the randomness, so a run can be repeated exactly |

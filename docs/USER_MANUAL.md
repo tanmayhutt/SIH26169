@@ -61,8 +61,8 @@ executable on that platform before publishing it.
 The same program is also served as a web application, so no installation at all is needed on
 any platform: the project site opens it directly in a current browser (Chrome, Edge, Firefox or
 Safari, on Windows, Linux, macOS, or a tablet). The web page and the desktop window are the same
-interface: the same toolbar (Start, Pause, Step, Stop, Speed, Open video, Simulator, Save
-scenario, Screenshot, Results, Manual, About), the same parameter panel with every field, the
+interface: the same toolbar (Start, Pause, Step, Stop, Speed, Open video, Truth CSV, Simulator,
+Save scenario, Screenshot, Results, Manual, About), the same parameter panel with every field, the
 same six tiles, views, four plots, telemetry column and end-of-run summary, and the same
 keyboard keys. Both are generated from one definition in the code (`fsoc_tracker/ui_shared.py`)
 and run the same engine, so a given scenario and seed give the same numbers and the same report.
@@ -116,6 +116,7 @@ Optional, to retrain the AI detector: `pip install -e ".[train]"` then
 | Start / Pause / Step / Stop | Run control. Space starts or pauses, N steps one frame while paused, Esc stops. |
 | Speed | 0.25x to 4x real time, or Max speed (shows the true processing rate). |
 | Open video (Benchmark 2) | Choose an `.mp4`; the simulator is bypassed and the video frames become the scene. Ctrl+O. |
+| Truth CSV | In video mode: load the evaluators' beacon positions for the video (section 5), so errors and true lock are computed. |
 | Use simulator | Return to the simulated scene. |
 | Save scenario | Save the panel as a `.yaml`; it appears in the Scenario list. Ctrl+S. |
 | Screenshot | Save a PNG of the window into `results/`. Ctrl+P. |
@@ -129,7 +130,7 @@ Six tiles above the pictures update every frame and turn green when the problem 
 specification is met, amber when it is not: tracker state, acquisition time (2 s or less),
 mean tracking error since acquisition (10 px or less), mean centroiding error, lock retention
 (target loss under 5 percent), and processing FPS (20 or more). In video mode the two error
-tiles read "n/a" because the video carries no ground truth.
+tiles read "n/a" unless a ground-truth file is loaded (section 5).
 
 ### Screen view (left picture)
 
@@ -245,7 +246,8 @@ Values inside the PS envelope give no note.
 |---|---|
 | Corrected | A value was outside the accepted range and was clamped, for example salt and pepper 13 (a fraction) becomes 0.5. |
 | Beyond the PS | A value is outside the PS table, and the row is named: screen below 2000 x 2000 (row 1), update rate below 30 Hz (row 5) or 20 Hz (row 15), pan or tilt outside 5 to 10 deg/s (rows 13, 14), size outside 5-20 x 5-20 (row 10), custom shape without a mask, salt and pepper above about 10% (row 21), Gaussian sigma above 20 (row 22), jitter above 20 px/frame (row 23), platform above 20 px/frame (row 25), turbulence above 0.6, contrast below 0.4. The PS targets are not promised for it. |
-| Cannot be met | A physical limit: the designated beacon moves faster than the camera turns (800 px/s at 5 deg/s and the default FOV), or above 70 percent of it; jitter plus platform motion above the camera's turn per frame (26.7 px/frame at the defaults); salt and pepper at 50%; designation `cue` without a point; designation `start` with a video; other targets that look the same as the designated one in appearance mode. |
+| Near the limit | The designated beacon moves above 70 percent of the camera turn rate. It can be done, with little margin. |
+| Cannot be met | A physical limit: the designated beacon moves faster than the camera turns (800 px/s at 5 deg/s and the default FOV); jitter plus platform motion above the camera's turn per frame (26.7 px/frame at the defaults); salt and pepper at 50%; designation `cue` without a point; designation `start` with a video; a ground-truth file that is not found; other targets that look the same as the designated one in appearance mode. |
 
 ## 5. Running Benchmark 2 (video input)
 
@@ -264,10 +266,30 @@ Values inside the PS envelope give no note.
 3. Click Start. The video frames are used as the scene; nothing is drawn by the simulator.
 4. When the run ends, `frames.csv` contains the measured beacon centre for every frame
    (`det_x`, `det_y`) and `report.pdf` contains acquisition time, re-acquisition time,
-   lock retention rate and FPS. Tracking and centroiding error against truth are not
-   available because the video carries no ground truth.
+   lock retention rate and FPS. Without a ground-truth file, tracking and centroiding error
+   read "n/a" and lock is judged from the tracker's own estimate, which can overstate it.
 
 From the command line: `fsoc-tracker video path/to/file.mp4`
+
+### Ground-truth file (optional)
+
+If the evaluators give the true beacon positions, put them in a CSV: frame (or `t` in
+seconds), x, y in video pixels. Header names are matched loosely (`frame`/`idx`, `t`/`time`,
+`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. Frames not
+listed count as "beacon not visible". With it, tracking error, centroiding error, RMSE and a
+true lock retention are computed against their positions.
+
+| How | Where |
+|---|---|
+| Command line | `fsoc-tracker video clip.mp4 --truth truth.csv` |
+| Beside the video | a file named `<video>_truth.csv` (or `<video>.csv`) next to the video is picked up by the command line and the desktop app |
+| Desktop | toolbar button "Truth CSV" (enabled in video mode) |
+| Web | toolbar button "Truth CSV" (uploads the file) |
+| Scenario file | field `video_truth` |
+
+The report's source line names the truth file or says "no ground-truth file". Measured on a
+noisy_line clip rendered to `.mp4` with its truth: tracking error 8.09 px, centroiding error
+0.188 px; without the file both read n/a.
 
 ## 6. Scenario files and the command line
 
@@ -294,7 +316,7 @@ Commands:
 
 ```
 fsoc-tracker run --scenario configs/scenarios/fog_circular.yaml [--seed 3] [--duration 20]
-fsoc-tracker video path/to/file.mp4
+fsoc-tracker video path/to/file.mp4 [--truth truth.csv]
 fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-49
 fsoc-tracker gui
 ```
@@ -314,7 +336,8 @@ Benchmark Performance 2 gives you `.mp4` files. No scenario file is needed: open
 the desktop application, drop it on the web app, or run `fsoc-tracker video <file>`. The
 per-frame CSV then carries `det_x`, `det_y` (the measured centroids) for comparison with the
 evaluators' predefined values, and the report carries acquisition, re-acquisition, lock
-retention and FPS.
+retention and FPS. If they give the true positions, load them as a ground-truth file (section 5)
+and the errors are computed against them.
 
 ## 7. Output files
 
@@ -351,7 +374,8 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Tracked | Percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. A high tracked rate with a low lock rate means the camera, not the tracker, could not keep up. |
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
 | Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
-| FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |
+| FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
+| `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
 
 ## 9. Troubleshooting
 
@@ -363,5 +387,6 @@ an `envelope.md` table. The web app names its downloads the same way.
 - Low frame rate: reduce the screen size, disable Poisson noise, or uncheck Real-time
   pacing to see the true processing speed.
 - "Cannot open video": the file must be readable by OpenCV (H.264 `.mp4` is safest).
-- The AI detector is not used: `models/beacon_heatmap.onnx` is missing; the classical
-  detector runs alone. Retrain with `python training/train_heatmap.py`.
+- The AI detector is not used: `models/beacon_heatmap.onnx` is missing (it is looked up in the
+  working folder and in the package folder); the classical detector runs alone. In the standard
+  scenarios the AI supplies 0 percent of measurements anyway: it only fills gaps. Retrain with `python training/train_heatmap.py`.

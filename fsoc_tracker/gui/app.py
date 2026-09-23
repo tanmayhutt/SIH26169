@@ -27,7 +27,8 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
-                         new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH)
+                         new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
+                         TRUTH_TIP, truth_sidecar)
 from ..engine.config import target_name, parse_xy
 
 
@@ -267,7 +268,10 @@ class SceneView(QtWidgets.QLabel):
             if len(beacons) > 1 or self.names:
                 name = self.names[i] if i < len(self.names) else f"Target {i + 1}"
                 p.setFont(font); p.setPen(QtGui.QColor(C["signal"] if des else C["muted"]))
-                p.drawText(QtCore.QPointF(bx * s + 9, by * s - 6), name if not des else name + "  (designated)")
+                label = name if not des else name + "  (designated)"
+                tw = QtGui.QFontMetrics(font).horizontalAdvance(label)
+                x = bx * s + 9 if bx * s + 9 + tw < p.device().width() - 4 else bx * s - 9 - tw   # keep the label on the picture
+                p.drawText(QtCore.QPointF(x, by * s - 6), label)
 
     def reset(self):
         self.trail_true.clear(); self.trail_win.clear()
@@ -451,6 +455,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_clear_video = tb.addAction("Simulator", self.clear_video)
         self.act_clear_video.setToolTip("Leave video mode and use the simulated scene again")
         self.act_clear_video.setEnabled(False)
+        self.act_truth = tb.addAction("Truth CSV", self.open_truth); self.act_truth.setToolTip(TRUTH_TIP); self.act_truth.setEnabled(False)
+        self.video_truth = ""
         spacer = QtWidgets.QWidget(); spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
         spacer.setStyleSheet("background: transparent;")
         tb.addWidget(spacer)
@@ -669,6 +675,7 @@ class MainWindow(QtWidgets.QMainWindow):
         cfg.designation = self.cmb_mode.currentText()
         cfg.designation_cue = self.ed_cue.text().strip()
         cfg.video = self.video_path
+        cfg.video_truth = self.video_truth if self.video_path else ""
         if cfg.video and for_run:
             # the run gets a copy: the panel keeps its target list for when the video is closed
             import copy
@@ -936,9 +943,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_video(self):
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open video for Benchmark 2", "", "Video (*.mp4 *.avi *.mov *.mkv)")
         if p:
-            self.video_path = p; self.ed_name.setText(Path(p).stem)
+            self.video_path = p; self.ed_name.setText(Path(p).stem); self.video_truth = ""
             self._preview_video(p)
             self._video_label()
+            side = truth_sidecar(p)
+            if side:
+                self._set_truth(side)
 
     def _preview_video(self, path: str):
         """Probe the file, calibrate the settings to it, and show the first frame."""
@@ -980,8 +990,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tiles["state"].set("video ready", None, "press Start")
         self.tele.setPlainText(video_loaded_lines(Path(path).name, info, self.forms["camera"].read()))
 
+    def open_truth(self):
+        p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Ground truth for this video", str(Path(self.video_path or ".").parent), "CSV (*.csv)")
+        if p:
+            self._set_truth(p)
+
+    def _set_truth(self, p: str):
+        from ..engine.sources import load_truth
+        try:
+            n = len(load_truth(p, (self.video_info or {}).get("fps", 30.0)))
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Ground truth", f"Could not read this file:\n{e}"); return
+        self.video_truth = p
+        self.lbl_status.setText(f"Ground truth: {p} ({n} frames). Errors and RMSE will be computed against it.")
+
     def clear_video(self):
-        self.video_path = None; self.video_info = None
+        self.video_path = None; self.video_info = None; self.video_truth = ""
         self._set_video_mode(False)
         self._placeholders()
         for t in self.tiles.values():
@@ -1006,6 +1030,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     if w is not None:
                         w.setEnabled(not on)
         self.act_clear_video.setEnabled(on)
+        self.act_truth.setEnabled(on)
 
     def screenshot(self):
         Path(self.cfg.output_dir).mkdir(parents=True, exist_ok=True)

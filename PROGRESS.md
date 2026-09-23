@@ -112,6 +112,8 @@ flowchart LR
 | Designation of the target to follow: appearance, start cue or point cue (click or typed); the designated target is the one scored; ambiguous frames counted | 🟩 | row 8; identical decoys starting apart: 1 of 5 runs acquired by appearance only, 5 of 5 with the start cue |
 | Search re-measures candidates on the current frame (was a stale or missing picture after a loss; a crash at 50% salt and pepper) | 🟩 | regression batch unchanged: 42 of 42 runs identical |
 | Hard mode (tracker sees only the window) | 🟩 | square-spiral search; acquisition 3 to 12 s, physics-limited |
+| Coasting guard: an estimate more than 160 px outside the picture while coasting or re-acquiring sends the tracker back to a whole-scene search | 🟩 | lowlight_faint seed 2, 30 s: 158 px, 75.1% lock, re-acquisition 4.53 s before; 5.9 px, 96.2%, 0.07 s after |
+| Faint-path chain linking vectorised (same greedy order, identical results) | 🟩 | lowlight_faint 30 s: 99th-percentile frame 149 to 160 ms before, 26 to 33 ms after; true FPS 68 to 81 before, 95 to 96 after |
 
 ### 2.4 Controller  🟩
 
@@ -120,6 +122,7 @@ flowchart LR
 | Feedforward of velocity and acceleration, PID on error, latency lead for target and window | 🟩 |
 | Deadband and integrator clamping | 🟩 |
 | Saturation reported per frame | 🟩 |
+| Turn-limited lead: the 0.25 s acceleration lead capped so the path turns at most 0.1 rad over it | 🟩 |
 
 ### 2.5 Measured performance (15 s runs)  🟩
 
@@ -131,14 +134,16 @@ flowchart LR
 | Fog | 6.6 px | 100% | 🟩 |
 | Low light | 7.0 px | 100% | 🟩 |
 | Platform sway 12 px/f + vibration 20 px/f | 20 px raw, 14.6 px vibration removed | 99% | 🟥 physical limit: a random per-frame jitter cannot be cancelled before the frame arrives; the vibration-removed error is reported alongside |
-| Platform at PS maximum 20 + 20 px/f | 25 to 27 px (23 vibration removed) | 76 to 88% | 🟥 physical limit: measured the same at the allowed 10 deg/s (slew saturation 2%), so the random 20 px per-frame vibration is the limit, not the motor |
-| Multi-target stress with haze, noise, sway | 13.6 to 14.4 px | 98 to 99% | 🟩 identity held on every seed (fitted width, refined association, frozen signature at crossings) |
+| Platform at PS maximum 20 + 20 px/f, at 5 and 10 deg/s | about 23 to 25 px | 88.5 to 94.8% | 🟥 physical limit: measured the same at the allowed 10 deg/s (slew saturation 2%), so the random 20 px per-frame vibration is the limit, not the motor |
+| Multi-target stress with haze, noise, sway | 11.4 to 12.1 px | 100% | 🟩 identity held on every seed (fitted width, refined association, frozen signature at crossings) |
 | Hard mode | 6.5 to 8.9 px after acquisition | 100% | 🟩 acquisition 3 to 12 s |
 | Identical decoys, designation start (5 seeds) | 5.9 to 7.0 px | 100% | 🟩 acquisition 0.60 to 0.73 s |
 | Beacon shapes: 8 x 18 px rectangle among other shapes (5 seeds) | 6.1 to 7.1 px | 99.5 to 100% | 🟩 acquisition 0.73 to 0.83 s |
-| Faint beacon at 3 to 6 sigma | 6.7 to 12.3 px | 91 to 97.5% on all 10 seeds | 🟩 track-before-detect on a moving-target residual; acquisition 1.3 to 2.8 s on 9 seeds, 5.5 s on one |
+| Faint beacon at 3 to 6 sigma | 6.7 to 12.3 px | 91 to 97.5% on all 10 seeds; 96.4 to 97.8% on seeds 0 to 2 after the review fixes | 🟩 track-before-detect on a moving-target residual; acquisition 1.3 to 2.8 s on 9 seeds, 5.5 s on one |
+| Fast circle: 450 px at 4 deg/s, 80% of the turn rate (seeds 0 to 2) | 8.4 to 9.6 px | 100% | 🟩 acquisition 0.80 to 0.87 s; was 34.3 px at 14 to 19% lock before the turn-limited lead |
 
-Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
+Processing: 76 to 218 FPS at 2000 x 2000 on a laptop CPU (16-scenario pack) (spec 20). FPS is frames over processing
+time (1000 / mean ms); the mean of per-frame rates is kept as `fps_inst_mean` for comparison only.
 
 ### 2.6 Instrumentation  🟩
 
@@ -149,6 +154,8 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | `report.pdf`: spec check with the Targets and Followed lines and the scenario check notes, time series, paths and histograms; text wrapped line by line, metrics list continued on a second page | 🟩 |
 | `summary.json` carries `designation` and `checks` | 🟩 |
 | Vibration-removed tracking error alongside the raw one | 🟩 |
+| `fps_mean` as frames over processing time; the old mean of per-frame rates kept as `fps_inst_mean` (faint seed 2, 30 s: 92.0 said, 67.8 true) | 🟩 |
+| Benchmark 2 ground truth: a CSV of frame or t, x, y (`--truth`, Truth CSV on both front ends, or `<video>_truth.csv` beside the video) gives tracking and centroiding error, RMSE and true lock; the report's source line names it | 🟩 |
 | Batch runner with multi-seed envelope table | 🟩 |
 
 ### 2.7 Desktop application  🟩
@@ -165,19 +172,23 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | New random seed and heading each run, with a pin option; a loaded scenario keeps its own | 🟩 |
 | Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
 | Run section: Identical look, Designated, Designation, Cue (x,y), Edit target; preview at t = 0 with named targets, click to designate; click a video's first frame to cue | 🟩 |
-| Scenario check shown live, at Start, in the end dialog, in the report and the summary: Corrected, Beyond the PS, Cannot be met | 🟩 |
+| Scenario check shown live, at Start, in the end dialog, in the report and the summary: Corrected, Beyond the PS, Near the limit, Cannot be met | 🟩 |
+| Truth CSV toolbar button in video mode (desktop and web) | 🟩 |
 | Salt and pepper in percent on both panels; every numeric input clamped in the engine (the web page had taken 13 as a fraction) | 🟩 |
 | Video mode: target appearance (name, shape, width, height, mask, intensity) editable; motion locked | 🟩 |
 
 ### 2.8 Tests  🟩
 
-37 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+42 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
 accuracy, sub-pixel refinement, IMM prediction, re-acquisition metric, closed loop clear, closed
 loop with vibration, multi-target identity, 3 and 8 decoys, video path, desktop panel (video
 runs the whole file, a loaded scenario keeps its seed), PS rows, and targets (width and height,
 every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical
-extra targets, the designated target is scored, identical decoys need a cue, typed start).
-37 of 37 pass locally. Regression batch over the 15-scenario pack: the 42 earlier runs identical, 6 new.
+extra targets, the designated target is scored, identical decoys need a cue, typed start), and
+the review fixes (FPS is frames over processing time, a 4 deg/s target is kept centred, a coasting
+estimate cannot run off the screen, video ground truth gives errors, the CNN model is found from
+any folder). 42 of 42 pass locally. Regression batch over the 16-scenario pack against the
+committed merge: 38 same, 10 better, 0 worse, 3 new (fast_circular).
 
 ### 2.9 AI detector  🟨
 
@@ -194,14 +205,15 @@ flowchart LR
     f --> g[Fine-tune on a user video: tracker-confident frames become labels]:::done
 ```
 
-Honest state: on simulated scenes the classical pipeline carries the load and the CNN contributes about 0%
+Honest state: the CNN is a gap filler. In the standard scenarios the classical pipeline carries the load and the CNN supplies 0%
 of measurements; on a real phone video it supplied half of them. The faint-beacon case is now handled classically (chains of weak detections on a moving-target residual), so the CNN stays a gap filler.
 `training/finetune_from_video.py` adapts it to footage you provide (self-training from the tracker's confident frames).
+The model path is also looked up from the package folder, so an installed command started from another folder still loads it.
 
 ### 2.10 Executable builds  🟩
 
 Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
-37 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
+42 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
 scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
 `bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
 
@@ -286,7 +298,29 @@ One assumption: one screen pixel equals one camera pixel, so the 2000 px screen 
 4. 🟩 Multi-target identity: candidates ranked by fitted width (noise-independent) instead of blob area; the stress seed that swapped now holds 99% lock.
 5. 🟩 Faint beacon: track-before-detect on a moving-target residual; 10 seeds all hold 91 to 97.5% lock, acquisition under 2.8 s on nine of them.
 6. 🟩 PS row 8 designation, target names, shapes and separate width and height, typed start, scenario check, salt and pepper in percent with clamped inputs, video appearance fields, search fix.
-7. 🟨 Repeat the four-platform build and package check for the 2026-09-23 changes.
-8. ⬜ Proposed, not required by the PS: switching the designated target mid-run (scored in segments), changing the scenario live during a run, manual camera control. Tracking every beacon at once was dropped as not required.
+7. 🟨 Repeat the four-platform build and package check for the 2026-09-23 changes, including the review fixes.
+8. 🟩 Independent review by a teammate: fixed FPS metric, turn-limited lead, coasting guard, vectorised faint path, Benchmark 2 ground truth, independent read and shot noise planes, the Near the limit note, the CNN model path, a sway comment (20%, not 30%), and the new fast_circular scenario.
+9. ⬜ Proposed, not required by the PS: switching the designated target mid-run (scored in segments), changing the scenario live during a run, manual camera control. Tracking every beacon at once was dropped as not required.
+
+### Review findings (2026-09-23)
+
+An independent review by a teammate's session. Measured outcomes:
+
+| Finding | Outcome |
+|---|---|
+| FPS was the mean of per-frame rates | fixed: frames over processing time; faint seed 2, 30 s: 92.0 said, 67.8 true |
+| Fast targets lag | fixed in the controller, not the estimator (within 0.4 to 0.7 px of the truth): 4 deg/s circle 34.3 px to 8.4 px, 100% lock |
+| Coasting estimate runs away | fixed: faint seed 2, 30 s, 158 px and 75.1% lock to 5.9 px and 96.2% |
+| Faint search slow | fixed: 99th-percentile frame 149 to 160 ms to 26 to 33 ms |
+| Tracker sees the whole scene | unchanged: the documented reading of the PS; hard mode covers the window-only reading; a wide-field finder remains future work |
+| AI role small | unchanged: a gap filler, 0% of measurements in the standard scenarios |
+| No Benchmark 2 ground truth | added: truth CSV; noisy_line clip, 8.09 px tracking, 0.188 px centroiding |
+| Read and shot noise shared one random plane | fixed: independent planes; shot noise stays a Gaussian approximation of Poisson |
+| Beacon above 70% of the turn rate labelled Cannot be met | fixed: new note Near the limit |
+| 5 px beacon in rain with 10% salt and pepper never acquired, about 3 FPS | not reproduced: figure of 8, 30 s, seeds 0 to 2, 0.77 to 1.37 s, 6.0 to 6.5 px, 100% lock, 86 to 99 FPS |
+| `tests/test_ps_compliance.py` mostly checks presence | noted, not changed: behaviour is covered by the other tests |
+
+Regression batch (15 s, seeds 0 to 2) against the committed merge: 38 same, 10 better, 0 worse,
+3 new. Better: platform_max, platform_max_10degs, lowlight_faint and platform_jitter seed 0.
 
 Known limit: look-alikes that start at the same point as the designated beacon cannot be told apart at the start; even with the start cue those runs held 8 to 25% lock.
