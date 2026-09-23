@@ -11,7 +11,7 @@ of mobile Free Space Optical Communication terminals.
 
 Status on 2026-09-23: every mandatory item of the problem statement is implemented, tested and
 released. The 2026-09-23 changes (designation, shapes and sizes, scenario check, and the fixes
-from the independent review) still need the four-platform build, publish and deploy. Remaining
+from the independent review, then the PS audit fixes) still need the four-platform build, publish and deploy. Remaining
 work is preparation for the event (section 13).
 
 ---
@@ -31,7 +31,7 @@ work is preparation for the event (section 13).
 9. `docs/TESTING_GUIDE.md`: how to exercise every input by hand, with expected results.
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
-12. `docs/submission/LAKSHYA_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
+12. `docs/submission/ARGUS_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
 
 `PROGRESS.md` and `web/progress.json` are the running status record; the second drives the
 progress page on the site.
@@ -65,7 +65,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 42 tests
+.venv/bin/python -m pytest                      # 45 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -95,6 +95,7 @@ fsoc-tracker-gui                                                                
 uvicorn webapp.server:app --host 127.0.0.1 --port 8095                              # web app locally
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
+python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
 python tools/gui_screenshot.py results/shot full_stress   # desktop screenshots without a display
 python tools/make_demo_video.py                # regenerate the demo video (docs/demo/, not in git)
 python docs/build_pdfs.py                      # USER_MANUAL.pdf and TECHNICAL_REPORT.pdf (needs Chrome)
@@ -142,7 +143,7 @@ tests/                   test_engine.py, test_ps_compliance.py, test_targets.py,
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
 web/                     the progress page (index.html) and its data (progress.json)
-tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.py
+tools/                   compare_batches.py, ps_audit.py, gui_screenshot.py, make_demo_video.py
 .github/workflows/build.yml  four-platform build, tests and package check on each platform
 ```
 
@@ -176,7 +177,12 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
   0.67 (low light) to 0.96 (clear); a new track needs 0.62 (0.75 in hard mode).
 - Faint beacons use track-before-detect: weak detections on a moving-target residual (the frame
   minus a running mean) are linked into motion-consistent chains; a chain hit 6 of 8 frames with
-  mean SNR at least 3.5 and the right width is promoted. Off in hard mode. A faint beacon that
+  mean SNR at least 3.5 and the right width is promoted. Off in hard mode. While a faint track
+  is active, the raw detection is kept when the sub-pixel refit moves it more than 3 px or its
+  width exceeds 2.5 times the track's recent median width, and a candidate wider than that is not
+  associated: at 3 to 6 sigma the refit could slide onto a neighbouring noise clump (the centre
+  jumped several px, the width ballooned to 7.5 px). On lowlight_faint seed 7 this took the run
+  from 86 px error and 78.6 percent lock to 2.8 px and 94.8 percent. A faint beacon that
   never moves is not covered; the PS does not ask for one. The chain linking is vectorised with
   NumPy (same greedy order, identical results); it was a Python loop over up to 400 candidates x
   600 chains, and lowlight_faint's 99th-percentile frame time fell from 149 to 160 ms to 26 to 33 ms.
@@ -185,7 +191,9 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
 - The neural detector (84 thousand parameter heat-map network on a 128 x 128 patch, trained on
   simulator frames, run by ONNX Runtime) only fills gaps when the classical detector finds nothing
   near the prediction, and never overrides it. It is warmed up at start so its first use does not
-  stall a run. It supplies 0 percent of measurements in the standard scenarios. The model path is
+  stall a run. It supplies 0 percent of measurements in the standard scenarios. It is not used while a faint
+  track is active: it was trained on visible beacons, and on a 3 to 6 sigma patch its peak was
+  often noise. The model path is
   also looked up from the package folder, so an installed command started elsewhere still loads it.
 
 ### 6.3 Estimation, identity and control
@@ -212,7 +220,10 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
   50 percent salt and pepper). The regression batch is unchanged by the fix.
 - Controller: feed-forward of the estimated velocity and acceleration, led by the command latency
   plus the estimator lag; the lag is defined at 30 Hz and scales with the camera rate (a 60 fps
-  video halved it). PID kp 5, kd 0.3, ki 0.8 with anti-windup.
+  video halved it). PID kp 5, kd 0, ki 0.8 with anti-windup. The derivative was 0.3 until the PS
+  audit: it acted on an error that reaches the controller one frame late and in whole pixels, and
+  drove a limit cycle of about +/-10 px, so a still beacon was never settled (mean 6.4 px, peak
+  15.6 px). With kd 0 a still beacon is held within 4 px (mean 1.6 px); the integral term stays.
 - The acceleration lead (0.25 s) is capped so the path turns by at most `Controller.TURN_MAX` =
   0.1 rad over it. A straight-line extrapolation pointed a fast circling beacon off its path; the
   estimator was fine (within 0.4 to 0.7 px of the truth at every speed, velocity lag 1 to 2
@@ -234,7 +245,10 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
 
 Applied in physical order (extinction, blur, picture shift, detector noise). Platform motion is a
 bounded sway (amplitude at most 20 percent of the screen) with the configured peak speed; a
-sustained 20 px per frame shift would leave the screen in seconds.
+sustained 20 px per frame shift would leave the screen in seconds. The figure-8 sway is scaled so
+its peak equals the setting: it is fastest at its crossing, sqrt(2) times the circle speed, and
+set to 20 it peaked at 28.3 px per frame before 2026-09-23. Every pattern stays within the PS
++/-20 px per frame.
 
 Benchmark 2 ground truth: `video_truth` (`--truth`, the Truth CSV button on both front ends, or a
 `<video>_truth.csv` or `<video>.csv` beside the video, picked up by the command line and the
@@ -272,17 +286,21 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (42 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (45 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
-   worse. Last recorded state (2026-09-23, after the review fixes, against the committed merge):
-   38 same, 10 better, 0 worse, 3 new (fast_circular).
-3. For interface changes, take screenshots at 1600 x 1000 and 1366 x 768 with
+   worse. Last recorded state (2026-09-23, after the PS audit fixes, against the previous
+   commit): 0 worse, 5 better (platform maximum lock), every other run in its "same" band,
+   although tracking errors dropped by about two thirds (the tool flags error increases, not
+   decreases).
+3. `python tools/ps_audit.py` must pass: it measures every PS item by running the code and
+   writes `docs/PS_AUDIT.md` (39 of 39 on 2026-09-23). CI runs it on the Linux job.
+4. For interface changes, take screenshots at 1600 x 1000 and 1366 x 768 with
    `tools/gui_screenshot.py` and look at them; check the web page in a browser too.
-4. `python webapp/smoke.py` for the web app.
-5. After a release build, `tests/package_check.py` runs automatically on each platform; run it on
+5. `python webapp/smoke.py` for the web app.
+6. After a release build, `tests/package_check.py` runs automatically on each platform; run it on
    the macOS archives locally as well (Intel through Rosetta: `--arch x86_64`).
-6. Update `web/progress.json`, `PROGRESS.md`, `COMPLIANCE.md` and the PDFs so they say what the
+7. Update `web/progress.json`, `PROGRESS.md`, `COMPLIANCE.md` and the PDFs so they say what the
    code does.
 
 ## 9. How to release
@@ -317,13 +335,13 @@ files downloaded instead of opened.
 
 ## 11. Known limits (documented, not bugs)
 
-- Platform sway plus vibration at the PS maximum (20 + 20 px per frame): 88.5 to 94.8 percent lock,
-  about 23 to 25 px raw error; the same at 10 deg/s. A random jump of the
+- Platform sway plus vibration at the PS maximum (20 + 20 px per frame): 93.4 to 97.2 percent lock,
+  21.7 to 23.5 px raw error (platform_max and platform_max_10degs, seeds 0 to 2). A random jump of the
   whole picture every frame cannot be anticipated. Every PDF produced under vibration says so.
-- Full stress (decoys, haze, noise, sway and vibration together): 11.4 to 12.1 px, 100 percent
-  lock over 15 s, seeds 0 to 2; it stacks disturbances the PS lists separately.
-- Faint beacon: all ten seeds 91 to 97.5 percent lock before the review fixes; one seed acquires in
-  5.5 s. After the fixes, seeds 0 to 2 hold 96.4 to 97.8 percent over 15 s.
+- Full stress (decoys, haze, noise, sway and vibration together): 10.3 to 11.3 px, 98.2 to 100
+  percent lock over 15 s, seeds 0 to 2; it stacks disturbances the PS lists separately.
+- Faint beacon, seeds 0 to 9: acquisition 0.80 to 2.00 s, 2.4 to 3.5 px, lock 94.0 to 97.8
+  percent. Seeds 7 and 8 hold 94.8 and 94.0 percent, just above the 5 percent target-loss limit.
 - A tracker that observes the whole scene is the documented reading of the PS (section 6.1). A
   low-resolution wide-field finder for acquisition in the window-only reading remains future work.
 - Not reproduced: a review reported a 5 px beacon in rain with 10 percent salt and pepper as never
@@ -354,7 +372,7 @@ files downloaded instead of opened.
 
 | Item | Owner | How |
 |---|---|---|
-| Presentation: rename the project to ARGUS on every slide (the PDF still says LAKSHYA) and fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
+| Presentation: fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
 | Rebuild the four archives for the 2026-09-23 changes, publish and deploy | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
@@ -383,4 +401,7 @@ with clamped inputs (the web app had taken 13 as a fraction), editable target ap
 mode and the search re-measurement fix; two new scenarios. Then an independent review: FPS as
 frames over processing time, the turn-limited lead, the coasting guard, a vectorised faint path,
 Benchmark 2 ground truth, independent noise planes, the Near the limit note and fast_circular.
+That evening the new PS audit (`tools/ps_audit.py`) found the derivative limit cycle on a still
+beacon and the figure-8 sway above 20 px per frame; both were fixed, the faint path got its refit
+and width guards (seed 7), and the deck was renamed ARGUS.
 The full commit history is in git.

@@ -112,7 +112,7 @@ class TrackerConfig:
     faint_snr_min: float = 3.5           # faint path: mean matched-filter SNR a chain of weak detections must show
     faint_threshold_k: float = 3.0       # faint path: detection threshold in noise sigmas (track-before-detect links the rest)
     kp: float = 5.0                      # rate command per degree of error (1/s)
-    kd: float = 0.3
+    kd: float = 0.0                      # no derivative: on an error that arrives a frame late in whole pixels it drove a +/-10 px limit cycle
     ki: float = 0.8
     feedforward: float = 1.0             # weight on predicted target angular rate
     estimator_lag_s: float = 0.25        # filter delay at the 30 Hz reference rate (about 7 frames), compensated with acceleration feedforward; scales with the frame rate

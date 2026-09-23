@@ -52,20 +52,20 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 
 | Scenario | What it tests | Expect |
 |---|---|---|
-| clear_line, clear_circular, clear_figure8 | rows 12, 16 to 20 on a clean sky | acquisition under 1.5 s, error 6 to 8 px, 100% lock |
-| clear_random | random walk (row 12) | error about 10 px, lock 98% |
-| noisy_line | salt and pepper 10%, Gaussian sigma 20, Poisson (rows 21, 22) | error 7 to 8 px, 100% lock |
-| fog_circular | fog preset: contrast, brightness, blur, turbulence (row 24) | error 6 to 7 px, 100% lock |
-| lowlight_figure8 | low-light preset (row 24) | error 7 to 8 px, 100% lock |
-| lowlight_faint | beacon at 3 to 6 sigma per frame; track-before-detect | acquisition 1.3 to 2.8 s, error 7 to 12 px, lock over 90% |
-| platform_jitter | sway 12 px/frame plus vibration 20 px/frame (rows 23, 25) | raw error about 20 px, 14 px with vibration removed, lock 96 to 99% |
-| platform_max | both at the PS maximum, 20 + 20 px/frame | lock 88.5 to 94.8%, error about 23 to 25 px: the documented physical limit |
+| clear_line, clear_circular, clear_figure8 | rows 12, 16 to 20 on a clean sky | acquisition 0.60 to 1.33 s, error 2.1 to 3.7 px, 100% lock |
+| clear_random | random walk (row 12) | acquisition 0.67 to 1.03 s, error 5.1 to 6.3 px, 100% lock |
+| noisy_line | salt and pepper 10%, Gaussian sigma 20, Poisson (rows 21, 22) | acquisition 0.67 to 1.00 s, error 2.4 to 3.7 px, centroid 0.19 px, 100% lock |
+| fog_circular | fog preset: contrast, brightness, blur, turbulence (row 24) | error 2.5 to 3.7 px, 100% lock |
+| lowlight_figure8 | low-light preset (row 24) | error 2.5 to 3.7 px, 100% lock |
+| lowlight_faint | beacon at 3 to 6 sigma per frame; track-before-detect | over seeds 0 to 9: acquisition 0.80 to 2.00 s, error 2.4 to 3.5 px, lock 94.0 to 97.8% (seeds 7 and 8 at 94.8 and 94.0%, just above the 5% loss limit) |
+| platform_jitter | sway 12 px/frame plus vibration 20 px/frame (rows 23, 25) | raw error 19.0 to 19.4 px, lock 99.3 to 100% |
+| platform_max | both at the PS maximum, 20 + 20 px/frame | acquisition 0.73 to 0.97 s, lock 93.4 to 97.2%, error 21.7 to 23.5 px: the documented physical limit |
 | platform_max_10degs | the same with the gimbal at 10 deg/s | the same result: the motor is not the limit, the random jump is |
-| full_stress | three beacons, haze, noise, sway, vibration (row 8) | designated beacon held, error 11.4 to 12.1 px, lock 100% |
-| fast_circular | 450 px circle at 4 deg/s, 80% of the camera turn rate (rows 13, 14, 17) | acquisition 0.80 to 0.87 s, error 8.4 to 9.6 px, 100% lock; the scenario check shows "Near the limit" |
-| hardmode_line | tracker sees only the window; must sweep | acquisition 3 to 12 s (spiral sweep), then as clear line |
-| decoys_identical | Remote terminal plus three identical look-alikes starting apart, paths crossing; designation start (row 8) | acquisition 0.60 to 0.73 s, error 5.9 to 7.0 px, 100% lock |
-| beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | acquisition 0.73 to 0.83 s, error 6.1 to 7.1 px, lock 99.5 to 100% |
+| full_stress | three beacons, haze, noise, sway, vibration (row 8) | designated beacon held, acquisition 0.30 to 1.03 s, error 10.3 to 11.3 px, lock 98.2 to 100% |
+| fast_circular | 450 px circle at 4 deg/s, 80% of the camera turn rate (rows 13, 14, 17) | acquisition 0.67 to 0.70 s, error 4.6 to 5.3 px, 100% lock; the scenario check shows "Near the limit" |
+| hardmode_line | tracker sees only the window; must sweep | acquisition 2.83 to 11.97 s (spiral sweep), then error 2.6 to 3.7 px, 100% lock |
+| decoys_identical | Remote terminal plus three identical look-alikes starting apart, paths crossing; designation start (row 8) | error 3.3 to 3.5 px, 100% lock |
+| beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | error 2.6 to 3.1 px, 100% lock |
 | TEMPLATE_evaluator | every field labelled by PS row, PS defaults | behaves like clear line; copy it to enter evaluator values |
 
 Picking a scenario runs it exactly as written: its seed and paths are kept and "New seed each
@@ -118,7 +118,7 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 - Motion: line, circular, figure8, random, spiral, sinusoidal, waypoints, static.
 - Speed (px/s): 120 default. Above about 700 px/s (26 px per frame) the 5 deg/s gimbal
   saturates; the report then prints a note about it. A fast circle stays centred: fast_circular
-  (640 px/s on a 450 px radius) holds 8.4 to 9.6 px.
+  (640 px/s on a 450 px radius) holds 4.6 to 5.3 px.
 - Radius (px), Period (s): size and speed of the circular, figure-8, spiral and sinusoidal
   paths. Short periods with large radii raise the acceleration and the tracking error.
 - Start: random, centre, or "x,y" typed in screen pixels (for example 400,1500).
@@ -146,8 +146,10 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   beacons take longer.
 - Faint path threshold (3.0 sigma) and min chain SNR (3.5): the faint-beacon path. Higher
   values are stricter.
-- Controller gains kp, kd, ki, feedforward, estimator lag: the PID and lead. The defaults were
-  tuned on the scenario pack; large changes show up as oscillation on the gimbal plot.
+- Controller gains kp, kd, ki, feedforward, estimator lag: the PID and lead. Defaults kp 5, kd 0,
+  ki 0.8. kd is 0 because the error arrives a frame late in whole pixels: set it to 0.3 and a
+  still beacon shows a limit cycle of about +/-10 px on the gimbal plot. Large changes to the
+  other gains show up as oscillation too.
 - Use picture-shift estimate: on by default; off makes vibration handling worse.
 
 ### Scenario check
@@ -182,7 +184,7 @@ and in the summary `checks`.
    `<video>_truth.csv` beside the video, or run `fsoc-tracker video clip.mp4 --truth truth.csv`.
    Expect the error tiles to show values and the report's source line to name the file; without
    it the line says "no ground-truth file". A noisy_line clip rendered to .mp4 with its truth
-   gave tracking error 8.09 px and centroiding error 0.188 px. A path that does not exist gives
+   gave tracking error 4.85 px and centroiding error 0.188 px. A path that does not exist gives
    a "Cannot be met" note.
 
 Things to try: a phone video (variable frame rate is handled and flagged), a video with the
@@ -230,7 +232,8 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 42 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path)
+python -m pytest                       # 45 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track)
+python tools/ps_audit.py               # every PS item measured by running the code; writes docs/PS_AUDIT.md; 39 of 39 pass, exit 1 on a failure
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

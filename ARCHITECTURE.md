@@ -3,7 +3,7 @@
 Solution architecture for SIH Problem Statement 26169 (Department of Space / ISRO, Space Applications Centre).
 Mentors: Pranav Kumar Pandey (pranavpandey@sac.isro.gov.in), Koushik Basak (koushik@sac.isro.gov.in), Abhishek Khanna (akn@sac.isro.gov.in).
 
-This document is the design baseline for the code, the technical report, and the user manual. The implementation lives in `fsoc_tracker/`; where a constant below differs from the code, the code and `context.md` (Decisions) are current. Notable settled values: PID kp 5 / kd 0.3 / ki 0.8, feedforward 1.0 with acceleration lead 0.25 s, IMM process noise sqrt(q) = 32 / 200 / 71 px/s^2, capture radius 30 px, jitter cap 25 px, signature threshold 1.1, platform sway amplitude <= 20% of screen.
+This document is the design baseline for the code, the technical report, and the user manual. The implementation lives in `fsoc_tracker/`; where a constant below differs from the code, the code and `context.md` (Decisions) are current. Notable settled values: PID kp 5 / kd 0 / ki 0.8 (kd was 0.3 until 2026-09-23; it drove a +/-10 px limit cycle), feedforward 1.0 with acceleration lead 0.25 s, IMM process noise sqrt(q) = 32 / 200 / 71 px/s^2, capture radius 30 px, jitter cap 25 px, signature threshold 1.1, platform sway amplitude <= 20% of screen.
 
 ---
 

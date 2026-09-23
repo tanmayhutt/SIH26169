@@ -76,6 +76,7 @@ class Tracker:
         self._chains: list[dict] = []     # track-before-detect chains while searching
         self._faint_v = (0.0, 0.0)
         self._faint_q: list[float] = []
+        self._faint_sig: list[float] = []   # widths accepted by the faint track, for its size gate
         self._det_img: np.ndarray | None = None
         self._audit_det: ClassicalDetector | None = None   # half-resolution detector for the identity audit
         self._static: np.ndarray | None = None   # running mean of the picture: stars and sky, not a moving beacon
@@ -231,12 +232,22 @@ class Tracker:
             n_c = len(cands)
             chosen, gate_d = self._associate(cands)
             if chosen is not None:
+                raw = chosen
                 chosen = self.classical.refine(det_img, chosen)
+                if self.faint:
+                    # at 3 to 6 sigma the sub-pixel fit can slide onto a neighbouring noise clump
+                    # (the centre jumps, the width balloons); one such measurement kicks the
+                    # velocity and the track walks off the beacon, so keep the detection instead
+                    ref = float(np.median(self._faint_sig)) if len(self._faint_sig) >= 5 else max(raw.sigma, 1.0)
+                    if np.hypot(chosen.x - raw.x, chosen.y - raw.y) > 3.0 or chosen.sigma > 2.5 * max(ref, 0.8):
+                        chosen = raw
             tier = "classical" if chosen is not None else "none"
             # Tier 2: the CNN fills gaps. It is asked only when the classical detector found
             # nothing acceptable near the prediction, and its answer is used only when it is
             # confident and close to the prediction. It never overrides a classical hit.
-            if chosen is None and self.cnn is not None and self.tc.detector in ("cnn", "hybrid"):
+            # (not for a faint track: the network was trained on visible beacons, and on a 3 to 6
+            # sigma patch its peak is as likely noise; the faint path has its own detector)
+            if chosen is None and not self.faint and self.cnn is not None and self.tc.detector in ("cnn", "hybrid"):
                 c2 = self.cnn.detect(img, px, py)
                 if c2 is not None and c2.confidence >= 0.6:
                     g2 = self.imm.gate(c2.x, c2.y)
@@ -487,6 +498,7 @@ class Tracker:
         self.provisional = True
         self.faint = True
         self._faint_q = []
+        self._faint_sig = []
         self._faint_v = (ch["vx"], ch["vy"])
         last = ch["last"]   # appearance of the real detection, so the track's signature is realistic
         return Candidate(ch["x"], ch["y"], last.area, last.peak, float(np.mean(ch["snr"][-6:])), float(np.median(ch["sig"][-6:])), 0.5, "classical", True, last.bw, last.bh, last.hm_area)
@@ -526,8 +538,13 @@ class Tracker:
         px, py = self.imm.position()
         gate = min(12.0 + 3.0 * self.jitter_sigma, 40.0) * (1 + 0.3 * self.miss_count)
         best, best_g = None, 0.0
+        # the beacon's width stays about the same from frame to frame; a much wider blob in the
+        # gate is a noise smudge, however strong, and following it walks the track off the beacon
+        sig_ref = float(np.median(self._faint_sig)) if len(self._faint_sig) >= 5 else None
         for c in cands:
             if c.snr < 2.5 or np.hypot(c.x - px, c.y - py) > gate:
+                continue
+            if sig_ref is not None and c.sigma > 2.5 * max(sig_ref, 0.8):
                 continue
             g = self.imm.gate(c.x, c.y)
             if g > 5.0:
@@ -537,6 +554,8 @@ class Tracker:
         if best is not None:
             self._faint_q.append(best.snr)
             self._faint_q = self._faint_q[-12:]
+            self._faint_sig.append(best.sigma)
+            self._faint_sig = self._faint_sig[-15:]
             if len(self._faint_q) >= 12 and float(np.mean(self._faint_q)) < 3.0:
                 self._set(Mode.SEARCH)
                 self.imm.initialised = False

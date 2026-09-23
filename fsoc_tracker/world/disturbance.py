@@ -111,7 +111,10 @@ class DisturbanceModel:
         if c.platform_motion == "circular":
             return amp * math.cos(w * t), amp * math.sin(w * t)
         if c.platform_motion == "figure8":
-            return amp * math.sin(w * t), 0.5 * amp * math.sin(2 * w * t)
+            # the figure-8 path is fastest at its crossing, sqrt(2) times the circle's speed;
+            # scale it so its peak speed is v, like every other pattern
+            a8 = amp / math.sqrt(2.0)
+            return a8 * math.sin(w * t), 0.5 * a8 * math.sin(2 * w * t)
         if c.platform_motion == "spiral":
             r = amp * (0.2 + 0.8 * ((t / (3 * c.platform_period_s)) % 1.0))
             return r * math.cos(w * t), r * math.sin(w * t)

@@ -74,6 +74,12 @@ jobs:
       - name: Tests
         shell: bash
         run: python -m pytest -q
+      - name: PS audit (every row, shall item, deliverable and benchmark of 26169.pdf, measured)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python tools/ps_audit.py --out out/PS_AUDIT.md
       - name: Web app smoke test
         shell: bash
         run: python webapp/smoke.py

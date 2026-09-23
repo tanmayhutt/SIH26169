@@ -230,11 +230,17 @@ Shows the target chosen in Edit target.
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
 - Controller gains, deadband, capture radius, estimator lag, minimum confidence to acquire.
+  Defaults: kp 5, kd 0, ki 0.8. The derivative gain is 0 on purpose: the error reaches the
+  controller one frame late and in whole pixels, and a derivative on it (0.3 before) drove a
+  limit cycle of about +/-10 px, so a still beacon was never settled. With kd 0 a still beacon
+  is held within 4 px.
 - Faint path: when nothing reaches the acquisition confidence, weak detections (threshold
   `faint_threshold_k`, default 3 sigma) are linked across frames and a motion-consistent
   chain with mean SNR above `faint_snr_min` (default 3.5) is promoted. Used automatically for
-  dim beacons in low light; a static dim beacon is not covered by this path.
-- Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 3 to 12 s depending on where the beacon is.
+  dim beacons in low light; a static dim beacon is not covered by this path. While a faint track
+  is active, a sub-pixel fit that jumps more than 3 px or balloons in width is discarded, much
+  wider blobs are not followed, and the AI detector is not used.
+- Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 2.83 to 11.97 s (measured) depending on where the beacon is.
 
 ### 4.1 Scenario check
 
@@ -288,7 +294,7 @@ true lock retention are computed against their positions.
 | Scenario file | field `video_truth` |
 
 The report's source line names the truth file or says "no ground-truth file". Measured on a
-noisy_line clip rendered to `.mp4` with its truth: tracking error 8.09 px, centroiding error
+noisy_line clip rendered to `.mp4` with its truth: tracking error 4.85 px, centroiding error
 0.188 px; without the file both read n/a.
 
 ## 6. Scenario files and the command line
@@ -383,6 +389,8 @@ an `envelope.md` table. The web app names its downloads the same way.
   scenario check shows it as "Corrected" with the old and new value.
 - The beacon is never acquired: read the scenario check. "Cannot be met" notes name the setting
   that makes the run impossible.
+- The camera keeps swinging around a still beacon: check that kd is 0. A derivative gain above
+  0 makes the camera oscillate by about +/-10 px.
 - The window does not start on Linux: install `libxcb-cursor0` (Qt 6 requirement).
 - Low frame rate: reduce the screen size, disable Poisson noise, or uncheck Real-time
   pacing to see the true processing speed.

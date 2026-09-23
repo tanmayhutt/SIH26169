@@ -8,5 +8,6 @@
 - [ ] Perception, estimation or control changed: regression batch compared with `tools/compare_batches.py`, no run worse (paste the last line)
 - [ ] Interface changed: made in `fsoc_tracker/ui_shared.py` so desktop and web stay the same; screenshots checked
 - [ ] `python webapp/smoke.py` passes
+- [ ] `python tools/ps_audit.py` passes every check (it rewrites `docs/PS_AUDIT.md`; commit it)
 - [ ] Records updated where affected: `web/progress.json`, `PROGRESS.md`, `COMPLIANCE.md`, `docs/HANDOVER.md`, `docs/KNOWLEDGE_TRANSFER.md`, PDFs
 - [ ] Not tuned to a single test video; no competitor code; no secrets committed

@@ -1,27 +1,27 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 16 \u00b7 tests 42 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 16 \u00b7 tests 45 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-23",
   "verification": {
     "title": "Build verification: September 23, 2026",
-    "summary": "42 of 42 automated checks pass locally after the September 23 changes (designation, target names, shapes and sizes, scenario check, input validation) and the fixes from an independent review (FPS metric, fast targets, coasting guard, faint-path speed, Benchmark 2 ground truth). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
+    "summary": "45 of 45 automated checks pass locally after the September 23 changes (designation, target names, shapes and sizes, scenario check, input validation), the fixes from an independent review (FPS metric, fast targets, coasting guard, faint-path speed, Benchmark 2 ground truth) and the fixes the PS audit led to (no derivative term, figure-8 sway within its setting, faint-track guards). The PS audit (tools/ps_audit.py) measures every PS item by running the code: 39 of 39 pass. The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
       {
         "name": "Automated tests",
         "status": "pass",
-        "text": "42 of 42 pytest checks locally: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point, and 8 target tests (width and height, every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra targets, the designated target is the one scored, identical decoys need a cue, typed start), and 5 review-fix tests (FPS is frames over processing time, a 4 deg/s target is kept centred, a coasting estimate cannot run off the screen, video ground truth gives errors, the CNN model is found from any folder). The earlier 22 passed on the Windows, Linux, Intel Mac and Apple silicon runners; that run will be repeated for the new tests."
+        "text": "45 of 45 pytest checks locally: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point, and 8 target tests (width and height, every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra targets, the designated target is the one scored, identical decoys need a cue, typed start), and 5 review-fix tests (FPS is frames over processing time, a 4 deg/s target is kept centred, a coasting estimate cannot run off the screen, video ground truth gives errors, the CNN model is found from any folder), and 3 PS-audit tests (a still beacon is centred without oscillation, the platform sway never exceeds the set speed, a faint track is not walked off by noise). The earlier 22 passed on the Windows, Linux, Intel Mac and Apple silicon runners; that run will be repeated for the new tests."
       },
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "16 scenarios (incl. the platform maximum at 10 deg/s and the new fast_circular), 15 s each, 3 seeds, compared run by run with the previous batch. After the review fixes, against the committed merge: 38 same, 10 better, 0 worse, 3 new (fast_circular). Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.7 to 12.3 px at 91 to 97.5% over ten seeds before the review fixes (was not acquired at all); seeds 0 to 2 now 96.4 to 97.8%. Multi-target stress 11.4 to 12.1 px at 100% lock (was 13.7 to 14.4 px at 98.4 to 98.8%). fast_circular (450 px circle at 4 deg/s, 80% of the turn rate): acquisition 0.80 to 0.87 s, 8.4 to 9.6 px, 100% lock. Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep. decoys_identical (three identical look-alikes, designation start), seeds 0 to 4: acquisition 0.60 to 0.73 s, 5.9 to 7.0 px, 100% lock. beacon_shapes (8 x 18 px rectangle among other shapes): 0.73 to 0.83 s, 6.1 to 7.1 px, 99.5 to 100% lock."
+        "text": "16 scenarios (incl. the platform maximum at 10 deg/s and fast_circular), 15 s each, seeds 0 to 2, compared run by run with the previous batch. After the PS audit fixes, against the previous commit: 0 worse, 5 better by the tool's lock rule (platform maximum lock), every other run in its \"same\" band, although tracking errors dropped by about two thirds (the comparison tool flags error increases, not decreases). Clear line, circle and figure of 8: acquisition 0.60 to 1.33 s, 2.1 to 3.7 px mean tracking error, 100% lock, centroid error 0.006 to 0.007 px, 190 to 216 FPS. Clear random walk: 0.67 to 1.03 s, 5.1 to 6.3 px, 100%. Heavy noise (10% salt and pepper, sigma 20, Poisson): 0.67 to 1.00 s, 2.4 to 3.7 px, 100%, centroid 0.19 px, 97 to 105 FPS. Fog and low light: 0.63 to 1.57 s, 2.5 to 3.7 px, 100%, centroid 0.08 to 0.15 px. Faint beacon over seeds 0 to 9: 0.80 to 2.00 s, 2.4 to 3.5 px, 94.0 to 97.8% lock; seeds 7 and 8 at 94.8 and 94.0%, just above the 5% target-loss limit. Multi-target stress: 0.30 to 1.03 s, 10.3 to 11.3 px, 98.2 to 100% lock. decoys_identical: 3.3 to 3.5 px, 100%. beacon_shapes: 2.6 to 3.1 px, 100%. fast_circular (450 px circle at 4 deg/s, 80% of the turn rate): 0.67 to 0.70 s, 4.6 to 5.3 px, 100%. Hard mode: 2.83 to 11.97 s (search, by design), 2.6 to 3.7 px, 100%. FPS over the whole pack 69 to 216."
       },
       {
         "name": "Multi-seed envelope",
         "status": "pass",
-        "text": "3 seeds per scenario, all 13 scenarios of the September 22 pack; the faint scenario over 10 seeds. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum held 76 to 88% lock at 5 and at 10 deg/s alike; after the review fixes 88.5 to 94.8%, error about 23 to 25 px: the random per-frame vibration is the physical limit."
+        "text": "3 seeds per scenario, all 13 scenarios of the September 22 pack; the faint scenario over 10 seeds. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum held 76 to 88% lock at 5 and at 10 deg/s alike; after the review fixes 88.5 to 94.8%; after the PS audit fixes 93.4 to 97.2%, error 21.7 to 23.5 px: the random per-frame vibration is the physical limit."
       },
       {
         "name": "Truth independence",
@@ -41,12 +41,12 @@
       {
         "name": "AI detector",
         "status": "pass",
-        "text": "Kept as a gap-filling fallback (v2, 8 px validation localisation, 51% of measurements on a phone video, 0% in the standard scenarios). The faint-beacon case it was meant for is now handled classically by track-before-detect, so nothing in the specification depends on the network. The model path is also looked up from the package folder, so an installed command started from another folder still loads it."
+        "text": "Kept as a gap-filling fallback (v2, 8 px validation localisation, 51% of measurements on a phone video, 0% in the standard scenarios). The faint-beacon case it was meant for is now handled classically by track-before-detect, so nothing in the specification depends on the network. It is not used while a faint track is active: it was trained on visible beacons, and on a 3 to 6 sigma patch its peak was often noise. The model path is also looked up from the package folder, so an installed command started from another folder still loads it."
       },
       {
         "name": "Platform at PS maximum",
         "status": "blocked",
-        "text": "20 px per frame sway plus 20 px per frame vibration: 88.5 to 94.8% lock (platform_max and platform_max_10degs, 15 s, seeds 0 to 2, after the review fixes; was 76 to 88%), error about 23 to 25 px. Measured with the gimbal at the 10 deg/s the PS allows (platform_max_10degs.yaml): slew saturation drops from about a third of frames to 2%, lock and error do not improve. So the motor is not the limit; the random per-frame vibration is, and no controller can anticipate a random jump before the frame arrives. Every report under vibration prints this in words beside the vibration-removed figure."
+        "text": "20 px per frame sway plus 20 px per frame vibration: 93.4 to 97.2% lock (platform_max and platform_max_10degs, 15 s, seeds 0 to 2; 76 to 88% on September 22, 88.5 to 94.8% after the review fixes), error 21.7 to 23.5 px, acquisition 0.73 to 0.97 s. Measured with the gimbal at the 10 deg/s the PS allows (platform_max_10degs.yaml): slew saturation drops from about a third of frames to 2%, lock and error do not improve. So the motor is not the limit; the random per-frame vibration is, and no controller can anticipate a random jump before the frame arrives. Every report under vibration prints this in words beside the vibration-removed figure."
       },
       {
         "name": "Demo video",
@@ -104,9 +104,14 @@
         "text": "An independent review by a teammate's session, answered with measurements. FPS was the mean of per-frame rates (faint seed 2, 30 s: 92.0 said, 67.8 true); now frames over processing time, the old value kept as fps_inst_mean for comparison only. Fast targets: the estimator was within 0.4 to 0.7 px of the truth; the controller's straight-line lead pointed off a tight curve; the lead is now capped at a 0.1 rad turn (450 px circle at 4 deg/s: 34.3 px, 14 to 19% lock before; 8.4 px, 100% after). A coasting estimate could run far off the screen (faint seed 2, 30 s: 158 px, 75.1% lock, 4.53 s re-acquisition); it now falls back to a whole-scene search (5.9 px, 96.2%, 0.07 s). Faint-path linking vectorised: 99th-percentile frame 149 to 160 ms to 26 to 33 ms. Read and shot noise now use independent random planes. Unchanged by design: the tracker observes the whole scene (the documented reading of the PS; a wide-field finder remains future work), and the CNN stays a gap filler. Not reproduced: a 5 px beacon in rain with 10% salt and pepper reported as never acquired; our run (figure of 8, 30 s, seeds 0 to 2) acquired in 0.77 to 1.37 s at 6.0 to 6.5 px, 100% lock, 86 to 99 FPS."
       },
       {
+        "name": "PS audit",
+        "status": "pass",
+        "text": "tools/ps_audit.py measures every PS item by running the code: rows 1 to 25, the eight shall functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered noisy video and its truth CSV. It writes docs/PS_AUDIT.md and exits with 1 if any check fails; the build workflow runs it on the Linux job, and it is in CONTRIBUTING.md and the pull-request template. 39 of 39 pass. It found three defects, all fixed. Shall 6: the derivative gain (kd 0.3) acted on an error that reaches the controller one frame late and in whole pixels, and drove a limit cycle of about +/-10 px; a still beacon was never settled (mean 6.4 px, peak 15.6 px). With kd 0 it is held within 4 px (mean 1.6 px); the integral term stays. Row 25: the figure-8 sway peaked at 28.3 px/frame when set to 20 (it is fastest at its crossing, sqrt(2) times the circle speed); it is now scaled so its peak equals the setting. Faint beacon seed 7: the sub-pixel refit slid onto noise clumps and the track walked off (86 px, 78.6% lock); the raw detection is now kept when the refit moves more than 3 px or the width exceeds 2.5 times the track's recent median, much wider candidates are not associated, and the CNN is not used on a faint track: 2.8 px, 94.8% lock."
+      },
+      {
         "name": "Four-platform rerun",
         "status": "partial",
-        "text": "The build workflow and per-platform package check will be repeated for the September 23 changes and the review fixes; the archives on the site predate them."
+        "text": "The build workflow and per-platform package check will be repeated for the September 23 changes, the review fixes and the PS audit fixes; the archives on the site predate them."
       }
     ]
   },
@@ -654,6 +659,11 @@
               "name": "Salt and pepper shown in percent; every input clamped in the engine",
               "status": "done",
               "tag": "row 21"
+            },
+            {
+              "name": "Figure-8 sway scaled so its peak equals the setting (was 28.3 px/f at 20)",
+              "status": "done",
+              "tag": "row 25"
             }
           ]
         },
@@ -699,6 +709,10 @@
             },
             {
               "name": "Faint-path chain linking vectorised, identical results",
+              "status": "done"
+            },
+            {
+              "name": "Faint-track guards: refit jump and width checks; no CNN on a faint track (seed 7: 86 px to 2.8 px)",
               "status": "done"
             }
           ]
@@ -797,7 +811,7 @@
               "status": "done"
             },
             {
-              "name": "PID with clamping and deadband",
+              "name": "PI with clamping and deadband (kp 5, kd 0, ki 0.8)",
               "status": "done"
             },
             {
@@ -816,6 +830,11 @@
               "name": "Lead capped at a 0.1 rad turn of the path: 4 deg/s circle 34.3 px to 8.4 px",
               "status": "done",
               "tag": "rows 17-18"
+            },
+            {
+              "name": "Derivative removed (kd 0): the +/-10 px limit cycle on a still beacon is gone, held within 4 px",
+              "status": "done",
+              "tag": "shall 6"
             }
           ]
         }
@@ -871,52 +890,52 @@
           "caption": "results, 15 s runs",
           "items": [
             {
-              "name": "Clear paths 6.4 to 8.2 px, 100% lock, 3 seeds",
+              "name": "Clear paths 2.1 to 3.7 px, 100% lock, 3 seeds; random walk 5.1 to 6.3 px",
               "status": "done"
             },
             {
-              "name": "Heavy noise 7.3 to 8.2 px, 100% lock",
+              "name": "Heavy noise 2.4 to 3.7 px, 100% lock",
               "status": "done"
             },
             {
-              "name": "Fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, 100% lock",
+              "name": "Fog and low light 2.5 to 3.7 px, 100% lock",
               "status": "done"
             },
             {
-              "name": "Acquisition 0.6 to 2.0 s on every scenario except hard mode (3 to 12 s sweep) and one faint seed (5.5 s)",
+              "name": "Acquisition 0.30 to 2.00 s on the measured scenarios except hard mode (2.83 to 11.97 s sweep)",
               "status": "done"
             },
             {
-              "name": "Sway 12 px/f plus vibration: 99% lock; raw error 20 px because the picture itself jumps 20 px per frame, 14.6 px with the vibration removed. A random per-frame jitter is unknowable before the frame arrives, so no controller can cancel it: physical limit, documented",
+              "name": "Sway 12 px/f plus vibration: 99.3 to 100% lock; raw error 19.0 to 19.4 px because the picture itself jumps 20 px per frame. A random per-frame jitter is unknowable before the frame arrives, so no controller can cancel it: physical limit, documented",
               "status": "blocked",
               "tag": "20 px raw"
             },
             {
-              "name": "PS maximum sway 20 + 20 px/f: 88.5 to 94.8% lock, about 23 to 25 px, at 5 and 10 deg/s (slew saturation 2% at 10 deg/s), so the random per-frame vibration is the physical limit, not the motor",
+              "name": "PS maximum sway 20 + 20 px/f: 93.4 to 97.2% lock, 21.7 to 23.5 px, at 5 and 10 deg/s (slew saturation 2% at 10 deg/s), so the random per-frame vibration is the physical limit, not the motor",
               "status": "blocked",
               "tag": "limit"
             },
             {
-              "name": "Multi-target stress: 11.4 to 12.1 px, 100% lock on every seed",
+              "name": "Multi-target stress: 10.3 to 11.3 px, 98.2 to 100% lock",
               "status": "done"
             },
             {
-              "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 10 seeds all at 91 to 97.5% lock, acquisition under 2.8 s on nine",
+              "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 10 seeds at 94.0 to 97.8% lock (seeds 7 and 8 just above the 5% loss limit), acquisition 0.80 to 2.00 s",
               "status": "done",
-              "tag": "needs cnn"
+              "tag": "no cnn"
             },
             {
-              "name": "Identical decoys with designation start: 5.9 to 7.0 px, 100% lock, 5 seeds",
+              "name": "Identical decoys with designation start: 3.3 to 3.5 px, 100% lock, 3 seeds",
               "status": "done",
               "tag": "row 8"
             },
             {
-              "name": "Beacon shapes, 8 x 18 px rectangle among others: 6.1 to 7.1 px, 99.5 to 100% lock, 5 seeds",
+              "name": "Beacon shapes, 8 x 18 px rectangle among others: 2.6 to 3.1 px, 100% lock, 3 seeds",
               "status": "done",
               "tag": "rows 9-10"
             },
             {
-              "name": "Fast circle, 450 px at 4 deg/s: 8.4 to 9.6 px, 100% lock, 3 seeds",
+              "name": "Fast circle, 450 px at 4 deg/s: 4.6 to 5.3 px, 100% lock, 3 seeds",
               "status": "done",
               "tag": "new"
             }
@@ -1002,7 +1021,7 @@
       "blurb": "Tests that fail if the system drifts from the problem statement.",
       "groups": [
         {
-          "caption": "tests, 42 passing",
+          "caption": "tests, 45 passing",
           "items": [
             {
               "name": "Geometry and gimbal limits",
@@ -1045,6 +1064,15 @@
             {
               "name": "Review fixes: FPS, fast target, coasting guard, video truth, CNN path",
               "status": "done"
+            },
+            {
+              "name": "PS audit tests: still beacon, platform sway speed, faint track",
+              "status": "done"
+            },
+            {
+              "name": "PS audit tool and CI step: every PS item measured, 39 of 39",
+              "status": "done",
+              "tag": "compliance"
             }
           ]
         }
@@ -1171,6 +1199,10 @@
             {
               "name": "Demo video, about 4 min, composed from the engine (tools/make_demo_video.py); a narrated screen recording is optional",
               "status": "done"
+            },
+            {
+              "name": "docs/PS_AUDIT.md, generated by tools/ps_audit.py",
+              "status": "done"
             }
           ]
         },
@@ -1194,7 +1226,7 @@
               "status": "done"
             },
             {
-              "name": "SIH idea-submission presentation, 8 slides (docs/submission/)",
+              "name": "SIH idea-submission presentation, 8 slides, renamed ARGUS with the full form on slide 1 (docs/submission/ARGUS_SIH2026_26169.pdf)",
               "status": "done"
             },
             {

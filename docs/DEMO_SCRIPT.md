@@ -28,7 +28,8 @@ Scenario: clear line. Press Start.
 
 - Watch SEARCH turn to TRACK in about a second. Say: "acquisition under one second and a
   half, specification two seconds".
-- Point at the tracking error tile settling around 7 px, specification 10.
+- Point at the tracking error tile settling around 2 to 4 px (measured 2.1 to 3.7 px on the clear
+  paths), specification 10.
 - Point at the camera view: the beacon sits at the centre; the gimbal command plot shows
   the pan and tilt rates inside the 5 deg/s limit.
 - Press Stop, then Report. Show the PDF: header with the configuration, the metric table,
@@ -41,17 +42,18 @@ Change Motion to circular, then figure8, then random. Start each for ten seconds
 that spiral, sinusoidal and a user-defined waypoint path are there too.
 
 Optional: scenario fast circular. "A 450 px circle at 4 deg/s, 80 percent of the camera's
-turn rate. The scenario check says Near the limit." The error stays at 8.4 to 9.6 px with
+turn rate. The scenario check says Near the limit." The error stays at 4.6 to 5.3 px with
 100 percent lock.
 
 ## 4. Disturbances (3 min)
 
 - Scenario: noisy line. "Ten percent salt and pepper, Gaussian sigma 20 and Poisson noise,
-  all three PS noise kinds at once." Tracking error stays under 10 px.
+  all three PS noise kinds at once." Tracking error stays at 2.4 to 3.7 px, specification 10.
 - Scenario: fog circular. "Contrast reduced, brightness reduced, blur, turbulence."
 - Scenario: lowlight faint. "The beacon is at three to six sigma per frame. A single frame
   cannot find it; the tracker links weak detections across frames and only promotes a
-  chain with consistent motion." Show the acquisition in about two seconds.
+  chain with consistent motion." Show the acquisition in two seconds or less (0.80 to 2.00 s
+  over ten seeds).
 - Scenario: platform jitter. "Camera jitter and platform sway, both from row 23 and 25.
   The picture shift is measured every frame and fed forward to the gimbal." Point out the
   vibration-removed error in the report later.
@@ -71,8 +73,8 @@ turn rate. The scenario check says Near the limit." The error stays at 8.4 to 9.
 ## 6. Hard mode (1 min)
 
 Set Hard mode to yes on clear line. "Now the tracker sees only the camera window, so it
-must sweep the screen. The square-spiral search finds the beacon in three to twelve
-seconds at the 5 deg/s limit." This is the honest cost of the rate limit; the PS allows up
+must sweep the screen. The square-spiral search finds the beacon in 2.8 to 12 seconds
+at the 5 deg/s limit." This is the honest cost of the rate limit; the PS allows up
 to 10 deg/s, and raising it shortens the sweep.
 
 ## 7. Benchmark 2, video input (2 min)

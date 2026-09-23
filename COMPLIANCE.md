@@ -3,7 +3,9 @@
 Source of truth: `26169.pdf` (SIH26169, Department of Space / ISRO SAC). Every row of its
 parameter table, every "shall" item, every deliverable and every evaluation stage is listed
 here with where it is implemented and how it is verified. `tests/test_ps_compliance.py`
-fails if any default is changed away from the PS.
+fails if any default is changed away from the PS. `tools/ps_audit.py` measures every row, "shall"
+item, deliverable and benchmark by running the code and writes `docs/PS_AUDIT.md` (39 of 39 pass on
+2026-09-23); the build runs it on the Linux job and fails if any check fails.
 
 Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not yet.
 
@@ -26,16 +28,16 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 13 | Max pan speed | 5 to 10 deg/s, default 5 | 5, editable | `CameraConfig.max_pan_rate_deg_s`, enforced in `Gimbal.apply` | `test_rows_13_to_15`, `test_gimbal_rate_and_pose_limits` | 🟩 |
 | 14 | Max tilt speed | 5 to 10 deg/s, default 5 | 5, editable | same | same | 🟩 |
 | 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz | `Simulation.steps` | `test_rows_13_to_15` | 🟩 |
-| 16 | Acquisition time | <= 2 s | 0.6 to 1.4 s measured (full view) | `metrics.summarise` | `test_closed_loop_clear_meets_spec`, batch envelope | 🟩 |
-| 17 | Tracking error | <= 10 px | 6.6 to 7.3 px clear, noise, fog, low light; 8.4 to 9.6 px on a 450 px circle at 4 deg/s (lead capped by the path's turn) | same, `Controller.TURN_MAX` | same, `fast_circular.yaml`, `test_review_fixes.py` | 🟩 (🟨 under 20 px/frame vibration the truth itself jumps; vibration-removed value also reported) |
-| 18 | Target loss | < 5% | 0 to 2% on full-view scenarios; 0% on the fast circle; a coasting estimate more than 160 px outside the picture falls back to a whole-scene search | same, `Tracker` | same, `test_review_fixes.py` | 🟩 |
+| 16 | Acquisition time | <= 2 s | 0.60 to 1.57 s measured on clear, noise, fog and low light (full view); faint beacon 0.80 to 2.00 s over 10 seeds | `metrics.summarise` | `test_closed_loop_clear_meets_spec`, batch envelope | 🟩 |
+| 17 | Tracking error | <= 10 px | 2.1 to 3.7 px clear line, circle and figure 8; 5.1 to 6.3 px random walk; 2.4 to 3.7 px heavy noise; 2.5 to 3.7 px fog and low light; 4.6 to 5.3 px on a 450 px circle at 4 deg/s (lead capped by the path's turn); a still beacon held within 4 px (no derivative term, which drove a +/-10 px limit cycle) | same, `Controller.TURN_MAX` | same, `fast_circular.yaml`, `test_review_fixes.py` | 🟩 (🟨 under 20 px/frame vibration the truth itself jumps; vibration-removed value also reported) |
+| 18 | Target loss | < 5% | 0% on clear, noise, fog, low light and the fast circle (lock 100%); faint beacon lock 94.0 to 97.8% over 10 seeds (seeds 7 and 8 at 94.8 and 94.0%, just above the limit); a coasting estimate more than 160 px outside the picture falls back to a whole-scene search | same, `Tracker` | same, `test_review_fixes.py` | 🟩 |
 | 19 | Re-acquisition time | <= 1 s | 0.07 to 0.4 s measured | same | `test_closed_loop_with_disturbance_keeps_lock` | 🟩 |
-| 20 | Processing speed | >= 20 FPS | 76 to 218 FPS at 2000 x 2000 over the 16-scenario pack (2026-09-23 batch); `fps_mean` is frames over processing time (1000 / mean ms), the mean of per-frame rates is kept as `fps_inst_mean` for comparison only | same | all closed-loop tests, `test_review_fixes.py` | 🟩 |
+| 20 | Processing speed | >= 20 FPS | 69 to 216 FPS at 2000 x 2000 over the 16-scenario pack (2026-09-23 batch); `fps_mean` is frames over processing time (1000 / mean ms), the mean of per-frame rates is kept as `fps_inst_mean` for comparison only | same | all closed-loop tests, `test_review_fixes.py` | 🟩 |
 | 21 | Image noise | salt and pepper (~10%), Gaussian, Poisson; one or more selectable | all three, independent switches; salt and pepper shown in percent on both panels, stored as a fraction; inputs clamped, above 10% flagged by the scenario check | `DisturbanceModel.apply_image`, `engine/checks.py` | `test_rows_21_to_25`, `test_salt_and_pepper_shown_in_percent`, `test_scenario_check_clamps_and_warns`, `noisy_line.yaml` | 🟩 |
 | 22 | Max standard deviation of noise | 20 px, user-defined | `gaussian_sigma` up to any value | `DisturbanceConfig.gaussian_sigma` | `test_rows_21_to_25` | 🟩 |
 | 23 | Max camera jitter | +/- 20 px per frame, user-defined | `jitter_px`, applied to the whole picture | `DisturbanceModel.step` | `platform_jitter.yaml` | 🟩 |
 | 24 | Atmospheric disturbance | Clear, Haze, Fog, Rain, Low light; user-defined reduction in contrast and brightness | five presets plus editable contrast, brightness, blur, turbulence | `ATMOSPHERE_PRESETS`, `apply_image` | `test_rows_21_to_25`, `fog_circular.yaml`, `lowlight_figure8.yaml` | 🟩 |
-| 25 | Platform motion | +/- 20 px per frame max; linear mandatory; circular, random, spiral, figure of 8 optional | all five as bounded sways with the configured peak speed | `DisturbanceModel._platform` | `test_rows_21_to_25`, `platform_jitter.yaml`, `platform_max.yaml` | 🟩 |
+| 25 | Platform motion | +/- 20 px per frame max; linear mandatory; circular, random, spiral, figure of 8 optional | all five as bounded sways with the configured peak speed; the figure 8 is scaled so its peak equals the setting (it peaked at 28.3 px/frame at a 20 setting before 2026-09-23); the PS audit measures the peak of every pattern, never above 20 | `DisturbanceModel._platform` | `test_rows_21_to_25`, `platform_jitter.yaml`, `platform_max.yaml` | 🟩 |
 
 ## "The developed software shall be able to"
 
@@ -80,4 +82,4 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | What "lock" means | TRACK state with the estimate within 30 px of the window centre | acquisition needs a capture criterion |
 | How the "designated" target is designated | appearance (default), start cue or point cue (click or typed); tracking every beacon at once not built | the PS says "a designated moving target" but not how; its metrics are for one target |
 | A sustained 20 px per frame platform shift | modelled as a bounded sway with that peak speed | a sustained shift leaves the screen in seconds |
-| AI role | classical detector first; CNN fills gaps and handles faint beacons; trained on the simulator's exact labels; it supplies 0% of measurements in the standard scenarios | keeps FPS and reliability independent of the model |
+| AI role | classical detector first; CNN fills gaps (not on a faint track, which has its own track-before-detect); trained on the simulator's exact labels; it supplies 0% of measurements in the standard scenarios | keeps FPS and reliability independent of the model |

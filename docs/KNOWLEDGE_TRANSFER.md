@@ -407,8 +407,11 @@ The command to the mount has two parts:
 
 - **Feed-forward**: turn at the speed the beacon is predicted to move, leading it by the mount's
   delay. This does most of the work.
-- **PID correction**: a small correction proportional to the remaining error, its rate of change,
-  and its sum over time.
+- **PI correction**: a small correction proportional to the remaining error (kp 5) and to its sum
+  over time (ki 0.8). The derivative gain kd is 0. It was 0.3 until 2026-09-23: the error reaches
+  the controller one frame late and in whole pixels, so a derivative on it drove a limit cycle of
+  about +/-10 px. On a still beacon the camera oscillated forever (mean 6.4 px, peak 15.6 px). With
+  kd 0 a still beacon is held within 4 px (mean 1.6 px).
 
 The lead is defined at 30 Hz and scales with the camera rate, so a 60 fps video is handled
 correctly. Commands never exceed the speed limit; the report says when the mount was at its limit.
@@ -417,7 +420,7 @@ The lead is also capped on tight curves. A fixed 0.25 s lead extrapolates in a s
 fast circle that points the feed-forward off the path. So the lead is shortened until the path
 turns by at most 0.1 rad over it. Slow or gently curving beacons keep the full lead. On a 450 px
 circle at 4 deg/s (80 percent of the camera turn rate) the error fell from 34.3 px at 14 to 19
-percent lock to 8.4 px at 100 percent lock.
+percent lock to 8.4 px at 100 percent lock (4.6 to 5.3 px now, with kd 0).
 
 ## B8. Step 7: measure and report (the performance log)
 
@@ -453,7 +456,7 @@ target loss, re-acquisition count and times, processing time, gimbal saturation.
    "beacon not visible"), tracking error, centroiding error, RMSE and a true lock retention are
    computed against the evaluators' positions. Give it with `--truth truth.csv`, the "Truth CSV"
    toolbar button (desktop and web), or name it `<video>_truth.csv` next to the video. On a
-   noisy_line clip rendered to .mp4 with its truth: tracking error 8.09 px, centroiding error
+   noisy_line clip rendered to .mp4 with its truth: tracking error 4.85 px, centroiding error
    0.188 px.
 
 ## B10. Step 9: where the AI is
@@ -465,7 +468,8 @@ target loss, re-acquisition count and times, processing time, gimbal saturation.
 - It runs through ONNX Runtime, a small engine, from a 0.3 MB file; the training library is not
   shipped.
 - It is used only when the classical detector finds nothing near the prediction, and never
-  overrides it. It is loaded and warmed up at start so its first use does not freeze a run.
+  overrides it. It is not used while a faint track is active: it was trained on visible beacons,
+  and on a 3 to 6 sigma patch its peak was often noise. It is loaded and warmed up at start so its first use does not freeze a run.
 - Honest assessment: it is a gap filler. In the standard scenarios it supplies 0 percent of the
   measurements, because the classical path does not miss there; on a real phone video it supplied
   about half the measurements.
@@ -481,7 +485,12 @@ Noise sparkles appear and vanish at random, but a real beacon moves along a smoo
 nothing clear is found, the tracker follows many weak candidates across frames and keeps only a
 chain that moves consistently, is hit in 6 of 8 frames, and has the right size. That chain becomes
 a provisional track that must be confirmed in 5 of 6 frames. This took the faint-beacon scenario
-from never acquired to 91 to 97.5 percent lock. The chain linking is vectorised (same greedy
+from never acquired to 94.0 to 97.8 percent lock over 10 seeds. Two guards keep a faint track on
+the beacon. The sub-pixel refit could slide onto a neighbouring noise clump (the centre jumped
+several px, the width ballooned to 7.5 px), so the raw detection is kept when the refit moves more
+than 3 px or the width exceeds 2.5 times the track's recent median width, and a much wider
+candidate is not associated. On seed 7 this took the run from 86 px error and 78.6 percent lock to
+2.8 px and 94.8 percent. The chain linking is vectorised (same greedy
 order, identical results), so the 99th-percentile frame time on the faint beacon fell from 149 to
 160 ms to 26 to 33 ms.
 
@@ -509,7 +518,11 @@ published. Nothing needs installing, and it works offline.
 
 ## B14. Step 13: how we know it works
 
-- 42 automated tests, including one per group of PS rows that pins every default to the PS.
+- 45 automated tests, including one per group of PS rows that pins every default to the PS.
+- A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
+  the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
+  noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
+  fails. Now 39 of 39 pass.
 - A regression batch: 16 scenarios x 3 seeds, compared run by run with the previous batch before
   any change is accepted.
 - Package checks on each platform, and hand checks on both macOS builds.
@@ -575,6 +588,14 @@ published. Nothing needs installing, and it works offline.
   random planes. One reported failure (a 5 px beacon in rain with 10% salt and pepper, never
   acquired) could not be reproduced with our settings: 0.77 to 1.37 s, 6.0 to 6.5 px, 100% lock.
   Regression batch against the committed merge: 38 same, 10 better, 0 worse, 3 new (fast_circular).
+- **2026-09-23 evening. The PS audit.** A new tool measures every PS item by running the code. Its
+  Shall 6 check found that a still beacon was never settled: the derivative gain drove a limit
+  cycle of about +/-10 px (mean 6.4 px, peak 15.6 px). With kd 0 it is held within 4 px (mean
+  1.6 px), and tracking errors across the pack dropped by about two thirds. Its row 25 check found
+  the figure-8 sway peaking at 28.3 px/frame when set to 20; it is now scaled so its peak equals
+  the setting. The faint beacon seed 7 walked off onto noise (86 px, 78.6% lock); the refit and
+  width guards and keeping the CNN off faint tracks give 2.8 px, 94.8%. Regression: 0 worse, 5
+  better (platform maximum lock). The audit passes 39 of 39. The deck was renamed ARGUS.
 
 ## C2. Principles we adopted along the way
 
@@ -601,6 +622,7 @@ published. Nothing needs installing, and it works offline.
 | Half-maximum area as the identity size | Worse under noise | Fitted width plus area |
 | Heavier appearance weight in identity | Rejected the true beacon in haze | Kept moderate |
 | Control-side tweaks for the platform maximum (filtered derivative, adaptive noise, smoothed derivative) | Helped one scenario, hurt another | Reverted |
+| Derivative gain kd 0.3 | A +/-10 px limit cycle: a still beacon never settled (mean 6.4 px, peak 15.6 px) | kd 0; a still beacon is held within 4 px |
 | Motor at 10 deg/s for the platform maximum | Saturation 2 percent, lock unchanged | Limit documented as the shake |
 | Neural network as the main detector | Less accurate and slower than classical | Kept as a gap filler |
 
@@ -612,22 +634,23 @@ published. Nothing needs installing, and it works offline.
 
 | Scenario | Acquisition | Tracking error (mean) | Lock | Verdict |
 |---|---|---|---|---|
-| Clear line, circle, figure of 8 | 0.7 to 1.4 s | 6.4 to 8.2 px | 100% | pass |
-| Clear random walk | about 1.1 s | about 10 px | 98% | pass |
-| Heavy noise (salt and pepper 10%, Gaussian 20, Poisson) | 0.8 to 1.1 s | 7.3 to 8.2 px | 100% | pass |
-| Fog | 0.7 to 1.4 s | 6.6 to 7.3 px | 100% | pass |
-| Low light | 0.8 to 1.7 s | 6.9 to 8.0 px | 100% | pass |
-| Faint beacon (3 to 6 sigma per frame), 10 seeds | 1.3 to 2.8 s (one seed 5.5 s) | 6.7 to 12.3 px | 91 to 97.5% | pass on most seeds; after the review fixes, seeds 0 to 2 hold 96.4 to 97.8% |
-| Multi-target stress (decoys, haze, noise, sway, shake) | 0.7 to 1.3 s | 11.4 to 12.1 px | 100% | identity held; error above 10 px because of the shake |
-| Sway 12 px/frame plus shake 20 px/frame | about 0.8 s | about 20 px raw, 14 px with the shake removed | 96 to 99% | shake limit |
-| Platform at the PS maximum (20 + 20 px/frame), 5 and 10 deg/s | about 0.8 s | about 23 to 25 px | 88.5 to 94.8% | documented physical limit |
-| Fast circle, 450 px at 4 deg/s (80% of the camera turn rate) | 0.80 to 0.87 s | 8.4 to 9.6 px | 100% | pass |
-| Hard mode (window only) | 3 to 12 s | 7 to 12 px | 100% after the sweep | acquisition beyond 2 s by design |
-| Identical decoys, designation start (5 seeds) | 0.60 to 0.73 s | 5.9 to 7.0 px | 100% | pass |
-| Beacon shapes, 8 x 18 px rectangle among other shapes (5 seeds) | 0.73 to 0.83 s | 6.1 to 7.1 px | 99.5 to 100% | pass |
+| Clear line, circle, figure of 8 | 0.60 to 1.33 s | 2.1 to 3.7 px | 100% | pass |
+| Clear random walk | 0.67 to 1.03 s | 5.1 to 6.3 px | 100% | pass |
+| Heavy noise (salt and pepper 10%, Gaussian 20, Poisson) | 0.67 to 1.00 s | 2.4 to 3.7 px | 100% | pass |
+| Fog and low light | 0.63 to 1.57 s | 2.5 to 3.7 px | 100% | pass |
+| Faint beacon (3 to 6 sigma per frame), 10 seeds | 0.80 to 2.00 s | 2.4 to 3.5 px | 94.0 to 97.8% | pass; seeds 7 and 8 at 94.8 and 94.0%, just above the 5% target-loss limit |
+| Multi-target stress (decoys, haze, noise, sway, shake) | 0.30 to 1.03 s | 10.3 to 11.3 px | 98.2 to 100% | identity held; error above 10 px because of the shake |
+| Sway 12 px/frame plus shake 20 px/frame | about 0.8 s | 19.0 to 19.4 px raw | 99.3 to 100% | shake limit |
+| Platform at the PS maximum (20 + 20 px/frame), 5 and 10 deg/s | 0.73 to 0.97 s | 21.7 to 23.5 px | 93.4 to 97.2% | documented physical limit |
+| Fast circle, 450 px at 4 deg/s (80% of the camera turn rate) | 0.67 to 0.70 s | 4.6 to 5.3 px | 100% | pass |
+| Hard mode (window only) | 2.83 to 11.97 s | 2.6 to 3.7 px | 100% | acquisition beyond 2 s by design (search) |
+| Identical decoys, designation start | 0.60 to 0.73 s | 3.3 to 3.5 px | 100% | pass |
+| Beacon shapes, 8 x 18 px rectangle among other shapes | 0.73 to 0.83 s | 2.6 to 3.1 px | 100% | pass |
 
-- Centroiding error: about 0.006 px in clear air, 0.1 to 0.4 px under heavy noise.
-- Processing (frames over processing time): 76 to 218 FPS on a laptop, 95 to 96 FPS on the faint
+- Centroiding error: 0.006 to 0.007 px in clear air, 0.19 px under heavy noise, 0.08 to 0.15 px in
+  fog and low light.
+- Processing (frames over processing time): 69 to 216 FPS on a laptop over the whole pack (190 to
+  216 clear, 97 to 105 under heavy noise), 95 to 96 FPS on the faint
   beacon over 30 s, 41 to 176 FPS on the slower build machines; the
   requirement is 20.
 - Identical tracking numbers on Windows, Linux and both Macs.
@@ -639,9 +662,11 @@ published. Nothing needs installing, and it works offline.
   raw error on each frame is about the size of the jump. We report the error with the shake removed
   beside it (the part the camera can physically follow). A faster motor (10 deg/s) was tested and
   does not help. Fixing it would need a larger sensor for electronic stabilisation, outside the PS.
-  Lock at this setting is 88.5 to 94.8%, error about 23 to 25 px.
+  Lock at this setting is 93.4 to 97.2%, error 21.7 to 23.5 px.
 - **Everything at once (full stress)** stacks disturbances the PS lists separately; tracking holds
-  at 100% lock over 15 s, error sits at 11.4 to 12.1 px.
+  at 98.2 to 100% lock over 15 s, error sits at 10.3 to 11.3 px.
+- **Faint beacon near the loss limit.** Over 10 seeds lock is 94.0 to 97.8%; seeds 7 and 8 hold
+  94.8 and 94.0%, just above the 5% target-loss limit.
 - **Look-alikes that start together.** Identical targets that start at the same point as the
   designated beacon cannot be told apart at the start; even with the start cue these runs failed
   (lock 8 to 25%). Look-alikes that start apart pass with the start cue.
@@ -656,7 +681,7 @@ published. Nothing needs installing, and it works offline.
 
 ## E0. The presentation
 
-Our SIH idea-submission deck is `docs/submission/LAKSHYA_SIH2026_26169.pdf`. It follows the SIH
+Our SIH idea-submission deck is `docs/submission/ARGUS_SIH2026_26169.pdf`. It follows the SIH
 template: title (PS ID, title, theme, category, team ID, team name), proposed solution, technical
 approach (methodology and architecture), working prototype, feasibility and viability, impact and
 benefits, research and references. Its numbers are the measured ones in Part D.
@@ -694,9 +719,12 @@ web app. Keep the report PDF ready to open.
   is what the PS asks ("a designated moving target", row 8). The target is designated by
   appearance, by a start cue or by a click. Tracking all at once is not required: the PS metrics
   are for one target and one camera.
-- **Is it fast enough?** 76 to 218 FPS on a laptop against the required 20, measured as frames
+- **Is it fast enough?** 69 to 216 FPS on a laptop against the required 20, measured as frames
   over processing time (not the mean of per-frame rates, which overstates it).
-- **How accurate is the centre?** About 0.01 px in clear air.
+- **How accurate is the centre?** 0.006 to 0.007 px in clear air, 0.19 px under heavy noise.
+- **How do you know every PS item is met?** `tools/ps_audit.py` measures each one by running the
+  code (rows 1 to 25, the eight "shall" functions, the deliverables, both benchmarks) and writes
+  `docs/PS_AUDIT.md`; 39 of 39 pass, and the build runs it.
 - **Can it be used with real hardware?** Yes: the frame source and the gimbal are separate
   interfaces, so a real camera and pan-tilt unit can replace the simulated ones.
 
