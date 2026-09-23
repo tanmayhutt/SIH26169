@@ -105,6 +105,17 @@ class VideoSource:
         cfg.camera.update_rate_hz = fps
         cfg.camera.width = min(cfg.camera.width, w)
         cfg.camera.height = min(cfg.camera.height, h)
+        # the evaluators' reference positions, if given: every error metric is then computed
+        # against them, exactly as in the simulator
+        self.truth = load_truth(cfg.video_truth, fps) if cfg.video_truth else None
+
+    def _truth(self, i: int) -> Truth | None:
+        if self.truth is None:
+            return None
+        xy = self.truth.get(i)
+        if xy is None:
+            return Truth(beacons=[(float("nan"), float("nan"))], visible=[False])
+        return Truth(beacons=[xy], visible=[True])
 
     def __iter__(self):
         i = 0
@@ -113,12 +124,58 @@ class VideoSource:
             if not ok:
                 break
             if self.colour and bgr.ndim == 3:
-                yield Frame(i, i * self.dt, bgr, None)
+                yield Frame(i, i * self.dt, bgr, self._truth(i))
             else:
                 gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
-                yield Frame(i, i * self.dt, gray, None)
+                yield Frame(i, i * self.dt, gray, self._truth(i))
             i += 1
         self.cap.release()
+
+
+TRUTH_COLS = {"frame": ("frame", "frame_idx", "idx", "f", "n"), "t": ("t", "time", "t_s", "time_s", "t_sim"),
+              "x": ("x", "true_x", "cx", "beacon_x", "x_px"), "y": ("y", "true_y", "cy", "beacon_y", "y_px")}
+
+
+def load_truth(path: str | Path, fps: float) -> dict[int, tuple[float, float]]:
+    """Ground truth for a video (Benchmark 2): a CSV with a frame number (or a time in
+    seconds) and the beacon centre x, y in video pixels, one row per frame. Header names are
+    matched loosely (frame/idx, t/time, x/true_x/cx, y/true_y/cy); without a header the
+    columns are frame, x, y. Frames not listed count as 'beacon not visible'."""
+    import csv
+    rows = list(csv.reader(open(path, newline="", encoding="utf-8-sig")))
+    rows = [r for r in rows if r and any(c.strip() for c in r)]
+    if not rows:
+        raise ValueError(f"{path}: empty truth file")
+    head = [c.strip().lower() for c in rows[0]]
+    def col(key):
+        for i, h in enumerate(head):
+            if h in TRUTH_COLS[key]:
+                return i
+        return None
+    try:
+        [float(c) for c in rows[0][:3]]
+        has_header = False
+    except ValueError:
+        has_header = True
+    if has_header:
+        fi, ti, xi, yi = col("frame"), col("t"), col("x"), col("y")
+        if xi is None or yi is None or (fi is None and ti is None):
+            raise ValueError(f"{path}: need a frame (or t) column and x, y columns; found {', '.join(head)}")
+        body = rows[1:]
+    else:
+        fi, ti, xi, yi = 0, None, 1, 2
+        body = rows
+    out: dict[int, tuple[float, float]] = {}
+    for r in body:
+        try:
+            x, y = float(r[xi]), float(r[yi])
+            k = int(round(float(r[fi]))) if fi is not None else int(round(float(r[ti]) * fps))
+        except (ValueError, IndexError):
+            continue
+        out[k] = (x, y)
+    if not out:
+        raise ValueError(f"{path}: no usable rows")
+    return out
 
 
 def make_source(cfg: RunConfig):

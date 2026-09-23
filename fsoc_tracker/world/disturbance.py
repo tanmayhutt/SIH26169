@@ -180,7 +180,10 @@ class DisturbanceModel:
         if c.platform_motion == "circular":
             return amp * math.cos(w * t), amp * math.sin(w * t)
         if c.platform_motion == "figure8":
-            return amp * math.sin(w * t), 0.5 * amp * math.sin(2 * w * t)
+            # the figure-8 path is fastest at its crossing, sqrt(2) times the circle's speed;
+            # scale it so its peak speed is v, like every other pattern
+            a8 = amp / math.sqrt(2.0)
+            return a8 * math.sin(w * t), 0.5 * a8 * math.sin(2 * w * t)
         if c.platform_motion == "spiral":
             r = amp * (0.2 + 0.8 * ((t / (3 * c.platform_period_s)) % 1.0))
             return r * math.cos(w * t), r * math.sin(w * t)
@@ -216,9 +219,16 @@ class DisturbanceModel:
             plane = np.roll(self._gauss_bank[k], (oy, ox), axis=(0, 1))
             f = out.astype(np.float32)
             if c.poisson:
-                # shot noise: std grows with sqrt of signal; scale so that a 235 peak
-                # has roughly sigma 6
-                f += plane * np.sqrt(np.maximum(f, 1.0)) * 0.4
+                # shot noise: std grows with sqrt of signal; scale so that a 235 peak has
+                # roughly sigma 6 (the Gaussian approximation of Poisson, fine at these counts).
+                # With read noise on as well, the shot noise takes its own plane, so the two
+                # are independent as in a real sensor.
+                sp_plane = plane
+                if c.gaussian_sigma > 0:
+                    k2 = (k + 1) % self._gauss_bank.shape[0]
+                    oy2, ox2 = int(self.rng.integers(0, self.h)), int(self.rng.integers(0, self.w))
+                    sp_plane = np.roll(self._gauss_bank[k2], (oy2, ox2), axis=(0, 1))
+                f += sp_plane * np.sqrt(np.maximum(f, 1.0)) * 0.4
             if c.gaussian_sigma > 0:
                 f += plane * c.gaussian_sigma
             out = np.clip(f, 0, 255).astype(np.uint8)

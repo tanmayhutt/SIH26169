@@ -20,7 +20,8 @@ SPEC = {
 DEFINITIONS = {
     "duration_s": "Simulation duration: last frame time minus first, in seconds.",
     "frames": "Number of frames processed.",
-    "fps_mean": "Processing speed: mean of 1 / per-frame processing time. Spec row 20: >= 20 FPS.",
+    "fps_mean": "Processing speed: frames per second of processing time (1000 / mean processing ms). Spec row 20: >= 20 FPS.",
+    "fps_inst_mean": "Mean of the per-frame rates 1 / processing time; higher than fps_mean when frame times vary, shown for comparison only.",
     "fps_p5": "5th percentile of instantaneous processing FPS (a slow-frame indicator).",
     "fps_wall": "Frames divided by wall-clock seconds, including rendering and display.",
     "proc_ms_mean": "Mean processing time per frame in milliseconds (detection, estimation, control).",
@@ -53,10 +54,13 @@ class Summary:
     values: dict = field(default_factory=dict)
     passed: dict = field(default_factory=dict)
     truth_available: bool = True
-    segments: list = field(default_factory=list)     # one entry per disturbance setting during the run
+    designation: dict = field(default_factory=dict)   # which target was followed, and how it was designated
+    checks: list = field(default_factory=list)        # scenario check notes (engine/checks.py)
+    segments: list = field(default_factory=list)      # one entry per disturbance setting during the run
 
     def to_dict(self):
         return {"values": self.values, "passed": self.passed, "truth_available": self.truth_available,
+                "designation": self.designation, "checks": self.checks,
                 "definitions": {k: DEFINITIONS[k] for k in self.values if k in DEFINITIONS},
                 "segments": self.segments}
 
@@ -81,7 +85,10 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float, changes: li
     v = s.values
     v["duration_s"] = float(t[-1] - t[0] + (t[1] - t[0] if n > 1 else 0))
     v["frames"] = n
-    v["fps_mean"] = float(np.mean(fps_i))
+    # the processing rate is frames over processing time; the mean of per-frame rates would
+    # overstate it whenever frame times vary (a few slow frames barely move that mean)
+    v["fps_mean"] = float(1000.0 / max(float(proc.mean()), 1e-6))
+    v["fps_inst_mean"] = float(np.mean(fps_i))
     v["fps_p5"] = _pct(fps_i, 5)
     v["fps_wall"] = float(n / wall_s) if wall_s > 0 else float("nan")
     v["proc_ms_mean"] = float(proc.mean())
@@ -157,7 +164,7 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float, changes: li
 
 SEGMENT_DEFINITION = ("When the disturbances change during a run, each setting is a segment. Per segment: tracking, "
                       "vibration-removed and centroiding error means, lock retention and tracked rate over its frames "
-                      "after the first acquisition of the run, and the mean processing FPS. The run's overall figures "
+                      "after the first acquisition of the run, and FPS as frames over processing time. The run's overall figures "
                       "above span every segment.")
 
 
@@ -188,6 +195,7 @@ def segment_summaries(records: list[Record], good: np.ndarray, changes: list[dic
             "centroid_err_mean_px": _mean([records[i].centroid_err_px for i in idx]),
             "lock_retention_pct": float(100 * good[after].mean()) if len(after) else None,
             "tracked_pct": float(100 * np.mean([records[i].mode == "TRACK" for i in after])) if len(after) else None,
-            "fps_mean": _mean([records[i].fps_inst for i in idx]),
+            # frames over processing time, as fps_mean for the whole run
+            "fps_mean": 1000.0 / max(float(np.mean([records[i].proc_ms for i in idx])), 1e-6),
         })
     return out

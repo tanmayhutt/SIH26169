@@ -11,13 +11,14 @@ from ..engine.config import RunConfig, apply_atmosphere_preset
 from .camera import Gimbal
 from .disturbance import DisturbanceModel, FrameDisturbance
 from .scene import make_background
+from .sprites import make_sprite
 from .targets import Target, TargetState
 
 
 @dataclass
 class Truth:
     """Where things really are this frame, in observed-picture pixels."""
-    beacons: list[tuple[float, float]] = field(default_factory=list)   # designated first
+    beacons: list[tuple[float, float]] = field(default_factory=list)   # in configured order; RunConfig.designated picks the beacon
     visible: list[bool] = field(default_factory=list)
     disturbance: FrameDisturbance = field(default_factory=FrameDisturbance)
     window: tuple[int, int, int, int] = (0, 0, 0, 0)                   # x0, y0, w, h
@@ -43,25 +44,11 @@ class World:
         self._sprites: dict[tuple, np.ndarray] = {}
 
     # ---------------------------------------------------------------- sprite
-    def _sprite(self, shape: str, size: int) -> np.ndarray:
-        key = (shape, size)
+    def _sprite(self, tc) -> np.ndarray:
+        w, h = tc.dims
+        key = (tc.shape, w, h, tc.mask if tc.shape == "custom" else "")
         if key not in self._sprites:
-            s = max(size, 2)
-            pad = 3
-            n = s + 2 * pad
-            sp = np.zeros((n, n), np.float32)
-            if shape == "square":
-                sp[pad:pad + s, pad:pad + s] = 1.0
-                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)          # optics soften the edge
-            elif shape == "circle":
-                cv2.circle(sp, (n // 2, n // 2), s // 2, 1.0, -1, lineType=cv2.LINE_AA)
-                sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
-            else:  # gaussian
-                yy, xx = np.mgrid[0:n, 0:n]
-                sig = s / 3.0
-                sp = np.exp(-((xx - n / 2 + 0.5) ** 2 + (yy - n / 2 + 0.5) ** 2) / (2 * sig * sig))
-            sp /= sp.max()
-            self._sprites[key] = sp
+            self._sprites[key] = make_sprite(tc.shape, w, h, tc.mask)
         return self._sprites[key]
 
     # ---------------------------------------------------------------- render
@@ -76,19 +63,20 @@ class World:
             x = st.x + d.wander_dx
             y = st.y + d.wander_dy
             inten = float(np.clip(st.intensity * d.scint, 0, 255))
-            sp = self._sprite(tgt.cfg.shape, tgt.cfg.size_px)
-            n = sp.shape[0]
+            sp = self._sprite(tgt.cfg)
+            nh, nw = sp.shape
             # sub-pixel placement by shifting the sprite
             ix, iy = int(np.floor(x)), int(np.floor(y))
             fx, fy = x - ix, y - iy
             # Pixel-centre convention: the sprite's centre index is (n-1)/2, it is placed at
             # ix - n//2, so shift by the difference to land exactly on (x, y).
-            off = n // 2 - (n - 1) / 2.0
-            M = np.array([[1, 0, fx + off], [0, 1, fy + off]], np.float32)
-            sps = cv2.warpAffine(sp, M, (n, n), flags=cv2.INTER_LINEAR)
-            x0, y0 = ix - n // 2, iy - n // 2
+            offx = nw // 2 - (nw - 1) / 2.0
+            offy = nh // 2 - (nh - 1) / 2.0
+            M = np.array([[1, 0, fx + offx], [0, 1, fy + offy]], np.float32)
+            sps = cv2.warpAffine(sp, M, (nw, nh), flags=cv2.INTER_LINEAR)
+            x0, y0 = ix - nw // 2, iy - nh // 2
             xa, ya = max(x0, 0), max(y0, 0)
-            xb, yb = min(x0 + n, self.w), min(y0 + n, self.h)
+            xb, yb = min(x0 + nw, self.w), min(y0 + nh, self.h)
             if xb > xa and yb > ya:
                 region = img[ya:yb, xa:xb].astype(np.float32)
                 patch = sps[ya - y0:yb - y0, xa - x0:xb - x0] * inten

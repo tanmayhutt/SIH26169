@@ -99,7 +99,7 @@ def test_noise_switched_on_mid_run_reaches_the_picture():
 
 def test_changes_are_cleaned_before_use():
     assert clean_disturbance_changes({"jitter_px": "-5", "atmosphere": "volcano", "bogus": 1, "poisson": "true",
-                                      "salt_pepper_frac": 3}) == {"jitter_px": 0.0, "poisson": True, "salt_pepper_frac": 1.0}
+                                      "salt_pepper_frac": 3}) == {"jitter_px": 0.0, "poisson": True, "salt_pepper_frac": 0.5}   # clamped to LIMITS
     fog = apply_disturbance_changes(DisturbanceConfig(), {"atmosphere": "fog", "contrast": 0.8})
     assert fog.contrast == 0.8 and fog.brightness == 60.0            # an explicit value beats the preset
 

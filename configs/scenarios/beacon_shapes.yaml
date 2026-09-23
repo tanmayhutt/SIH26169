@@ -1,0 +1,17 @@
+# PS rows 9 and 10, user-defined: the designated beacon is an 8 x 18 px rectangle (width and
+# height set separately), among decoys of other user-defined shapes: a cross, a ring, a diamond
+# and a custom 0/1 pattern. The tracker picks the designated one by its configured appearance.
+name: beacon_shapes
+seed: 4
+duration_s: 30
+designated: 0
+designation: auto
+targets:
+  - {name: Remote terminal, shape: square, size_px: 8, height_px: 18, motion: circular, radius_px: 380, period_s: 12, start: centre}
+  - {name: Cross, shape: cross, size_px: 16, height_px: 16, intensity: 210, motion: line, speed_px_s: 100, heading_deg: 60, start: "400,400"}
+  - {name: Ring, shape: ring, size_px: 18, height_px: 18, intensity: 220, motion: figure8, radius_px: 300, period_s: 16, start: "1500,1400"}
+  - {name: Diamond, shape: diamond, size_px: 14, height_px: 14, intensity: 200, motion: random, speed_px_s: 80, start: "1600,500"}
+  - {name: Pattern, shape: custom, size_px: 12, height_px: 12, mask: "10101;01010;10101;01010;10101", intensity: 215, motion: sinusoidal, speed_px_s: 90, heading_deg: 160, start: "500,1500"}
+disturbance:
+  gaussian_sigma: 5
+  poisson: true

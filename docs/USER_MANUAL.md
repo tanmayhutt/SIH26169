@@ -52,17 +52,17 @@ Platform notes:
   and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine ARGUS`
   on the extracted folder once.
 
-Results are written to a `results` folder next to the executable. Every archive is produced by
-the same build workflow, which also runs the test suite and a smoke test of the packaged
-executable on that platform before publishing it.
+Results are written to a `results` folder next to the executable. Every archive passed the test
+suite and a smoke test of the packaged executable on its own platform before it was published
+(Windows and Linux on the GitHub build workflow, macOS on the team's Mac).
 
 ### 2.3 Web application
 
 The same program is also served as a web application, so no installation at all is needed on
 any platform: the project site opens it directly in a current browser (Chrome, Edge, Firefox or
 Safari, on Windows, Linux, macOS, or a tablet). The web page and the desktop window are the same
-interface: the same toolbar (Start, Pause, Step, Stop, Speed, Open video, Simulator, Save
-scenario, Screenshot, Results, Manual, About), the same parameter panel with every field, the
+interface: the same toolbar (Start, Pause, Step, Stop, Speed, Open video, Truth CSV, Simulator,
+Save scenario, Screenshot, Results, Manual, About), the same parameter panel with every field, the
 same six tiles, views, four plots, telemetry column and end-of-run summary, and the same
 keyboard keys. Both are generated from one definition in the code (`fsoc_tracker/ui_shared.py`)
 and run the same engine, so a given scenario and seed give the same numbers and the same report.
@@ -116,6 +116,7 @@ Optional, to retrain the AI detector: `pip install -e ".[train]"` then
 | Start / Pause / Step / Stop | Run control. Space starts or pauses, N steps one frame while paused, Esc stops. |
 | Speed | 0.25x to 4x real time, or Max speed (shows the true processing rate). |
 | Open video (Benchmark 2) | Choose an `.mp4`; the simulator is bypassed and the video frames become the scene. Ctrl+O. |
+| Truth CSV | In video mode: load the evaluators' beacon positions for the video (section 5), so errors and true lock are computed. |
 | Use simulator | Return to the simulated scene. |
 | Save scenario | Save the panel as a `.yaml`; it appears in the Scenario list. Ctrl+S. |
 | Screenshot | Save a PNG of the window into `results/`. Ctrl+P. |
@@ -129,13 +130,16 @@ Six tiles above the pictures update every frame and turn green when the problem 
 specification is met, amber when it is not: tracker state, acquisition time (2 s or less),
 mean tracking error since acquisition (10 px or less), mean centroiding error, lock retention
 (target loss under 5 percent), and processing FPS (20 or more). In video mode the two error
-tiles read "n/a" because the video carries no ground truth.
+tiles read "n/a" unless a ground-truth file is loaded (section 5).
 
 ### Screen view (left picture)
 
 The whole scene, downscaled, with a 2 degree grid. Cyan rectangle: the camera window and its
 centre. Orange circle: the true beacon (simulator only). Green cross: the tracker's estimate.
-Grey circles: other targets. Faint trails: where the beacon and the window have been. The
+Grey circles: other targets. Every target carries its name; the designated one is marked
+"(designated)" in the signal colour, the others are muted. Before a run the view shows a
+preview of the scene at t = 0 with every target named; click a target to make it the designated
+one. Faint trails: where the beacon and the window have been. The
 legend is printed along the bottom edge.
 
 ### Camera view (right picture)
@@ -165,12 +169,16 @@ truth, errors and timing. Before a run it shows a short how-to.
 ## 4. Parameters
 
 Every row of the problem statement parameter table has a control. Values outside the
-suggested range are allowed where the table says "user-defined".
+suggested range are allowed where the table says "user-defined". Every numeric input is
+clamped to its accepted range in the engine, for both applications, and the scenario check
+(section 4.1) says what a value means.
 
 ### Run
 - Name, Seed: the seed makes a run exactly repeatable.
 - Duration (s): length of a simulator run. Ignored for video input (the whole video runs).
 - Extra targets: number of additional beacons (decoys) added with random paths.
+- Identical look: the generated extra targets copy target 1's shape, size and brightness. The
+  tracker is then told the designated one's start position as well (see Target).
 
 ### Screen (rows 1 to 2)
 - Width, Height: scene size in pixels. Default 2000 x 2000.
@@ -185,16 +193,30 @@ suggested range are allowed where the table says "user-defined".
 - Max accel, Command latency: gimbal realism.
 - Hard mode: the tracker sees only the pixels inside the window and must search.
 
-### Designated target (rows 7 to 12)
-- Shape: square (default), circle, gaussian. Size in pixels (default 10). Peak intensity.
+### Target (rows 7 to 12)
+- Target: pick the target this section shows and edits; `*` marks the designated one.
+- Designated: tick it on the target the tracker must follow (PS: "a designated moving target").
+  The report scores this one. One target is always designated, so the box cannot be unticked:
+  tick it on another target instead. Before a run, clicking a target on the preview does the same.
+  How the tracker finds it is automatic: by its configured shape, size and brightness, and when
+  another target looks the same, by its start position as well (as an operator or a GPS cue
+  would). A scenario file can force a mode with `designation: appearance | start | cue`.
+- Name: shown on the views, in the telemetry and in the report. Empty means "Target N".
+- Shape: square (default), circle, gaussian, cross, ring, diamond, custom. Width and Height in
+  pixels, set separately (default 10 x 10; the PS range is 5-20 x 5-20). A square with unequal
+  sides is a rectangle, a circle an ellipse. Peak intensity.
+- Custom shape (0/1 rows): for shape `custom`, rows of 0 and 1 separated by `;`, stretched to
+  width x height. `010;111;010` is a plus. A PNG path also works.
 - Motion: line, circular, figure8, random, spiral, sinusoidal, waypoints, static. For
   `waypoints`, the Waypoints field takes screen-pixel points as `x,y; x,y; ...`; the beacon
   follows them at Speed and loops (the PS row 12 user-defined path).
-- Speed, Radius, Period, Heading: path parameters. Start: random or centre.
+- Speed, Radius, Period, Heading: path parameters. Start: random, centre, or a typed `x,y` in
+  screen pixels (for example `400,1500`).
 - Blink: optional intensity modulation in Hz. 0 is steady.
 
 ### Disturbances (rows 21 to 25)
-- Salt and pepper fraction (0.10 = 10 percent), Gaussian sigma (up to 20), Poisson.
+- Salt and pepper in percent of pixels (10 = 10 percent; accepted 0 to 50; scenario files store
+  it as a fraction, 0.10), Gaussian sigma (up to 20), Poisson.
 - Camera jitter: pixels per frame, up to 20.
 - Atmosphere preset: clear, haze, fog, rain, lowlight. Selecting a preset fills contrast,
   brightness, blur and turbulence; each can then be edited.
@@ -216,28 +238,72 @@ the larger peak speed. Video runs (Benchmark 2) have no live disturbances; the v
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
 - Controller gains, deadband, capture radius, estimator lag, minimum confidence to acquire.
+  Defaults: kp 5, kd 0, ki 0.8. The derivative gain is 0 on purpose: the error reaches the
+  controller one frame late and in whole pixels, and a derivative on it (0.3 before) drove a
+  limit cycle of about +/-10 px, so a still beacon was never settled. With kd 0 a still beacon
+  is held within 4 px.
 - Faint path: when nothing reaches the acquisition confidence, weak detections (threshold
   `faint_threshold_k`, default 3 sigma) are linked across frames and a motion-consistent
   chain with mean SNR above `faint_snr_min` (default 3.5) is promoted. Used automatically for
-  dim beacons in low light; a static dim beacon is not covered by this path.
-- Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 3 to 12 s depending on where the beacon is.
+  dim beacons in low light; a static dim beacon is not covered by this path. While a faint track
+  is active, a sub-pixel fit that jumps more than 3 px or balloons in width is discarded, much
+  wider blobs are not followed, and the AI detector is not used.
+- Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 2.83 to 11.97 s (measured) depending on where the beacon is.
+
+### 4.1 Scenario check
+
+Below the Run section, both applications show notes on the current values. They also appear in
+the status bar at Start, in the end-of-run dialog, on page 1 of the report and in the summary.
+Values inside the PS envelope give no note.
+
+| Note | Meaning |
+|---|---|
+| Corrected | A value was outside the accepted range and was clamped, for example salt and pepper 13 (a fraction) becomes 0.5. |
+| Beyond the PS | A value is outside the PS table, and the row is named: screen below 2000 x 2000 (row 1), update rate below 30 Hz (row 5) or 20 Hz (row 15), pan or tilt outside 5 to 10 deg/s (rows 13, 14), size outside 5-20 x 5-20 (row 10), custom shape without a mask, salt and pepper above about 10% (row 21), Gaussian sigma above 20 (row 22), jitter above 20 px/frame (row 23), platform above 20 px/frame (row 25), turbulence above 0.6, contrast below 0.4. The PS targets are not promised for it. |
+| Near the limit | The designated beacon moves above 70 percent of the camera turn rate. It can be done, with little margin. |
+| Cannot be met | A physical limit: the designated beacon moves faster than the camera turns (800 px/s at 5 deg/s and the default FOV); jitter plus platform motion above the camera's turn per frame (26.7 px/frame at the defaults); salt and pepper at 50%; designation `cue` without a point; designation `start` with a video; a ground-truth file that is not found; other targets that look the same as the designated one in appearance mode. |
 
 ## 5. Running Benchmark 2 (video input)
 
 1. Click "Open video (Benchmark 2)" and choose the `.mp4` file. The application reads the
    file's real facts (displayed size with any rotation tag applied, average frame rate with a
    variable-rate warning, exact frame count, length) and calibrates the settings to them:
-   the screen becomes the video's size and the update rate its frame rate. Target and
-   disturbance settings are locked, because the video already contains them.
+   the screen becomes the video's size and the update rate its frame rate. Disturbance settings
+   and the target's motion fields are locked, because the video already contains them.
+   The target's appearance (name, shape, width, height, mask, intensity) stays editable: for a
+   video it is the statement of what to look for. Set it to the beacon in the video. Only the
+   designated target's look is used.
+   To point the tracker at one beacon, click it on the first frame: the tracker then takes the spot nearest that point
+   and Designation switches to `cue`.
 2. Set the camera window size, FOV and rate limits if the graders specify them; these are
    not in the file. Degree readouts depend on the FOV you set.
 3. Click Start. The video frames are used as the scene; nothing is drawn by the simulator.
 4. When the run ends, `frames.csv` contains the measured beacon centre for every frame
    (`det_x`, `det_y`) and `report.pdf` contains acquisition time, re-acquisition time,
-   lock retention rate and FPS. Tracking and centroiding error against truth are not
-   available because the video carries no ground truth.
+   lock retention rate and FPS. Without a ground-truth file, tracking and centroiding error
+   read "n/a" and lock is judged from the tracker's own estimate, which can overstate it.
 
 From the command line: `fsoc-tracker video path/to/file.mp4`
+
+### Ground-truth file (optional)
+
+If the evaluators give the true beacon positions, put them in a CSV: frame (or `t` in
+seconds), x, y in video pixels. Header names are matched loosely (`frame`/`idx`, `t`/`time`,
+`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. Frames not
+listed count as "beacon not visible". With it, tracking error, centroiding error, RMSE and a
+true lock retention are computed against their positions.
+
+| How | Where |
+|---|---|
+| Command line | `fsoc-tracker video clip.mp4 --truth truth.csv` |
+| Beside the video | a file named `<video>_truth.csv` (or `<video>.csv`) next to the video is picked up by the command line and the desktop app |
+| Desktop | toolbar button "Truth CSV" (enabled in video mode) |
+| Web | toolbar button "Truth CSV" (uploads the file) |
+| Scenario file | field `video_truth` |
+
+The report's source line names the truth file or says "no ground-truth file". Measured on a
+noisy_line clip rendered to `.mp4` with its truth: tracking error 4.85 px, centroiding error
+0.188 px; without the file both read n/a.
 
 ## 6. Scenario files and the command line
 
@@ -248,17 +314,23 @@ name: fog_circular
 seed: 6
 duration_s: 30
 targets:
-  - {shape: square, size_px: 10, motion: circular, radius_px: 400, period_s: 15}
+  - {name: Remote terminal, shape: square, size_px: 10, height_px: 10, motion: circular, radius_px: 400, period_s: 15}
 disturbance:
   atmosphere: fog
   gaussian_sigma: 8
 ```
 
+Target fields: `name`, `shape`, `size_px` (width), `height_px` (0 = same as the width), `mask`
+(for `custom`), `intensity`, `motion` and its path fields, `start` (`random`, `centre` or
+`"x,y"`). Run fields for designation: `designated` (index of the target to follow, default 0),
+`designation` (`appearance`, `start` or `cue`) and `designation_cue` (`"x,y"` in screen pixels).
+`disturbance.salt_pepper_frac` is a fraction (0.10 = 10 percent).
+
 Commands:
 
 ```
 fsoc-tracker run --scenario configs/scenarios/fog_circular.yaml [--seed 3] [--duration 20]
-fsoc-tracker video path/to/file.mp4
+fsoc-tracker video path/to/file.mp4 [--truth truth.csv]
 fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-49
 fsoc-tracker gui
 ```
@@ -291,7 +363,8 @@ Benchmark Performance 2 gives you `.mp4` files. No scenario file is needed: open
 the desktop application, drop it on the web app, or run `fsoc-tracker video <file>`. The
 per-frame CSV then carries `det_x`, `det_y` (the measured centroids) for comparison with the
 evaluators' predefined values, and the report carries acquisition, re-acquisition, lock
-retention and FPS.
+retention and FPS. If they give the true positions, load them as a ground-truth file (section 5)
+and the errors are computed against them.
 
 ## 7. Output files
 
@@ -309,8 +382,8 @@ seed and time it belongs to:
 | File | Contents |
 |---|---|
 | `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time, and `segment` (0 until the first disturbance change, then 1, 2, ...). |
-| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `segments` holds the figures of each disturbance setting when they changed during the run. |
-| `<label>_report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. A run whose disturbances changed has one more page, a row per setting. |
+| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `designation` (followed target, index, mode, cue, all target names, ambiguous frames, redesignations) and `checks` (the scenario check notes).; `segments` (the figures of each disturbance setting, when they changed during the run). |
+| `<label>_report.pdf` | Specification check, the Targets and Followed lines, the scenario check notes and the metric table (continued on the next page when long); time series; paths, histograms and model probabilities. A run whose disturbances changed has one more page, a row per setting. |
 | `<label>_scenario.yaml` | The exact parameters used, including any disturbance changes as `schedule`, so the run can be repeated. |
 
 With `--out <folder>` on the command line the folder is yours; the files inside are still
@@ -328,14 +401,22 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Tracked | Percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. A high tracked rate with a low lock rate means the camera, not the tracker, could not keep up. |
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
 | Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
-| FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |
+| FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
+| `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
 | Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting
 
+- A value changed after you typed it: it was outside the accepted range and was clamped. The
+  scenario check shows it as "Corrected" with the old and new value.
+- The beacon is never acquired: read the scenario check. "Cannot be met" notes name the setting
+  that makes the run impossible.
+- The camera keeps swinging around a still beacon: check that kd is 0. A derivative gain above
+  0 makes the camera oscillate by about +/-10 px.
 - The window does not start on Linux: install `libxcb-cursor0` (Qt 6 requirement).
 - Low frame rate: reduce the screen size, disable Poisson noise, or uncheck Real-time
   pacing to see the true processing speed.
 - "Cannot open video": the file must be readable by OpenCV (H.264 `.mp4` is safest).
-- The AI detector is not used: `models/beacon_heatmap.onnx` is missing; the classical
-  detector runs alone. Retrain with `python training/train_heatmap.py`.
+- The AI detector is not used: `models/beacon_heatmap.onnx` is missing (it is looked up in the
+  working folder and in the package folder); the classical detector runs alone. In the standard
+  scenarios the AI supplies 0 percent of measurements anyway: it only fills gaps. Retrain with `python training/train_heatmap.py`.

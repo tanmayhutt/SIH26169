@@ -27,7 +27,9 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
-                         new_random_seed, prepare_video_run, section_object, LIVE_SECTIONS, LIVE_DEBOUNCE_MS)
+                         new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
+                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS)  # noqa: F401
+from ..engine.config import target_name, parse_xy
 
 
 # ----------------------------------------------------------------------------- form helpers
@@ -39,6 +41,7 @@ class DataclassForm(QtWidgets.QWidget):
         super().__init__(parent)
         self.obj = obj
         self.widgets: dict[str, QtWidgets.QWidget] = {}
+        self.scales: dict[str, float] = {}      # display unit / stored unit (salt and pepper: % on screen, fraction stored)
         lay = QtWidgets.QFormLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setVerticalSpacing(6)
@@ -65,6 +68,9 @@ class DataclassForm(QtWidgets.QWidget):
         if spec is None:
             return None
         k = spec["kind"]
+        if spec.get("scale"):
+            self.scales[name] = spec["scale"]
+            v = v * spec["scale"]
         if k == "bool":
             w = QtWidgets.QCheckBox(); w.setChecked(v); w.toggled.connect(self.changed)
         elif k == "int":
@@ -74,7 +80,9 @@ class DataclassForm(QtWidgets.QWidget):
             w.setSingleStep(spec["step"]); w.setValue(v); w.valueChanged.connect(self.changed)
         elif k == "choice":
             w = QtWidgets.QComboBox(); w.addItems(spec["choices"])
-            if v in spec["choices"]:
+            if spec.get("editable"):
+                w.setEditable(True)
+            if v in spec["choices"] or spec.get("editable"):
                 w.setCurrentText(v)
             w.currentTextChanged.connect(self.changed)
         else:
@@ -89,7 +97,8 @@ class DataclassForm(QtWidgets.QWidget):
             if isinstance(w, QtWidgets.QCheckBox):
                 out[name] = w.isChecked()
             elif isinstance(w, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
-                out[name] = w.value()
+                # the stored unit, as read() writes it (salt and pepper shows % and stores a fraction)
+                out[name] = w.value() / self.scales[name] if name in self.scales else w.value()
             elif isinstance(w, QtWidgets.QComboBox):
                 out[name] = w.currentText()
             elif isinstance(w, QtWidgets.QLineEdit):
@@ -101,9 +110,9 @@ class DataclassForm(QtWidgets.QWidget):
             if isinstance(w, QtWidgets.QCheckBox):
                 setattr(self.obj, name, w.isChecked())
             elif isinstance(w, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
-                setattr(self.obj, name, w.value())
+                setattr(self.obj, name, w.value() / self.scales[name] if name in self.scales else w.value())
             elif isinstance(w, QtWidgets.QComboBox):
-                setattr(self.obj, name, w.currentText())
+                setattr(self.obj, name, w.currentText().strip())
             elif isinstance(w, QtWidgets.QLineEdit):
                 setattr(self.obj, name, w.text())
         return self.obj
@@ -116,7 +125,7 @@ class DataclassForm(QtWidgets.QWidget):
             if isinstance(w, QtWidgets.QCheckBox):
                 w.setChecked(bool(v))
             elif isinstance(w, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
-                w.setValue(v)
+                w.setValue(v * self.scales[name] if name in self.scales else v)
             elif isinstance(w, QtWidgets.QComboBox):
                 w.setCurrentText(str(v))
             elif isinstance(w, QtWidgets.QLineEdit):
@@ -235,7 +244,9 @@ def _text(p: QtGui.QPainter, x: float, y: float, text: str, col: str, font: QtGu
 
 
 class SceneView(QtWidgets.QLabel):
-    """The whole screen, downscaled, with the camera window, truth, estimate and trails."""
+    """The whole screen, downscaled, with the camera window, truth, estimate and trails.
+    A click reports the point in screen pixels (used to designate a target)."""
+    clicked = QtCore.pyqtSignal(float, float)
 
     def __init__(self):
         super().__init__()
@@ -244,6 +255,39 @@ class SceneView(QtWidgets.QLabel):
         self.setProperty("class", "view")
         self.trail_true: list[tuple[float, float]] = []
         self.trail_win: list[tuple[float, float]] = []
+        self.names: list[str] = []          # target names in configured order
+        self.designated = 0
+        self._geom = None                   # (scale, pixmap w, pixmap h, source w, source h) of the last picture
+
+    def set_targets(self, names: list[str], designated: int):
+        self.names, self.designated = list(names), int(designated)
+
+    def remember_geometry(self, s: float, pw: int, ph: int, w: int, h: int):
+        self._geom = (s, pw, ph, w, h)
+
+    def mousePressEvent(self, ev):
+        if self._geom is None:
+            return
+        s, pw, ph, w, h = self._geom
+        ox, oy = (self.width() - pw) / 2.0, (self.height() - ph) / 2.0
+        x, y = (ev.position().x() - ox) / s, (ev.position().y() - oy) / s
+        if 0 <= x < w and 0 <= y < h:
+            self.clicked.emit(float(x), float(y))
+
+    def draw_beacons(self, p: QtGui.QPainter, beacons, s: float, font):
+        """Every target with its name; the designated one in the signal colour."""
+        fm = QtGui.QFontMetrics(font)
+        for i, (bx, by) in enumerate(beacons):
+            des = i == self.designated
+            p.setPen(_pen(C["signal"] if des else C["muted"], 1.2 if des else 1.0))
+            p.drawEllipse(QtCore.QPointF(bx * s, by * s), 7 if des else 5, 7 if des else 5)
+            if len(beacons) > 1 or self.names:
+                name = self.names[i] if i < len(self.names) else f"Target {i + 1}"
+                p.setFont(font); p.setPen(QtGui.QColor(C["signal"] if des else C["muted"]))
+                label = name if not des else name + "  (designated)"
+                tw = QtGui.QFontMetrics(font).horizontalAdvance(label)
+                x = bx * s + 9 if bx * s + 9 + tw < p.device().width() - 4 else bx * s - 9 - tw   # keep the label on the picture
+                p.drawText(QtCore.QPointF(x, by * s - 6), label)
 
     def reset(self):
         self.trail_true.clear(); self.trail_win.clear()
@@ -279,12 +323,10 @@ class SceneView(QtWidgets.QLabel):
         p.drawLine(int(cx - 6), int(cy), int(cx + 6), int(cy)); p.drawLine(int(cx), int(cy - 6), int(cx), int(cy + 6))
         self.trail_win.append((cx, cy))
         if res.frame.truth is not None and res.frame.truth.beacons:
-            tx, ty = res.frame.truth.beacons[0]
+            di = min(self.designated, len(res.frame.truth.beacons) - 1)
+            tx, ty = res.frame.truth.beacons[di]
             self.trail_true.append((tx * s, ty * s))
-            p.setPen(_pen(C["signal"], 1.2)); p.drawEllipse(QtCore.QPointF(tx * s, ty * s), 7, 7)
-            p.setPen(_pen(C["muted"], 1.0))
-            for (bx, by) in res.frame.truth.beacons[1:]:
-                p.drawEllipse(QtCore.QPointF(bx * s, by * s), 5, 5)
+            self.draw_beacons(p, res.frame.truth.beacons, s, mono(8))
         if res.track.estimate is not None:
             ex, ey = res.track.estimate
             p.setPen(_pen(C["good"], 1.2))
@@ -301,6 +343,7 @@ class SceneView(QtWidgets.QLabel):
             p.fillRect(QtCore.QRectF(x, pm.height() - 13, 8, 3), QtGui.QColor(col))
             x = _text(p, x + 12, pm.height() - 7, txt, col, f, W - x - 20) + 16
         p.end()
+        self.remember_geometry(s, pm.width(), pm.height(), w, h)
         self.setPixmap(pm)
 
 
@@ -429,6 +472,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.act_clear_video = tb.addAction("Simulator", self.clear_video)
         self.act_clear_video.setToolTip("Leave video mode and use the simulated scene again")
         self.act_clear_video.setEnabled(False)
+        self.act_truth = tb.addAction("Truth CSV", self.open_truth); self.act_truth.setToolTip(TRUTH_TIP); self.act_truth.setEnabled(False)
+        self.video_truth = ""
         spacer = QtWidgets.QWidget(); spacer.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
         spacer.setStyleSheet("background: transparent;")
         tb.addWidget(spacer)
@@ -465,12 +510,39 @@ class MainWindow(QtWidgets.QMainWindow):
         self.chk_random = QtWidgets.QCheckBox("New seed each run"); self.chk_random.setChecked(True)
         self.chk_random.setToolTip("On: each Start draws a new seed (start position, noise, decoys) and a new heading for line paths, so every run is different. "
                                    "Off: the seed shown is used, so a run can be repeated exactly. The seed used is always shown in the status bar and saved with the results.")
-        for lab, w in (("Name", self.ed_name), ("Seed", self.sp_seed), ("", self.chk_random), ("Duration (s)", self.sp_dur), ("Extra targets", self.sp_extra)):
+        # targets: how many, which one is followed, how it is designated, which one the panel edits
+        self.sp_extra.setToolTip(RUN_TIPS["extra"])
+        self.chk_identical = QtWidgets.QCheckBox("Identical look"); self.chk_identical.setToolTip(RUN_TIPS["identical"])
+        for lab, w in (("Name", self.ed_name), ("Seed", self.sp_seed), ("", self.chk_random), ("Duration (s)", self.sp_dur), ("Extra targets", self.sp_extra),
+                       ("", self.chk_identical)):
             l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); rl.addRow(l, w)
+        # the Target section: pick a target to edit, tick the one to follow
+        self.cmb_edit = QtWidgets.QComboBox(); self.cmb_edit.setToolTip(RUN_TIPS["edit"])
+        self.chk_desig = QtWidgets.QCheckBox("Designated"); self.chk_desig.setToolTip(RUN_TIPS["designated"])
+        self.edit_idx = 0; self.designated_idx = 0
+        self.designation_mode = "auto"; self.designation_cue = ""
+        tw = QtWidgets.QWidget(); tl = QtWidgets.QFormLayout(tw); tl.setContentsMargins(0, 0, 0, 0); tl.setVerticalSpacing(6); tl.setHorizontalSpacing(10)
+        tl.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        for lab, w in (("Target", self.cmb_edit), ("", self.chk_desig)):
+            l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); tl.addRow(l, w)
+        self.target_box = QtWidgets.QWidget(); tb_l = QtWidgets.QVBoxLayout(self.target_box); tb_l.setContentsMargins(0, 0, 0, 0); tb_l.setSpacing(8)
+        tb_l.addWidget(tw); tb_l.addWidget(self.forms["target"])
+        self.lbl_check = QtWidgets.QLabel(""); self.lbl_check.setWordWrap(True); self.lbl_check.setProperty("class", "hint")
+        self.lbl_check.setToolTip("Scenario check: values beyond the problem statement, values the camera cannot physically follow, and values that were corrected.")
+        rl.addRow(self.lbl_check)
+        self.sp_extra.valueChanged.connect(self._targets_changed); self.chk_identical.toggled.connect(self._targets_changed)
+        self.cmb_edit.currentIndexChanged.connect(self._edit_changed)
+        self.chk_desig.clicked.connect(self._designate_current)
+        self.sp_seed.valueChanged.connect(lambda _v: self._schedule_check())
+        self.forms["target"].widgets["name"].textChanged.connect(self._name_edited)
+        for f in self.forms.values():
+            f.changed.connect(self._schedule_check)
+        self._check_timer = QtCore.QTimer(self); self._check_timer.setSingleShot(True); self._check_timer.setInterval(250)
+        self._check_timer.timeout.connect(self._run_check)
         panel = QtWidgets.QWidget(); pl = QtWidgets.QVBoxLayout(panel); pl.setContentsMargins(4, 0, 10, 0); pl.setSpacing(0)
         pl.addWidget(section("Run", run_w))
         for key, title, ref, hint in SECTIONS:
-            pl.addWidget(section(title, self.forms[key], hint, ref))
+            pl.addWidget(section(title, self.target_box if key == "target" else self.forms[key], hint, ref))
         pl.addStretch(1)
         scroll = QtWidgets.QScrollArea(); scroll.setWidget(panel); scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -485,6 +557,7 @@ class MainWindow(QtWidgets.QMainWindow):
         centre.addLayout(tiles)
         views = QtWidgets.QHBoxLayout(); views.setSpacing(8)
         self.scene_view = SceneView(); self.cam_view = CameraView()
+        self.scene_view.clicked.connect(self._scene_clicked)
         self._placeholders()
         views.addWidget(self.scene_view, 1); views.addWidget(self.cam_view, 1)
         centre.addLayout(views, 3)
@@ -526,6 +599,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status.addPermanentWidget(self.progress)
         self._set_running(False)
         self._buf_reset()
+        self._refresh_target_lists()
 
     def _plot(self, title):
         pw = pg.PlotWidget()
@@ -593,30 +667,158 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------- config
     def apply_cfg(self, cfg: RunConfig):
         self.cfg = cfg
+        self.edit_idx = 0
         self.forms["screen"].write(cfg.screen); self.forms["camera"].write(cfg.camera)
         self.forms["target"].write(cfg.targets[0]); self.forms["disturbance"].write(cfg.disturbance)
         self.forms["tracker"].write(cfg.tracker)
         self.ed_name.setText(cfg.name); self.sp_seed.setValue(cfg.seed); self.sp_dur.setValue(cfg.duration_s)
-        self.sp_extra.setValue(max(len(cfg.targets) - 1, 0))
+        self.sp_extra.blockSignals(True); self.sp_extra.setValue(max(len(cfg.targets) - 1, 0)); self.sp_extra.blockSignals(False)
+        self.designation_mode = cfg.designation; self.designation_cue = cfg.designation_cue
+        self.designated_idx = cfg.designated_index()
         self.video_path = cfg.video
+        self._refresh_target_lists()
         self._video_label()
 
-    def read_cfg(self) -> RunConfig:
+    def _read_targets(self):
+        """The panel's target form back into the list, and the list sized to 'Extra targets'."""
+        self.forms["target"].read()
+        seed = self.sp_seed.value()
+        t0 = self.cfg.targets[0]
+        self.cfg.targets = extra_targets(t0, self.cfg.targets, self.sp_extra.value(), seed, self.chk_identical.isChecked())
+
+    def read_cfg(self, for_run: bool = True) -> RunConfig:
         cfg = self.cfg
         cfg.screen = self.forms["screen"].read(); cfg.camera = self.forms["camera"].read()
-        t0 = self.forms["target"].read(); cfg.disturbance = self.forms["disturbance"].read(); cfg.tracker = self.forms["tracker"].read()
+        cfg.disturbance = self.forms["disturbance"].read(); cfg.tracker = self.forms["tracker"].read()
+        self._read_targets()
         cfg.name = self.ed_name.text().strip() or "run"; cfg.duration_s = self.sp_dur.value()
-        cfg.targets = [t0] + cfg.targets[1:]
-        if self.chk_random.isChecked():
+        if for_run and self.chk_random.isChecked():
             new_random_seed(cfg)
-            self.sp_seed.setValue(cfg.seed); self.forms["target"].write(cfg.targets[0])
+            self.sp_seed.blockSignals(True); self.sp_seed.setValue(cfg.seed); self.sp_seed.blockSignals(False)
+            self.forms["target"].write(cfg.targets[self.edit_idx])
         else:
             cfg.seed = self.sp_seed.value()
-        cfg.targets = extra_targets(cfg.targets[0], cfg.targets, self.sp_extra.value(), cfg.seed)
+        cfg.designated = min(self.designated_idx, len(cfg.targets) - 1)
+        cfg.designation = "cue" if (self.video_path and self.designation_cue) else self.designation_mode
+        cfg.designation_cue = self.designation_cue if self.video_path else ""
         cfg.video = self.video_path
-        if cfg.video:
-            prepare_video_run(cfg)
+        cfg.video_truth = self.video_truth if self.video_path else ""
+        if cfg.video and for_run:
+            # the run gets a copy: the panel keeps its target list for when the video is closed
+            import copy
+            cfg = prepare_video_run(copy.deepcopy(cfg))
         return cfg
+
+    # ------------------------------------------------------------- targets
+    def _refresh_target_lists(self):
+        names = target_labels(self.cfg)
+        self.designated_idx = min(max(self.designated_idx, 0), len(names) - 1)
+        self.cmb_edit.blockSignals(True); self.cmb_edit.clear()
+        self.cmb_edit.addItems([("* " if i == self.designated_idx else "") + n for i, n in enumerate(names)])
+        self.cmb_edit.setCurrentIndex(min(max(self.edit_idx, 0), len(names) - 1)); self.cmb_edit.blockSignals(False)
+        self.edit_idx = self.cmb_edit.currentIndex()
+        self._sync_desig_box()
+        self.scene_view.set_targets(names, self.designated_idx)
+        self._schedule_check()
+
+    def _sync_desig_box(self):
+        """The tick box shows whether the target being edited is the designated one. One target
+        is always designated, so the box cannot be unticked: tick it on another target instead."""
+        on = self.edit_idx == self.designated_idx
+        self.chk_desig.blockSignals(True); self.chk_desig.setChecked(on); self.chk_desig.setEnabled(not on); self.chk_desig.blockSignals(False)
+
+    def _designate_current(self, *_):
+        self.designated_idx = self.edit_idx
+        self._refresh_target_lists()
+        self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]}: the tracker follows it and the report scores it.")
+
+    def _targets_changed(self, *_):
+        self._read_targets()
+        self._refresh_target_lists()
+
+    def _edit_changed(self, idx: int):
+        if idx < 0 or idx >= len(self.cfg.targets):
+            return
+        self.forms["target"].read()                  # keep the edits of the target being left
+        self.edit_idx = idx
+        self.forms["target"].write(self.cfg.targets[idx])
+        self._sync_desig_box()
+        self._schedule_check()
+
+    def _name_edited(self, text: str):
+        i = self.edit_idx
+        if 0 <= i < len(self.cfg.targets):
+            self.cfg.targets[i].name = text
+            label = ("* " if i == self.designated_idx else "") + target_name(self.cfg.targets[i], i)
+            self.cmb_edit.setItemText(i, label)
+            self.scene_view.set_targets(target_labels(self.cfg), self.designated_idx)
+
+    def _scene_clicked(self, x: float, y: float):
+        """A click before a run designates: on a video, the clicked point becomes the cue; on
+        the simulator preview, the target nearest the click becomes the designated one."""
+        if self.thread is not None:
+            return
+        if self.video_path:
+            self.designation_cue = f"{x:.0f},{y:.0f}"
+            self.lbl_status.setText(f"Beacon marked at {x:.0f},{y:.0f} on the first frame: the tracker takes the spot nearest this point.")
+            self._preview_video(self.video_path)
+            self._schedule_check()
+            return
+        pos = getattr(self, "_preview_pos", None)
+        if pos:
+            self.designated_idx = int(np.argmin([np.hypot(px - x, py - y) for px, py in pos]))
+            self._refresh_target_lists()
+            self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]}: the tracker follows it and the report scores it.")
+            self._preview_sim()
+
+    # ------------------------------------------------------------- scenario check and preview
+    def _schedule_check(self, *_):
+        if self.thread is None:
+            self._check_timer.start()
+
+    def _run_check(self):
+        if self.thread is not None:
+            return
+        import copy
+        try:
+            cfg = copy.deepcopy(self.read_cfg(for_run=False))
+        except Exception:
+            return
+        lines = scenario_check(cfg)
+        self.lbl_check.setText("\n".join(lines) if lines else "Scenario check: all values inside the PS envelope.")
+        self.lbl_check.setStyleSheet(f"color: {C['signal'] if lines else C['faint']};")
+        if not self.video_path:
+            self._preview_sim(cfg)
+
+    def _preview_sim(self, cfg: RunConfig | None = None):
+        """The scene at t = 0 before a run, every target named, so the designated one can be
+        checked and chosen by clicking. With 'New seed each run' the run draws a new seed, so
+        random start positions will differ; the choice of target does not."""
+        import copy
+        from ..world.renderer import World
+        if self.thread is not None:
+            return
+        try:
+            cfg = copy.deepcopy(cfg or self.read_cfg(for_run=False))
+            world = World(cfg)
+            img, truth = world.render()
+        except Exception:
+            return
+        h, w = img.shape[:2]
+        side = min(self.scene_view.width(), self.scene_view.height()) - 8
+        s = side / max(h, w)
+        pm = QtGui.QPixmap.fromImage(to_qimage(img).scaled(int(w * s), int(h * s), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation))
+        p = QtGui.QPainter(pm); p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        self.scene_view.set_targets(target_labels(cfg), cfg.designated_index())
+        self.scene_view.draw_beacons(p, truth.beacons, s, mono(8))
+        x0, y0, ww, wh = truth.window
+        p.setPen(_pen(C["accent"], 1.5)); p.drawRect(int(x0 * s), int(y0 * s), int(ww * s), int(wh * s))
+        _bar(p, 0, 20, pm.width())
+        _text(p, 8, 14, "PREVIEW t = 0   click a target to designate it", C["muted"], mono(8.5), pm.width() - 16)
+        p.end()
+        self._preview_pos = list(truth.beacons)
+        self.scene_view.remember_geometry(s, pm.width(), pm.height(), w, h)
+        self.scene_view.setPixmap(pm)
 
     def _preset_changed(self, name):
         p = ATMOSPHERE_PRESETS.get(name)
@@ -645,6 +847,9 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Cannot start", str(e)); return
         self._buf_reset(); self.scene_view.reset(); self.cam_view.reset(); self._last_res = None
+        names = cfg.target_names()
+        self.scene_view.set_targets(names, self.sim.di)
+        self._following = names[self.sim.di] if names and not cfg.video else ""
         for k, d in blank_tiles().items():
             self.tiles[k].show(d)
         self.tiles["state"].set("starting", None, "")
@@ -666,7 +871,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.failed.connect(self.on_failed, Qt.ConnectionType.QueuedConnection)
         self.thread.start()
         self._set_running(True)
-        self.lbl_status.setText(status_text("running", name=cfg.name, seed=cfg.seed, out=self.out_dir))
+        self.lbl_status.setText(status_text("running", name=cfg.name, seed=cfg.seed, out=self.out_dir)
+                                + (f"   |   {scenario_check(cfg)[0]}" if scenario_check(cfg) else ""))
 
     def pause(self):
         if self.worker:
@@ -687,13 +893,17 @@ class MainWindow(QtWidgets.QMainWindow):
         # during a run only the live sections stay editable; everything else is fixed for the run
         for key, form in self.forms.items():
             form.setEnabled(not r or key in LIVE_SECTIONS)
-        for w in (self.ed_name, self.sp_seed, self.chk_random, self.sp_dur, self.sp_extra):
+        for w in (self.ed_name, self.sp_seed, self.chk_random, self.sp_dur, self.sp_extra,
+                  self.chk_identical, self.cmb_edit, self.chk_desig, self.target_box):
             w.setEnabled(not r)
         for a in (self.act_open, self.act_save):
             a.setEnabled(not r)
+        if not r and not self.video_path:
+            self._sync_desig_box()              # the designated target's own box stays unclickable
         if self.video_path:
             self._set_video_mode(True)          # a video run has no live disturbances (they are in the file)
         self.act_clear_video.setEnabled(bool(self.video_path) and not r)
+        self.act_truth.setEnabled(bool(self.video_path) and not r)
 
     # ------------------------------------------------------------- live disturbances
     def _live_edited(self):
@@ -747,7 +957,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.c_proc.setData(t, np.array(self.b_proc[-n:])); self.c_mode.setData(t, np.array(self.b_mode[-n:]))
         self.progress.setValue(r.frame)
         self._update_tiles(r)
-        self.tele.setPlainText(telemetry_lines(r))
+        self.tele.setPlainText(telemetry_lines(r, getattr(self, '_following', '')))
 
     def _update_tiles(self, r):
         for k, d in self.live.tiles().items():
@@ -769,7 +979,8 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Report", f"Report generation failed:\n{e}")
         v = sim.summary.values if sim.summary else {}
         p = sim.summary.passed if sim.summary else {}
-        msg = summary_text(v, p, str(sim.files["frames"]), str(report))
+        msg = summary_text(v, p, str(sim.files["frames"]), str(report), sim.summary.designation if sim.summary else None,
+                           sim.summary.checks if sim.summary else None)
         self.lbl_status.setText(status_text("finished", out=self.out_dir))
         self.last_summary_text = msg
         if self.headless:
@@ -813,9 +1024,12 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open video for Benchmark 2", "", "Video (*.mp4 *.avi *.mov *.mkv)")
         if p:
-            self.video_path = p; self.ed_name.setText(Path(p).stem)
+            self.video_path = p; self.ed_name.setText(Path(p).stem); self.video_truth = ""; self.designation_cue = ""
             self._preview_video(p)
             self._video_label()
+            side = truth_sidecar(p)
+            if side:
+                self._set_truth(side)
 
     def _preview_video(self, path: str):
         """Probe the file, calibrate the settings to it, and show the first frame."""
@@ -857,8 +1071,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tiles["state"].set("video ready", None, "press Start")
         self.tele.setPlainText(video_loaded_lines(Path(path).name, info, self.forms["camera"].read()))
 
+    def open_truth(self):
+        p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Ground truth for this video", str(Path(self.video_path or ".").parent), "CSV (*.csv)")
+        if p:
+            self._set_truth(p)
+
+    def _set_truth(self, p: str):
+        from ..engine.sources import load_truth
+        try:
+            n = len(load_truth(p, (self.video_info or {}).get("fps", 30.0)))
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Ground truth", f"Could not read this file:\n{e}"); return
+        self.video_truth = p
+        self.lbl_status.setText(f"Ground truth: {p} ({n} frames). Errors and RMSE will be computed against it.")
+
     def clear_video(self):
-        self.video_path = None; self.video_info = None
+        self.video_path = None; self.video_info = None; self.video_truth = ""
         self._set_video_mode(False)
         self._placeholders()
         for t in self.tiles.values():
@@ -871,7 +1099,13 @@ class MainWindow(QtWidgets.QMainWindow):
         those sections are locked; the camera window, its FOV and rate limits still apply."""
         for key, names in VIDEO_LOCKED.items():
             if key == "run":
-                self.sp_extra.setEnabled(not on); self.sp_dur.setEnabled(not on)
+                for w in (self.sp_extra, self.sp_dur, self.chk_identical, self.cmb_edit, self.chk_desig):
+                    w.setEnabled(not on)
+                if on:
+                    self.cmb_edit.setCurrentIndex(0)
+                else:
+                    self.designation_cue = ""
+                    self._sync_desig_box()
             elif names == "*":
                 self.forms[key].setEnabled(not on)
             else:
@@ -880,6 +1114,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     if w is not None:
                         w.setEnabled(not on)
         self.act_clear_video.setEnabled(on)
+        self.act_truth.setEnabled(on)
 
     def screenshot(self):
         Path(self.cfg.output_dir).mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Publish the desktop archives of a build-workflow run on the project site.
+# Publish the Windows and Linux desktop archives of a build-workflow run on the project site.
+# (The macOS archives are built and published by tools/build_macos.sh.)
 # The server downloads them itself (a home connection often times out on 700 MB).
 #
 #   bash webapp/publish_builds.sh               # latest successful run of build.yml
@@ -12,12 +13,18 @@ set -euo pipefail
 HOST=${HOST:-ubuntu@15.206.247.203}
 REPO_SLUG=${REPO_SLUG:-tanmayhutt/SIH26169}
 DEST=${DEST:-/srv/sih26169/site/downloads}
-RUN=${1:-$(gh run list --workflow=build.yml --status=success --limit 1 --json databaseId -q '.[0].databaseId')}
+RUN=${1:-$(gh run list --workflow=build.yml --status=completed --limit 1 --json databaseId -q '.[0].databaseId')}
 [ -n "$RUN" ] || { echo "no successful build run found"; exit 1; }
-[ "$(gh run view "$RUN" --json conclusion -q .conclusion)" = "success" ] || { echo "run $RUN did not succeed; not publishing"; exit 1; }
+# every platform build in the run must have passed (tests, packaging, packaged-app check); the run as a whole
+# can still fail in later jobs that do not affect the archives (for example GitHub release publishing)
+BAD=$(gh run view "$RUN" --json jobs -q '[.jobs[] | select(.name | startswith("build (")) | select(.conclusion != "success")] | length')
+NB=$(gh run view "$RUN" --json jobs -q '[.jobs[] | select(.name | startswith("build ("))] | length')
+[ "$NB" -ge 2 ] && [ "$BAD" = "0" ] || { echo "run $RUN: not every platform build succeeded; not publishing"; exit 1; }
 LIST=$(gh api "repos/$REPO_SLUG/actions/runs/$RUN/artifacts" -q '.artifacts[] | "\(.id) \(.name)"')
 echo "publishing run $RUN:"; echo "$LIST"
-{ gh auth token; echo "$LIST"; } | ssh -o BatchMode=yes "$HOST" "REPO_SLUG=$REPO_SLUG DEST=$DEST bash -s" <<'REMOTE'
+# the remote script goes as an argument; standard input carries only the token and the list
+# (a heredoc and a pipe cannot both be standard input: the heredoc would win)
+REMOTE_SCRIPT=$(cat <<'REMOTE'
 set -euo pipefail
 read -r T
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cd "$W"
@@ -31,3 +38,5 @@ unset T
 for f in out/*.zip out/*.tar.gz; do [ -f "$f" ] && install -m 644 "$f" "$DEST/"; done
 ls -la "$DEST" | grep -E "zip|tar"
 REMOTE
+)
+{ gh auth token; echo "$LIST"; } | ssh -o BatchMode=yes "$HOST" "REPO_SLUG=$REPO_SLUG DEST=$DEST bash -c $(printf '%q' "$REMOTE_SCRIPT")"

@@ -6,6 +6,7 @@ the CLI, scenario YAML files and the tests all share one definition. Defaults fo
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any, get_type_hints
@@ -46,9 +47,13 @@ class CameraConfig:
 
 @dataclass
 class TargetConfig:
-    """Rows 7 to 12: one beacon. Several may be listed; the first is the designated one."""
-    shape: str = "square"            # square | circle | gaussian
-    size_px: int = 10
+    """Rows 7 to 12: one beacon. Several may be listed; `RunConfig.designated` says which one
+    the tracker must follow (the first by default)."""
+    name: str = ""                   # shown in the panel, the views and the report; empty = "Target N"
+    shape: str = "square"            # square | circle | gaussian | cross | ring | diamond | custom
+    size_px: int = 10                # row 10: width in px
+    height_px: int = 0               # row 10: height in px; 0 = same as the width (a square spot)
+    mask: str = ""                   # shape "custom": rows of 0/1 separated by ";" (e.g. "010;111;010"), or a PNG path
     intensity: int = 235             # peak grey level 0..255
     motion: str = "line"             # line | circular | figure8 | random | spiral | sinusoidal | waypoints | static
     speed_px_s: float = 120.0        # along-track speed for line, random, sinusoidal
@@ -58,6 +63,15 @@ class TargetConfig:
     heading_deg: float = 30.0        # line, sinusoidal
     blink_hz: float = 0.0            # 0 = steady; >0 modulates intensity (optional realism)
     waypoints: str = ""              # user-defined path for motion "waypoints": "x,y; x,y; ..." in screen px, looped at speed_px_s
+
+    def __post_init__(self):
+        if not self.height_px or self.height_px <= 0:
+            self.height_px = self.size_px
+
+    @property
+    def dims(self) -> tuple[int, int]:
+        """(width, height) of the spot in px."""
+        return int(self.size_px), int(self.height_px or self.size_px)
 
 
 @dataclass
@@ -99,7 +113,7 @@ class TrackerConfig:
     faint_snr_min: float = 3.5           # faint path: mean matched-filter SNR a chain of weak detections must show
     faint_threshold_k: float = 3.0       # faint path: detection threshold in noise sigmas (track-before-detect links the rest)
     kp: float = 5.0                      # rate command per degree of error (1/s)
-    kd: float = 0.3
+    kd: float = 0.0                      # no derivative: on an error that arrives a frame late in whole pixels it drove a +/-10 px limit cycle
     ki: float = 0.8
     feedforward: float = 1.0             # weight on predicted target angular rate
     estimator_lag_s: float = 0.25        # filter delay at the 30 Hz reference rate (about 7 frames), compensated with acceleration feedforward; scales with the frame rate
@@ -129,9 +143,43 @@ class RunConfig:
     targets: list[TargetConfig] = field(default_factory=lambda: [TargetConfig()])
     disturbance: DisturbanceConfig = field(default_factory=DisturbanceConfig)
     tracker: TrackerConfig = field(default_factory=TrackerConfig)
+    # which target is the beacon to follow, and how the tracker is told (PS: "a designated
+    # moving target"). auto (default): by its configured size, shape and brightness, and when
+    # another target looks the same, by its start position as well (as an operator or a
+    # GPS/ephemeris cue would). appearance and start force one of those. cue: a point near
+    # it, for example a click on the first frame of a video.
+    designated: int = 0
+    designation: str = "auto"            # auto | appearance | start | cue
+    designation_cue: str = ""            # "x,y" in screen (video) px, used when designation == "cue"
     video: str | None = None             # set for Benchmark 2 runs: path to an .mp4
+    video_truth: str = ""                # optional ground truth for a video: CSV of frame (or t), x, y in video px
     output_dir: str = "results"
     schedule: list[ScheduledChange] = field(default_factory=list)   # disturbance changes during the run
+
+    # ------------------------------------------------------------ targets
+    def designated_index(self) -> int:
+        return int(min(max(self.designated, 0), max(len(self.targets) - 1, 0)))
+
+    def designated_target(self) -> "TargetConfig | None":
+        return self.targets[self.designated_index()] if self.targets else None
+
+    def look_alikes(self) -> list[int]:
+        """Indices of the other targets that look the same as the designated one (same shape,
+        size and about the same brightness): by appearance alone they cannot be told apart."""
+        t0 = self.designated_target()
+        if t0 is None:
+            return []
+        return [i for i, t in enumerate(self.targets)
+                if i != self.designated_index() and t.shape == t0.shape and t.dims == t0.dims and abs(t.intensity - t0.intensity) < 25]
+
+    def resolved_designation(self) -> str:
+        """The designation mode a run uses: auto becomes start when look-alikes exist."""
+        if self.designation == "auto":
+            return "start" if (self.look_alikes() and not self.video) else "appearance"
+        return self.designation
+
+    def target_names(self) -> list[str]:
+        return [target_name(t, i) for i, t in enumerate(self.targets)]
 
     # ------------------------------------------------------------------ IO
     def to_dict(self) -> dict[str, Any]:
@@ -172,6 +220,34 @@ def _build(cls, d: dict[str, Any]):
     return cls(**kwargs)
 
 
+def target_name(t: TargetConfig, i: int) -> str:
+    return (t.name or "").strip() or f"Target {i + 1}"
+
+
+def parse_xy(text: str) -> tuple[float, float] | None:
+    """"x,y" -> (x, y), or None when empty or malformed."""
+    try:
+        sx, sy = str(text).split(",")
+        return float(sx), float(sy)
+    except (ValueError, AttributeError):
+        return None
+
+
+# Accepted input range of every numeric setting, in the units of this file. Values outside are
+# clamped before a run (engine/checks.py) whatever the front end, so a typing slip can never
+# produce an impossible picture. The PS envelope (what the problem statement specifies) is
+# narrower and is checked separately, as warnings.
+LIMITS = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "height_px": (0, 60), "intensity": (20, 255),
+          "salt_pepper_frac": (0, 0.5), "gaussian_sigma": (0, 60), "jitter_px": (0, 60), "platform_px_frame": (0, 60),
+          "contrast": (0.05, 2.0), "brightness": (-120, 120), "turbulence": (0, 1), "blur_sigma": (0, 8), "fov_w_deg": (0.2, 60),
+          "fov_h_deg": (0.2, 60), "update_rate_hz": (5, 120), "max_pan_rate_deg_s": (0.5, 60), "max_tilt_rate_deg_s": (0.5, 60),
+          "speed_px_s": (0, 2000), "radius_px": (10, 3000), "period_s": (1, 600), "heading_deg": (-360, 360),
+          "background_level": (0, 120), "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2),
+          "deadband_px": (0, 20), "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10),
+          "blink_hz": (0, 15), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
+          "faint_snr_min": (0, 20), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
+
+
 ATMOSPHERE_PRESETS: dict[str, dict[str, float]] = {
     # contrast multiplier, brightness offset, blur, turbulence. Row 24 says the reduction in
     # contrast and brightness is user-defined; these are starting points the user can edit.
@@ -195,12 +271,10 @@ def apply_atmosphere_preset(d: DisturbanceConfig) -> DisturbanceConfig:
 
 PLATFORM_MOTIONS = ("none", "linear", "circular", "random", "spiral", "figure8")
 _PRESET_FIELDS = ("contrast", "brightness", "blur_sigma", "turbulence")
-_FRACTION_FIELDS = {"salt_pepper_frac": (0.0, 1.0), "turbulence": (0.0, 1.0)}
-_NON_NEGATIVE = {"gaussian_sigma", "jitter_px", "platform_px_frame", "blur_sigma", "contrast"}
 
 
 def clean_disturbance_changes(changes: dict) -> dict:
-    """Keep only real DisturbanceConfig fields, cast to their types and kept in range, so a
+    """Keep only real DisturbanceConfig fields, cast to their types and clamped to LIMITS, so a
     schedule from a scenario file or a request from the web page cannot inject anything else."""
     kinds = {f.name: f.type for f in fields(DisturbanceConfig)}
     out: dict[str, Any] = {}
@@ -212,12 +286,11 @@ def clean_disturbance_changes(changes: dict) -> dict:
             v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
         elif kind in ("float", float):
             v = float(v)
-            if k in _FRACTION_FIELDS:
-                v = min(max(v, _FRACTION_FIELDS[k][0]), _FRACTION_FIELDS[k][1])
-            elif k in _NON_NEGATIVE:
-                v = max(v, 0.0)
-            elif k == "platform_period_s":
-                v = max(v, 0.1)
+            if not math.isfinite(v):
+                continue
+            lim = LIMITS.get(k)                  # the same accepted range as a value typed before Start
+            if lim is not None:
+                v = min(max(v, float(lim[0])), float(lim[1]))
         else:
             v = str(v)
             if k == "atmosphere" and v not in ATMOSPHERE_PRESETS:
