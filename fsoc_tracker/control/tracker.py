@@ -145,6 +145,9 @@ class Tracker:
             else:
                 det_img = img
                 cands = self.classical.detect(img, roi)
+            # candidates past the first few come back unrefined; whoever picks one refines it
+            # on this frame's picture, never on one left over from an earlier frame or state
+            self._det_img = det_img
             tier = "classical" if cands else "none"
             chosen = self._pick_new(cands)
             # the faint path needs a still picture to build its moving-target residual; in hard
