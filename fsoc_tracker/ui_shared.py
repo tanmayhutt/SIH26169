@@ -189,6 +189,19 @@ def scenario_check(cfg: RunConfig) -> list[str]:
     return check_lines(check_config(copy.deepcopy(cfg)))
 
 
+TRUTH_TIP = ("Benchmark 2: the evaluators' reference positions as a CSV (frame or t, x, y in video pixels). With it, tracking and "
+             "centroiding error, RMSE and a true lock retention are computed against it. A file named <video>_truth.csv next to the video is picked up automatically.")
+
+
+def truth_sidecar(video_path: str) -> str:
+    """<stem>_truth.csv or <stem>.csv next to a video, if one exists."""
+    p = Path(video_path)
+    for cand in (p.with_name(p.stem + "_truth.csv"), p.with_suffix(".csv")):
+        if cand.is_file():
+            return str(cand)
+    return ""
+
+
 RUN_TIPS = {
     "extra": "More targets besides target 1 (PS row 8: multiple optional). Generated ones get random paths.",
     "identical": "Generated targets copy target 1's shape, size and brightness. Only a start or click cue can then tell the designated one apart.",
@@ -470,7 +483,7 @@ def front_end_bundle() -> dict:
     return {
         "version": __version__, "sections": schema(), "tiles": TILES, "modes": MODES, "speeds": SPEEDS,
         "default_speed": DEFAULT_SPEED_INDEX, "duration_range": DURATION_RANGE, "extra_max": EXTRA_TARGETS_MAX,
-        "run_tips": RUN_TIPS, "designations": CHOICES["designation"],
+        "run_tips": RUN_TIPS, "designations": CHOICES["designation"], "truth_tip": TRUTH_TIP,
         "presets": ATMOSPHERE_PRESETS, "video_locked": VIDEO_LOCKED, "legend": SCENE_LEGEND,
         "welcome": welcome_text(), "about": about_text(), "status_ready": status_text("ready"),
         "status_loaded": status_text("loaded", path="{path}"),

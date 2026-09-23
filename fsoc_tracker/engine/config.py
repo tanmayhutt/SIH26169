@@ -140,6 +140,7 @@ class RunConfig:
     designation: str = "appearance"      # appearance | start | cue
     designation_cue: str = ""            # "x,y" in screen (video) px, used when designation == "cue"
     video: str | None = None             # set for Benchmark 2 runs: path to an .mp4
+    video_truth: str = ""                # optional ground truth for a video: CSV of frame (or t), x, y in video px
     output_dir: str = "results"
 
     # ------------------------------------------------------------ targets

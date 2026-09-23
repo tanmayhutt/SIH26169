@@ -251,7 +251,15 @@ class CNNDetector:
     def __init__(self, model_path: str, patch: int = 128):
         self.patch = patch
         self.session = None
-        self.path = Path(model_path)
+        # a relative path is tried from the working folder, then from the package's own folder,
+        # so an installed command started anywhere still finds the model
+        p = Path(model_path)
+        if not p.is_absolute() and not p.exists():
+            for base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
+                if (base / p).exists():
+                    p = base / p
+                    break
+        self.path = p
 
     def available(self) -> bool:
         if self.session is not None:

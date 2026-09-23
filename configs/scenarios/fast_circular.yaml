@@ -1,0 +1,8 @@
+# A fast beacon: a 450 px circle at 4 deg/s (640 px/s), close to the camera's 5 deg/s turn
+# rate (PS rows 13 and 14). The PS does not state a target speed; this checks that the
+# tracker keeps up with the fastest beacon the camera can physically follow with margin.
+name: fast_circular
+seed: 0
+duration_s: 30
+targets:
+  - {name: Remote terminal, shape: square, size_px: 10, motion: circular, radius_px: 450, period_s: 4.42, start: centre}

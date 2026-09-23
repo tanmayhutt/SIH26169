@@ -305,6 +305,11 @@ async def start_run(body: dict):
             if not p.exists():
                 raise HTTPException(404, "uploaded video not found; upload it again")
             cfg.video = str(p); cfg.name = p.stem[:40]
+            tr = body.get("truth")
+            if tr:
+                tp = UPLOADS / Path(tr).name
+                if tp.exists():
+                    cfg.video_truth = str(tp)
             prepare_video_run(cfg)
         cfg.duration_s = min(max(cfg.duration_s, DURATION_RANGE[0]), DURATION_RANGE[1]) if not cfg.video else 0.0
         cfg.output_dir = str(RUNS)
@@ -426,6 +431,26 @@ async def upload_video(request: Request, file: UploadFile = File(...)):
     info["preview_header"] = video_preview_header(info)
     info["status"] = status_text("video", path=file.filename or name)
     return info
+
+
+@app.post("/api/truth")
+async def upload_truth(request: Request, file: UploadFile = File(...)):
+    """Ground truth for the uploaded video: a CSV of frame (or t), x, y."""
+    from fsoc_tracker.engine.sources import load_truth
+    data = await file.read()
+    if len(data) > 20 << 20:
+        raise HTTPException(413, "truth file larger than 20 MB")
+    name = uuid.uuid4().hex[:8] + ".csv"
+    dest = UPLOADS / name
+    dest.write_bytes(data)
+    fps = float(request.query_params.get("fps") or 30.0)
+    try:
+        n = len(load_truth(dest, fps))
+    except Exception as e:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(400, f"could not read this truth file: {e}")
+    return {"truth": name, "frames": n, "original_name": file.filename,
+            "status": f"Ground truth: {file.filename} ({n} frames). Errors and RMSE will be computed against it."}
 
 
 def _json_safe(v):

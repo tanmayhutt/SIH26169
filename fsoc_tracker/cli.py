@@ -59,6 +59,7 @@ def main(argv=None):
     v.add_argument("path")
     v.add_argument("--scenario", "-s", default=None)
     v.add_argument("--duration", type=float, default=None)
+    v.add_argument("--truth", default=None, help="ground-truth CSV (frame or t, x, y in video px): errors and RMSE are then computed against it")
     v.add_argument("--out", "-o", default=None)
 
     b = sub.add_parser("batch", help="run scenarios over many seeds and aggregate")
@@ -90,6 +91,14 @@ def main(argv=None):
         cfg = _load(a.scenario)
         cfg.video = a.path
         cfg.name = Path(a.path).stem
+        if a.truth:
+            cfg.video_truth = a.truth
+        else:
+            from .ui_shared import truth_sidecar
+            side = truth_sidecar(a.path)
+            if side:
+                cfg.video_truth = side
+                print(f"  ground truth: {side} (found next to the video)")
         cfg.duration_s = a.duration if a.duration is not None else 0.0
         out = Path(a.out) if a.out else Path(cfg.output_dir) / run_label(cfg)
         _run_one(cfg, out)

@@ -7,7 +7,8 @@ Three kinds of note, the same in the desktop app, the web app, the command line 
 - beyond_ps: a value is outside what the problem statement specifies (26169.pdf, the row is
   named), so the PS performance targets are not promised for it;
 - physical: the combination asks for something the modelled camera cannot do at all, such as a
-  beacon moving faster than the gimbal can turn.
+  beacon moving faster than the gimbal can turn;
+- near_limit: it can be done, with little margin (a beacon above 70% of the turn rate).
 
 Values inside the PS envelope produce no note. The check never changes a value that is inside
 the accepted range.
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from pathlib import Path
 
 from .config import LIMITS, RunConfig, parse_xy, target_name
 
@@ -139,7 +141,7 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
             notes.append(_note("physical", "target.speed", f"{target_name(t0, cfg.designated_index())} moves at up to {v:.0f} px/s but the camera turns at most "
                                                          f"{px_per_s:.0f} px/s ({cam.max_pan_rate_deg_s:g} deg/s): it cannot be kept centred."))
         elif v > 0.7 * px_per_s:
-            notes.append(_note("physical", "target.speed", f"{target_name(t0, cfg.designated_index())} moves at up to {v:.0f} px/s, {100 * v / px_per_s:.0f}% of the camera's "
+            notes.append(_note("near_limit", "target.speed", f"{target_name(t0, cfg.designated_index())} moves at up to {v:.0f} px/s, {100 * v / px_per_s:.0f}% of the camera's "
                                                          f"{px_per_s:.0f} px/s turn rate: little margin left for noise and vibration."))
     motion = d.jitter_px + (d.platform_px_frame if d.platform_motion != "none" else 0.0)
     if motion > px_per_frame:
@@ -149,6 +151,8 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
         notes.append(_note("physical", "disturbance.salt_pepper_frac", "Salt and pepper covers half of all pixels: the beacon is buried; detection is unlikely."))
     if cfg.designation == "cue" and parse_xy(cfg.designation_cue) is None:
         notes.append(_note("physical", "designation_cue", "Designation 'cue' needs a point: click the beacon on the scene (video: on the first frame) or type x,y."))
+    if cfg.video_truth and not Path(cfg.video_truth).is_file():
+        notes.append(_note("physical", "video_truth", f"Ground-truth file {cfg.video_truth} not found: errors cannot be computed."))
     if cfg.designation == "start" and cfg.video:
         notes.append(_note("physical", "designation", "Designation 'start' needs the simulator (a video has no configured start); click the beacon on the first frame instead."))
     if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance":
@@ -163,6 +167,6 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
 
 def check_lines(notes: list[dict]) -> list[str]:
     """Notes as text lines, most serious first."""
-    order = {"physical": 0, "beyond_ps": 1, "clamped": 2}
-    tag = {"physical": "Cannot be met", "beyond_ps": "Beyond the PS", "clamped": "Corrected"}
+    order = {"physical": 0, "near_limit": 1, "beyond_ps": 2, "clamped": 3}
+    tag = {"physical": "Cannot be met", "near_limit": "Near the limit", "beyond_ps": "Beyond the PS", "clamped": "Corrected"}
     return [f"{tag[n['level']]}: {n['text']}" for n in sorted(notes, key=lambda n: order.get(n["level"], 3))]
