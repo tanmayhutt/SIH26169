@@ -103,3 +103,28 @@ def test_cnn_model_found_from_any_folder():
     out = subprocess.run([sys.executable, "-c", code], cwd=tempfile.gettempdir(), capture_output=True, text=True,
                          env=dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1])))
     assert out.stdout.strip().endswith("True")
+
+
+def test_still_beacon_is_centred_without_oscillation():
+    # the derivative term on a one-frame-late, whole-pixel error drove a +/-10 px limit cycle;
+    # a still beacon must now be held within a few pixels (row 17)
+    cfg = RunConfig(); cfg.targets[0].start = "1700,300"; cfg.targets[0].motion = "static"
+    r = _run(cfg, 6.0).telemetry.records[120:]
+    assert max(x.tracking_err_px for x in r) < 4.0
+
+
+def test_platform_sway_never_exceeds_the_set_speed():
+    # row 25: +/- 20 px/frame maximum, for every pattern (the figure 8 was sqrt(2) too fast)
+    for m in ("linear", "circular", "figure8", "spiral", "random"):
+        cfg = RunConfig(); cfg.disturbance.platform_motion = m; cfg.disturbance.platform_px_frame = 20
+        r = _run(cfg, 6.0).telemetry.records
+        px = np.array([x.platform_dx for x in r]); py = np.array([x.platform_dy for x in r])
+        assert np.hypot(np.diff(px), np.diff(py)).max() <= 20.05, m
+
+
+def test_faint_track_is_not_walked_off_by_noise():
+    # a faint beacon (3 to 6 sigma): a refit that slides onto noise, or a network guess on a
+    # noise patch, used to kick the track off the beacon (seed 7: 86 px, 79 % lock)
+    cfg = RunConfig.load("configs/scenarios/lowlight_faint.yaml"); cfg.seed = 7
+    v = _run(cfg, 8.0).summary.values
+    assert v["tracking_err_mean_px"] < 10 and v["lock_retention_pct"] > 90
