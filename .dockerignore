@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+results
+dist
+build
+out
+docs
+tests
+training
+tools
+web
+**/__pycache__
+**/*.pyc
+.pytest_cache
+context.md
+*.pdf

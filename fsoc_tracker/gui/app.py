@@ -27,7 +27,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
-                         new_random_seed, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH)
+                         new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH)
 from ..engine.config import target_name, parse_xy
 
 
@@ -405,7 +405,7 @@ class CameraView(QtWidgets.QLabel):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"FSOC Tracker  v{__version__}  SIH26169")
+        self.setWindowTitle(f"ARGUS  v{__version__}  SIH26169")
         self.resize(1600, 960)
         self.cfg = RunConfig()
         self.thread: QtCore.QThread | None = None
@@ -626,6 +626,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if path:
             try:
                 self.apply_cfg(RunConfig.load(path))
+                # a scenario file (an evaluator's Benchmark 1 case) is run exactly as written
+                self.chk_random.setChecked(False)
                 self.lbl_status.setText(status_text("loaded", path=path))
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Load failed", str(e))
@@ -667,6 +669,10 @@ class MainWindow(QtWidgets.QMainWindow):
         cfg.designation = self.cmb_mode.currentText()
         cfg.designation_cue = self.ed_cue.text().strip()
         cfg.video = self.video_path
+        if cfg.video and for_run:
+            # the run gets a copy: the panel keeps its target list for when the video is closed
+            import copy
+            cfg = prepare_video_run(copy.deepcopy(cfg))
         return cfg
 
     # ------------------------------------------------------------- targets
@@ -1016,7 +1022,7 @@ class MainWindow(QtWidgets.QMainWindow):
         d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)
 
     def help(self):
-        QtWidgets.QMessageBox.information(self, "About FSOC Tracker", about_text())
+        QtWidgets.QMessageBox.information(self, "About ARGUS", about_text())
 
 
 def _open_path(p: Path):
@@ -1032,7 +1038,7 @@ def _open_path(p: Path):
 def main():
     QtCore.QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
-    app.setApplicationName("FSOC Tracker")
+    app.setApplicationName("ARGUS")
     app.setStyle("Fusion")          # the same widget look on Windows, Linux and macOS
     app.setStyleSheet(STYLESHEET)
     w = MainWindow(); w.show()

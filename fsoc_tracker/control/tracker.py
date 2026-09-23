@@ -162,6 +162,9 @@ class Tracker:
             else:
                 det_img = img
                 cands = self.classical.detect(img, roi)
+            # candidates past the first few come back unrefined; whoever picks one refines it
+            # on this frame's picture, never on one left over from an earlier frame or state
+            self._det_img = det_img
             tier = "classical" if cands else "none"
             # candidates are re-measured on this frame's picture (before, a search after a loss
             # re-measured them on the last tracked frame, and a first search with several strong

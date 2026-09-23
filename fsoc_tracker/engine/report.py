@@ -47,7 +47,7 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
         # ---------------------------------------------------------- page 1
         fig = plt.figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor("white")
-        fig.text(0.07, 0.955, "FSOC Tracker performance report", fontsize=17, weight="bold", color=INK)
+        fig.text(0.07, 0.955, "ARGUS performance report", fontsize=17, weight="bold", color=INK)
         sub = f"Run '{cfg.name}'   seed {cfg.seed}   {datetime.now():%Y-%m-%d %H:%M}   v{__version__}   {platform.system()} {platform.machine()}"
         fig.text(0.07, 0.932, sub, fontsize=8.5, color=MUTED)
         src = (f"Source: video {cfg.video}  ({cfg.screen.width}x{cfg.screen.height} px as displayed, {cfg.camera.update_rate_hz:.2f} fps average, "
