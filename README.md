@@ -27,6 +27,7 @@ CSV log and an automatic PDF performance report.
 | `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
 | `26169.pdf` | The problem statement itself |
 | `docs/submission/LAKSHYA_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
+| `docs/submission/DECK_CHECKLIST.md` | What every new version of the deck must still say |
 
 ## Quick start
 
