@@ -457,7 +457,7 @@ async function init() {
   document.title = "ARGUS  v" + U.version + "  SIH26169";
   buildPanel(); buildTiles(); showTiles(blankTiles()); fillForm(META.defaults); lockForVideo(false);
   $("scn").innerHTML = `<option value="">Custom (edit the panel)</option>` + META.scenarios.map(x => `<option value="${x.name}">${x.label}</option>`).join("");
-  $("scn").addEventListener("change", () => { const x = META.scenarios.find(y => y.name === $("scn").value); if (x) { fillForm(x.config); setStatus("Loaded configs/scenarios/" + x.name + ".yaml. Press Start."); } });
+  $("scn").addEventListener("change", () => { const x = META.scenarios.find(y => y.name === $("scn").value); if (x) { fillForm(x.config); $("rnd").checked = false; setStatus(U.status_loaded.replace("{path}", "configs/scenarios/" + x.name + ".yaml")); } });
   $("speed").innerHTML = U.speeds.map(s => `<option>${s[0]}</option>`).join(""); $("speed").selectedIndex = U.default_speed;
   $("tele").textContent = U.welcome; setStatus(U.status_ready); setRunning(false); drawPlots();
   $("start").onclick = start; $("pause").onclick = pause; $("step").onclick = step; $("stop").onclick = stop;

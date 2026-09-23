@@ -63,7 +63,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 22 tests, about 15 s
+.venv/bin/python -m pytest                      # 29 tests, about 25 s
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -227,7 +227,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (22 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (29 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state: 36 of 36 runs unchanged (2026-09-22).

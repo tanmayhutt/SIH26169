@@ -360,7 +360,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Centroiding error | Distance from the measured centroid to the true centroid over frames with a detection; mean, maximum, RMSE. |
 | Tracked rate | Percentage of frames after acquisition in state TRACK, regardless of centring; separates tracker failure from gimbal limits. |
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
-| Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. Row 19. |
+| Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 

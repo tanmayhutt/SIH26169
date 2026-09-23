@@ -162,6 +162,16 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
     return targets
 
 
+def prepare_video_run(cfg: RunConfig) -> RunConfig:
+    """A video run (Benchmark 2) processes the whole file, and the file already holds the scene,
+    its beacons and disturbances. Duration and Extra targets are locked in video mode, so their
+    panel values must not reach the run: a 30 s duration would cut a longer video short, and
+    decoys would switch on the identity audit for spots that are not in the configuration."""
+    cfg.duration_s = 0.0
+    cfg.targets = cfg.targets[:1]
+    return cfg
+
+
 def new_random_seed(cfg: RunConfig) -> None:
     """'New seed each run': a fresh seed, and a fresh heading for line and sinusoidal paths."""
     cfg.seed = int(np.random.default_rng().integers(0, 10 ** 6))
@@ -361,7 +371,8 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"  with vibration removed: {f('tracking_err_stab_mean_px')} px\n"
            f"Centroiding error mean {f('centroid_err_mean_px', '{:.3f}')} px, RMSE {f('centroid_err_rmse_px', '{:.3f}')} px\n"
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
-           f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
+           f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
+           + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
            f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
@@ -400,7 +411,7 @@ def status_text(kind: str, **kw) -> str:
     return {
         "ready": "Simulator input. Pick a scenario or set values, then press Start.",
         "video": f"Benchmark 2 input: {kw.get('path', '')}  (simulator bypassed). Press Start.",
-        "loaded": f"Loaded {kw.get('path', '')}. Press Start.",
+        "loaded": f"Loaded {kw.get('path', '')}. Its seed and paths are used as written; tick New seed each run for a fresh one. Press Start.",
         "running": f"Running '{kw.get('name', '')}' seed {kw.get('seed', '')}  ->  {kw.get('out', '')}",
         "finished": f"Finished. Report written to {kw.get('out', '')}",
     }[kind]
@@ -413,4 +424,5 @@ def front_end_bundle() -> dict:
         "default_speed": DEFAULT_SPEED_INDEX, "duration_range": DURATION_RANGE, "extra_max": EXTRA_TARGETS_MAX,
         "presets": ATMOSPHERE_PRESETS, "video_locked": VIDEO_LOCKED, "legend": SCENE_LEGEND,
         "welcome": welcome_text(), "about": about_text(), "status_ready": status_text("ready"),
+        "status_loaded": status_text("loaded", path="{path}"),
     }

@@ -65,8 +65,9 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 | hardmode_line | tracker sees only the window; must sweep | acquisition 3 to 12 s (spiral sweep), then as clear line |
 | TEMPLATE_evaluator | every field labelled by PS row, PS defaults | behaves like clear line; copy it to enter evaluator values |
 
-Tick "random seed" to get a different starting position and noise each run; untick and set
-Seed to repeat a run exactly.
+Picking a scenario runs it exactly as written: its seed and paths are kept and "New seed each
+run" is switched off. Tick it to get a different starting position and noise each run; untick
+it and set Seed to repeat a run exactly.
 
 ## 4. Every input you can change, and what to look for
 
@@ -186,7 +187,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 22 tests: geometry, gimbal, paths, centroid, IMM, closed loop, identity, video, PS rows
+python -m pytest                       # 29 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

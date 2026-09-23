@@ -111,7 +111,7 @@ Optional, to retrain the AI detector: `pip install -e ".[train]"` then
 
 | Control | Action |
 |---|---|
-| Scenario | Pick a ready-made test case from `configs/scenarios`. "Custom" keeps whatever is in the panel. |
+| Scenario | Pick a ready-made test case from `configs/scenarios`. "Custom" keeps whatever is in the panel. A picked scenario runs as written: its seed and paths are kept and "New seed each run" is switched off. |
 | Start / Pause / Step / Stop | Run control. Space starts or pauses, N steps one frame while paused, Esc stops. |
 | Speed | 0.25x to 4x real time, or Max speed (shows the true processing rate). |
 | Open video (Benchmark 2) | Choose an `.mp4`; the simulator is bypassed and the video frames become the scene. Ctrl+O. |
@@ -302,7 +302,7 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Centroiding error | Distance from the measured beacon centre to the true centre. |
 | Tracked | Percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. A high tracked rate with a low lock rate means the camera, not the tracker, could not keep up. |
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
-| Re-acquisition time | Time from losing lock to regaining it. Spec: 1 s or less. |
+| Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
 | FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |
 
 ## 9. Troubleshooting
