@@ -109,9 +109,9 @@
         "text": "tools/ps_audit.py measures every PS item by running the code: rows 1 to 25, the eight shall functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered noisy video and its truth CSV. It writes docs/PS_AUDIT.md and exits with 1 if any check fails; the build workflow runs it on the Linux job, and it is in CONTRIBUTING.md and the pull-request template. 39 of 39 pass. It found three defects, all fixed. Shall 6: the derivative gain (kd 0.3) acted on an error that reaches the controller one frame late and in whole pixels, and drove a limit cycle of about +/-10 px; a still beacon was never settled (mean 6.4 px, peak 15.6 px). With kd 0 it is held within 4 px (mean 1.6 px); the integral term stays. Row 25: the figure-8 sway peaked at 28.3 px/frame when set to 20 (it is fastest at its crossing, sqrt(2) times the circle speed); it is now scaled so its peak equals the setting. Faint beacon seed 7: the sub-pixel refit slid onto noise clumps and the track walked off (86 px, 78.6% lock); the raw detection is now kept when the refit moves more than 3 px or the width exceeds 2.5 times the track's recent median, much wider candidates are not associated, and the CNN is not used on a faint track: 2.8 px, 94.8% lock."
       },
       {
-        "name": "Four-platform rerun",
+        "name": "Archive rebuild",
         "status": "partial",
-        "text": "The build workflow and per-platform package check will be repeated for the September 23 changes, the review fixes and the PS audit fixes; the archives on the site predate them."
+        "text": "The macOS Intel and Apple silicon archives on the site were rebuilt on 2026-09-23 from the current code (tools/build_macos.sh, same checks). The Windows and Linux archives predate the evening fixes and will be rebuilt by the workflow once an Actions budget is set or the free minutes reset."
       }
     ]
   },
@@ -1147,7 +1147,7 @@
               "status": "done"
             },
             {
-              "name": "Build workflow: Windows x64, Linux x64, macOS Intel and Apple silicon, with tests and packaged smoke test on each",
+              "name": "Build workflow: Windows x64 and Linux x64 (manual or tag), tests and packaged smoke test on each; macOS Intel and Apple silicon built and checked by tools/build_macos.sh",
               "status": "done"
             },
             {

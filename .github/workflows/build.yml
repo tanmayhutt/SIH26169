@@ -1,33 +1,21 @@
-# Builds the standalone desktop application for every supported platform, runs the test suite
-# and a smoke test of the packaged executable and of the web app on each one, then publishes:
+# Builds the Windows and Linux desktop archives, runs the test suite and a smoke test of the
+# packaged executable and of the web app on each one, then publishes. The two macOS archives are
+# built on the team's Apple silicon Mac with tools/build_macos.sh (a macOS runner minute costs ten
+# Linux minutes; the free allowance was exhausted on 2026-09-23). Then it publishes:
 #   GitHub Releases   the four archives. A push to main updates the rolling "latest" pre-release;
 #                     a tag v* (git tag v1.0.0 && git push origin v1.0.0) makes a versioned release.
 #   GitHub Packages   ghcr.io/<owner>/argus-desktop  the four archives (oras pull ...)
 #                     ghcr.io/<owner>/argus-web      the web app as a Docker image (amd64, arm64)
 #                     tags: latest and sha-<commit> from main; <version> and stable from a tag.
 # Nothing is published unless every platform build, test and package check passed.
-#   Triggers: a push to main that changes the application, a tag v*, or manually
-#   (Actions > Build desktop application > Run workflow; publishes as a main build when run on main).
+#   Triggers: manually (Actions > Build desktop application > Run workflow) or a tag v*. Not on
+#   every push: each run spends Actions minutes, so a build is a decision.
 #   Fetch the archives for the project site with:  bash webapp/fetch_builds.sh
 name: Build desktop application
 on:
   workflow_dispatch:
   push:
-    branches: [main]
     tags: ["v*"]
-    paths:                        # documentation-only commits do not rebuild (tags always do)
-      - "fsoc_tracker/**"
-      - "webapp/**"
-      - "configs/**"
-      - "models/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "fsoc_tracker.spec"
-      - "Dockerfile"
-      - ".dockerignore"
-      - "docs/USER_MANUAL.*"
-      - "docs/TECHNICAL_REPORT.pdf"
-      - ".github/workflows/build.yml"
 permissions:
   contents: read
 concurrency:                      # a newer push to main supersedes a build still running; tags are never cancelled
@@ -45,12 +33,6 @@ jobs:
           - os: ubuntu-22.04        # oldest glibc still common on government desktops (Ubuntu 22.04, Debian 12, BOSS)
             label: linux-x64
             archive: tar.gz
-          - os: macos-15-intel      # macos-13 runners are retired and never start
-            label: macos-intel
-            archive: zip
-          - os: macos-14
-            label: macos-arm64
-            archive: zip
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -139,7 +121,8 @@ jobs:
           { echo "kind=$kind"; echo "version=$version"; echo "tags=$tags"; echo "owner=$owner"; } >> "$GITHUB_OUTPUT"
           echo "publishing as: $kind $version ($tags)"
 
-  # the four archives as a GitHub release and as a package on ghcr.io
+  # the two GitHub-built archives as a GitHub release and as a package on ghcr.io (the macOS
+  # archives are built locally and published on the project site by tools/build_macos.sh)
   publish-desktop:
     needs: [build, meta]
     if: needs.meta.outputs.kind != 'none'
@@ -159,17 +142,17 @@ jobs:
           pattern: ARGUS-*
           path: out
           merge-multiple: true
-      - name: Check all four archives are present
+      - name: Check both archives are present
         run: |
           ls -l out
-          for f in ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz ARGUS-macos-intel.zip ARGUS-macos-arm64.zip; do
+          for f in ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz; do
             test -s "out/$f" || { echo "missing $f"; exit 1; }
           done
       - name: GitHub release
         run: |
-          notes="ARGUS desktop application, built from ${GITHUB_SHA::7} by the build workflow. Every archive passed the test suite, the web app smoke test and the packaged-application check on its own platform.
+          notes="ARGUS desktop application (Windows and Linux), built from ${GITHUB_SHA::7} by the build workflow. Each archive passed the test suite, the web app smoke test and the packaged-application check on its own platform. The macOS archives (Intel and Apple silicon) are built on the team's Mac and published on the project site.
 
-          Windows: extract, run ARGUS.exe (ARGUS-cli.exe for the command line). Linux: tar xzf, then ./ARGUS/ARGUS. macOS: extract, run ARGUS (System Settings, Privacy and Security, Open Anyway on first start; the builds are not code-signed)."
+          Windows: extract, run ARGUS.exe (ARGUS-cli.exe for the command line). Linux: tar xzf, then ./ARGUS/ARGUS. The builds are not code-signed."
           if [ "$KIND" = release ]; then
             gh release create "$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "ARGUS $VERSION" --notes "$notes" --verify-tag
           else
@@ -186,10 +169,10 @@ jobs:
           oras push "$PKG:${TAGS}" \
             --artifact-type application/vnd.argus.desktop.v1 \
             --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --annotation "org.opencontainers.image.description=ARGUS desktop application: Windows x64, Linux x64, macOS Intel and Apple silicon archives" \
+            --annotation "org.opencontainers.image.description=ARGUS desktop application: Windows x64 and Linux x64 archives" \
             --annotation "org.opencontainers.image.version=${VERSION}" \
             --annotation "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz ARGUS-macos-intel.zip ARGUS-macos-arm64.zip
+            ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz
 
   # the web app as a Docker image on ghcr.io; started and checked before it is pushed
   publish-web:

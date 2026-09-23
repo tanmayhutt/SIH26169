@@ -52,9 +52,9 @@ Platform notes:
   and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine ARGUS`
   on the extracted folder once.
 
-Results are written to a `results` folder next to the executable. Every archive is produced by
-the same build workflow, which also runs the test suite and a smoke test of the packaged
-executable on that platform before publishing it.
+Results are written to a `results` folder next to the executable. Every archive passed the test
+suite and a smoke test of the packaged executable on its own platform before it was published
+(Windows and Linux on the GitHub build workflow, macOS on the team's Mac).
 
 ### 2.3 Web application
 

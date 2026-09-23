@@ -40,6 +40,7 @@ server (only if you will deploy); the login for the project site.
 
 ## Releasing
 
-Only after `main` is green: run the "Build desktop application" workflow, then
-`bash webapp/publish_builds.sh` and `bash webapp/deploy.sh` (needs server access). See
-`docs/HANDOVER.md` section 9.
+Only after `main` is green. Windows and Linux: run the "Build desktop application" workflow by
+hand (it spends Actions minutes), then `bash webapp/publish_builds.sh`. macOS Intel and Apple
+silicon: `bash tools/build_macos.sh` on an Apple silicon Mac (it builds, checks and uploads both).
+Then `bash webapp/deploy.sh`. All three need server access. See `docs/HANDOVER.md` section 9.

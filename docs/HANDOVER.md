@@ -310,13 +310,18 @@ files downloaded instead of opened.
    Actions, "Build desktop application", Run workflow (or `gh workflow run build.yml --ref main`).
    About 25 minutes. Each of Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel and macOS
    Apple silicon runs the tests, the web smoke test, packages with PyInstaller and runs the
-   package check. When all four pass, the workflow republishes the rolling `latest` pre-release
+   package check. Since 2026-09-23 the workflow builds only Windows and Linux and runs only when
+   started by hand or on a tag: a macOS runner minute costs ten Linux minutes and the free
+   allowance ran out. The two macOS archives are built with `bash tools/build_macos.sh` on an
+   Apple silicon Mac (Intel through Rosetta with an x86_64 Python that uv installs); it runs the
+   same smoke test and package check and uploads both. When both GitHub builds pass, the workflow republishes the rolling `latest` pre-release
    and the GitHub packages `argus-desktop` (the archives) and `argus-web` (the web app image,
    started and checked before it is pushed); see README, Releases and packages. For a versioned
    release push a tag: `git tag v1.0.0 && git push origin v1.0.0`. A newer push to `main` cancels
    a main build still running. macOS minutes on a private repository count ten times against the
    Actions allowance, so documentation-only commits do not rebuild.
-2. Publish the archives on the site: `bash webapp/publish_builds.sh` (the server downloads them).
+2. Publish the Windows and Linux archives on the site: `bash webapp/publish_builds.sh` (the
+   server downloads them). The macOS archives were uploaded by `tools/build_macos.sh`.
 3. Deploy code, web app, progress page and PDFs: `bash webapp/deploy.sh`. It syncs the repository
    to the server, reinstalls the virtual environment, restarts the service and reloads Caddy.
    Archives already on the site are kept unless `dist/` holds new ones.
@@ -373,7 +378,7 @@ files downloaded instead of opened.
 | Item | Owner | How |
 |---|---|---|
 | Presentation: fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
-| Rebuild the four archives for the 2026-09-23 changes, publish and deploy | team | section 9 |
+| Rebuild the Windows and Linux archives for the 2026-09-23 changes (the macOS ones are current): needs an Actions budget or the monthly reset, then the workflow and `publish_builds.sh` | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
 | Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |

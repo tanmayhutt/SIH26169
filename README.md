@@ -49,20 +49,22 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 
 Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/ARGUS/`.
 Run `ARGUS` inside it (no Python needed). With arguments it acts as the command line tool.
-`.github/workflows/build.yml` builds it for Windows x64, Linux x64, macOS Intel and macOS Apple
-silicon, running the tests and a packaged smoke test on each; `bash webapp/fetch_builds.sh` pulls
-the archives into `dist/` for deployment.
+`.github/workflows/build.yml` builds it for Windows x64 and Linux x64, running the tests and a
+packaged smoke test on each (`bash webapp/publish_builds.sh` puts the archives on the site).
+`bash tools/build_macos.sh` builds the macOS Intel and Apple silicon archives on an Apple silicon
+Mac (Intel through Rosetta), with the same checks, and uploads them. A macOS runner minute costs
+ten Linux minutes, which is why the Macs are built locally.
 
 ## Releases and packages
 
-Every push to `main` that changes the application rebuilds and republishes, once all four
-platform builds and their checks pass:
+The workflow runs when started by hand (Actions, Build desktop application, Run workflow) or
+when a tag is pushed, and republishes once both platform builds and their checks pass:
 
 | Where | What | Updated |
 |---|---|---|
-| Releases, `latest` (pre-release) | the four archives | every such push to `main` |
-| Releases, `v1.0.0` etc. | the four archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
-| Packages, `argus-desktop` | the four archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
+| Releases, `latest` (pre-release) | the Windows and Linux archives | every manual run on `main` |
+| Releases, `v1.0.0` etc. | the Windows and Linux archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
+| Packages, `argus-desktop` | the Windows and Linux archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
 | Packages, `argus-web` | the web app, `docker run -p 8095:8095 ghcr.io/tanmayhutt/argus-web:latest` | same tags, for linux/amd64 and linux/arm64 |
 
 The repository is private, so the releases and packages are too: pulling needs repository

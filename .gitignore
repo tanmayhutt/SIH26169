@@ -16,3 +16,5 @@ docs/demo/
 
 # macOS folder metadata
 .DS_Store
+.venv-intel/
+out/

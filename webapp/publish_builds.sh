@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Publish the desktop archives of a build-workflow run on the project site.
+# Publish the Windows and Linux desktop archives of a build-workflow run on the project site.
+# (The macOS archives are built and published by tools/build_macos.sh.)
 # The server downloads them itself (a home connection often times out on 700 MB).
 #
 #   bash webapp/publish_builds.sh               # latest successful run of build.yml
@@ -14,11 +15,11 @@ REPO_SLUG=${REPO_SLUG:-tanmayhutt/SIH26169}
 DEST=${DEST:-/srv/sih26169/site/downloads}
 RUN=${1:-$(gh run list --workflow=build.yml --status=completed --limit 1 --json databaseId -q '.[0].databaseId')}
 [ -n "$RUN" ] || { echo "no successful build run found"; exit 1; }
-# every platform build must have passed (tests, packaging, packaged-app check); the run as a whole
+# every platform build in the run must have passed (tests, packaging, packaged-app check); the run as a whole
 # can still fail in later jobs that do not affect the archives (for example GitHub release publishing)
 BAD=$(gh run view "$RUN" --json jobs -q '[.jobs[] | select(.name | startswith("build (")) | select(.conclusion != "success")] | length')
 NB=$(gh run view "$RUN" --json jobs -q '[.jobs[] | select(.name | startswith("build ("))] | length')
-[ "$NB" -ge 4 ] && [ "$BAD" = "0" ] || { echo "run $RUN: not all four platform builds succeeded; not publishing"; exit 1; }
+[ "$NB" -ge 2 ] && [ "$BAD" = "0" ] || { echo "run $RUN: not every platform build succeeded; not publishing"; exit 1; }
 LIST=$(gh api "repos/$REPO_SLUG/actions/runs/$RUN/artifacts" -q '.artifacts[] | "\(.id) \(.name)"')
 echo "publishing run $RUN:"; echo "$LIST"
 # the remote script goes as an argument; standard input carries only the token and the list

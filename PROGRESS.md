@@ -221,10 +221,12 @@ The model path is also looked up from the package folder, so an installed comman
 
 ### 2.10 Executable builds  🟩
 
-Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
-45 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and runs the packaged executable on a
-scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
-`bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
+Windows and Linux are built by `.github/workflows/build.yml` (run by hand or on a tag). Each job installs the
+project, runs the 45 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and
+runs the packaged executable on a scenario before uploading the archive; `bash webapp/publish_builds.sh` puts the
+archives on the site. The macOS Intel and Apple silicon archives are built by `bash tools/build_macos.sh` on the
+team's Apple silicon Mac (Intel through Rosetta) with the same checks, and uploaded by it. The 2026-09-23 macOS
+archives on the site are current; Windows and Linux await an Actions budget or the monthly reset.
 
 The four-platform run below predates the 2026-09-23 changes and will be repeated for them.
 
@@ -304,7 +306,7 @@ One assumption: one screen pixel equals one camera pixel, so the 2000 px screen 
 ## 5. Open items, in priority order
 
 1. 🟩 CNN kept as a fallback; report's performance table filled from the measured envelope.
-2. 🟩 Windows, Linux, macOS Intel and Apple silicon builds from the build workflow, package-checked on each platform.
+2. 🟩 Windows and Linux builds from the build workflow, macOS Intel and Apple silicon from `tools/build_macos.sh`, package-checked on each platform.
 3. 🟩 Technical report and user manual exported to PDF; demo video composed from the engine (`tools/make_demo_video.py`); demo script in `docs/DEMO_SCRIPT.md`.
 4. 🟩 Multi-target identity: candidates ranked by fitted width (noise-independent) instead of blob area; the stress seed that swapped now holds 99% lock.
 5. 🟩 Faint beacon: track-before-detect on a moving-target residual; 10 seeds hold 94.0 to 97.8% lock, acquisition 0.80 to 2.00 s.
