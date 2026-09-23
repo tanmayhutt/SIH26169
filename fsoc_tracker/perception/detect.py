@@ -15,6 +15,7 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from ..engine.config import TrackerConfig
+from ..world.sprites import make_sprite
 
 
 @dataclass
@@ -79,10 +80,20 @@ def refine_centroid(img: np.ndarray, x: float, y: float, r: int = 7) -> tuple[fl
 
 
 class ClassicalDetector:
-    def __init__(self, cfg: TrackerConfig, expected_size_px: float | None = None, expected_shape: str = "square"):
+    def __init__(self, cfg: TrackerConfig, expected_size_px: float | None = None, expected_shape: str = "square",
+                 expected_dims: tuple[float, float] | None = None, expected_mask: str = ""):
         self.cfg = cfg
-        self.expected_size_px = expected_size_px   # designated beacon size from config, if known
+        # the designated beacon's size from config, if known. For a spot of unequal width and
+        # height (PS row 10) the size priors use the geometric mean, and the width calibration
+        # below renders the real shape.
+        if expected_dims is not None and expected_dims[0] and expected_dims[1]:
+            self.expected_dims = (float(expected_dims[0]), float(expected_dims[1]))
+            expected_size_px = float(np.sqrt(self.expected_dims[0] * self.expected_dims[1]))
+        else:
+            self.expected_dims = (float(expected_size_px), float(expected_size_px)) if expected_size_px else None
+        self.expected_size_px = expected_size_px
         self.expected_shape = expected_shape
+        self.expected_mask = expected_mask
 
     def expected_area(self) -> float | None:
         """Blob area the designated beacon produces after the matched filter, in px."""
@@ -99,6 +110,19 @@ class ClassicalDetector:
         s = self.expected_size_px
         if not s:
             return None
+        legacy = self.expected_shape in ("square", "circle", "gaussian") and (
+            self.expected_dims is None or abs(self.expected_dims[0] - self.expected_dims[1]) < 1e-6)
+        if getattr(self, "_exp_sigma", None) is None and not legacy:
+            w, h = self.expected_dims
+            spr = make_sprite(self.expected_shape, int(round(w)), int(round(h)), self.expected_mask)
+            sh, sw = spr.shape
+            ph, pw = sh + 40, sw + 40
+            sp = np.zeros((ph, pw), np.float32)
+            sp[20:20 + sh, 20:20 + sw] = spr
+            c_x, c_y = 20 + (sw - 1) / 2.0, 20 + (sh - 1) / 2.0
+            patch = np.clip(20 + 200 * sp / max(sp.max(), 1e-6), 0, 255).astype(np.uint8)
+            _, _, self._exp_sigma = refine_centroid(patch, float(c_x), float(c_y), r=max(6, int(max(w, h)) + 4))
+            self._exp_hm = int(np.count_nonzero(patch > 20 + 100))
         if getattr(self, "_exp_sigma", None) is None:
             n = int(s) + 40
             sp = np.zeros((n, n), np.float32)
@@ -227,7 +251,15 @@ class CNNDetector:
     def __init__(self, model_path: str, patch: int = 128):
         self.patch = patch
         self.session = None
-        self.path = Path(model_path)
+        # a relative path is tried from the working folder, then from the package's own folder,
+        # so an installed command started anywhere still finds the model
+        p = Path(model_path)
+        if not p.is_absolute() and not p.exists():
+            for base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
+                if (base / p).exists():
+                    p = base / p
+                    break
+        self.path = p
 
     def available(self) -> bool:
         if self.session is not None:

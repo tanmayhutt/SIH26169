@@ -15,7 +15,8 @@ The application is a software stand-in for an FSOC coarse-alignment test bench. 
 scene with a moving optical beacon, adds atmospheric and platform disturbances, and runs a
 tracker that finds the beacon, measures its centre to a fraction of a pixel, predicts its
 motion and steers a rate-limited virtual pan-tilt camera to keep it centred. It also accepts
-`.mp4` files in place of the simulated scene (Benchmark 2). Every run writes a per-frame
+`.mp4` files in place of the simulated scene (Benchmark 2), with an optional ground-truth CSV
+of the beacon positions for error scoring. Every run writes a per-frame
 CSV log and an automatic PDF performance report.
 
 ## Start here
@@ -26,11 +27,12 @@ CSV log and an automatic PDF performance report.
 | `docs/HANDOVER.md` | Working on the code: setup, commands, code map, verification, release, server |
 | `CONTRIBUTING.md` | How teammates make and submit changes |
 | `CLAUDE.md` | Rules for every contributor and AI agent |
+| `docs/PS_AUDIT.md` | Every PS item checked by running the code, with the measured value (`python tools/ps_audit.py`) |
 | `COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
 | `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them) |
 | `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
 | `26169.pdf` | The problem statement itself |
-| `docs/submission/LAKSHYA_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
+| `docs/submission/ARGUS_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
 | `docs/submission/DECK_CHECKLIST.md` | What every new version of the deck must still say |
 
 ## Quick start
@@ -47,20 +49,22 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 
 Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/ARGUS/`.
 Run `ARGUS` inside it (no Python needed). With arguments it acts as the command line tool.
-`.github/workflows/build.yml` builds it for Windows x64, Linux x64, macOS Intel and macOS Apple
-silicon, running the tests and a packaged smoke test on each; `bash webapp/fetch_builds.sh` pulls
-the archives into `dist/` for deployment.
+`.github/workflows/build.yml` builds it for Windows x64 and Linux x64, running the tests and a
+packaged smoke test on each (`bash webapp/publish_builds.sh` puts the archives on the site).
+`bash tools/build_macos.sh` builds the macOS Intel and Apple silicon archives on an Apple silicon
+Mac (Intel through Rosetta), with the same checks, and uploads them. A macOS runner minute costs
+ten Linux minutes, which is why the Macs are built locally.
 
 ## Releases and packages
 
-Every push to `main` that changes the application rebuilds and republishes, once all four
-platform builds and their checks pass:
+The workflow runs when started by hand (Actions, Build desktop application, Run workflow) or
+when a tag is pushed, and republishes once both platform builds and their checks pass:
 
 | Where | What | Updated |
 |---|---|---|
-| Releases, `latest` (pre-release) | the four archives | every such push to `main` |
-| Releases, `v1.0.0` etc. | the four archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
-| Packages, `argus-desktop` | the four archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
+| Releases, `latest` (pre-release) | the Windows and Linux archives | every manual run on `main` |
+| Releases, `v1.0.0` etc. | the Windows and Linux archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
+| Packages, `argus-desktop` | the Windows and Linux archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
 | Packages, `argus-web` | the web app, `docker run -p 8095:8095 ghcr.io/tanmayhutt/argus-web:latest` | same tags, for linux/amd64 and linux/arm64 |
 
 The repository is private, so the releases and packages are too: pulling needs repository

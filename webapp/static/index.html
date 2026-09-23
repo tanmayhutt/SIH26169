@@ -105,6 +105,7 @@
   <div class="sep"></div>
   <button id="open" title="Benchmark 2 (Ctrl+O): use a video file as the scene; the simulator is bypassed">Open video</button>
   <button id="sim" title="Leave video mode and use the simulated scene again">Simulator</button>
+  <button id="truth">Truth CSV</button><input type="file" id="tfile" accept=".csv" style="display:none">
   <input type="file" id="file" accept=".mp4,.avi,.mov,.mkv" style="display:none">
   <div class="spacer"></div>
   <button id="save" title="Ctrl+S: save the current settings as a scenario file">Save scenario</button>
@@ -152,6 +153,7 @@ const COL = { accent: "#52C4DE", signal: "#E08D4C", good: "#5CBE93", muted: "#8D
 const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
 const UI = getComputedStyle(document.documentElement).getPropertyValue("--ui");
 let U = null, META = null, RUN_ID = null, WS = null, VIDEO = null, WATCHING = false, PAUSED = false, LAST = null, LIM = 5, TOTAL = 1;
+let TARGETS = [], EDIT = 0, DESIG = 0, DMODE = "auto", CUE = "", PREVIEW = null, GEOM = null, CHECK_T = null;   // targets as stored (engine units); which one the form edits
 let SEGMENT = 0, CHANGES = [], LIVE_TIMER = null;   // disturbance changes during the run: segment seen, change times
 const B = { t: [], terr: [], cerr: [], pan: [], tilt: [], proc: [], mode: [] };
 const TRAIL = { truth: [], win: [], cam: [] };
@@ -161,10 +163,11 @@ const sceneImg = new Image(), camImg = new Image();
 function fieldWidget(sec, f) {
   const id = sec + "." + f.name;
   if (f.kind === "bool") return `<label class="chk"><input type="checkbox" id="${id}"></label>`;
+  if (f.kind === "choice" && f.editable) return `<input type="text" id="${id}" list="dl-${id}"><datalist id="dl-${id}">${f.choices.map(c => `<option value="${c}">`).join("")}</datalist>`;
   if (f.kind === "choice") return `<select id="${id}">${f.choices.map(c => `<option>${c}</option>`).join("")}</select>`;
   if (f.kind === "text") return `<input type="text" id="${id}">`;
   const step = f.kind === "int" ? 1 : f.step, dec = f.kind === "int" ? 0 : f.decimals;
-  return `<input type="number" id="${id}" min="${f.min}" max="${f.max}" step="${step}" data-dec="${dec}">`;
+  return `<input type="number" id="${id}" min="${f.min}" max="${f.max}" step="${step}" data-dec="${dec}"${f.scale ? ` data-scale="${f.scale}"` : ""}>`;
 }
 function buildPanel() {
   const esc = s => String(s).replace(/"/g, "&quot;");
@@ -173,9 +176,13 @@ function buildPanel() {
     <div class="row"><span title="Same seed and settings give exactly the same run.">Seed</span><input type="number" id="seed" min="0" max="1000000" step="1"></div>
     <div class="row"><span></span><label class="chk" title="On: each Start draws a new seed and a new heading for line paths, so every run is different. Off: the seed shown is used, so a run can be repeated exactly."><input type="checkbox" id="rnd" checked> New seed each run</label></div>
     <div class="row" id="row-duration"><span>Duration (s)</span><input type="number" id="duration" min="${U.duration_range[0]}" max="${U.duration_range[1]}" step="1"></div>
-    <div class="row" id="row-extra"><span title="Decoy beacons with random paths. The tracker must keep following the designated one.">Extra targets</span><input type="number" id="extra" min="0" max="${U.extra_max}" step="1"></div></div>`;
+    <div class="row" id="row-extra"><span title="${esc(U.run_tips.extra)}">Extra targets</span><input type="number" id="extra" min="0" max="${U.extra_max}" step="1"></div>
+    <div class="row" id="row-identical"><span></span><label class="chk" title="${esc(U.run_tips.identical)}"><input type="checkbox" id="identical"> Identical look</label></div>
+    <div class="hint" id="check" title="Scenario check: values beyond the problem statement, values the camera cannot physically follow, and values that were corrected."></div></div>`;
   for (const s of U.sections) {
     h += `<div class="sec" id="sec-${s.key}"><div class="h">${s.title}${s.ref ? `<span>${s.ref}</span>` : ""}</div>${s.hint ? `<div class="hint">${s.hint}</div>` : ""}`;
+    if (s.key === "target") h += `<div class="row" id="row-edit" title="${esc(U.run_tips.edit)}"><span>Target</span><select id="edit"></select></div>
+      <div class="row" id="row-desig"><span></span><label class="chk" title="${esc(U.run_tips.designated)}"><input type="checkbox" id="desig"> Designated</label></div>`;
     for (const f of s.fields) h += `<div class="row" id="row-${s.key}.${f.name}" title="${esc(f.tip)}"><span>${f.label}</span>${fieldWidget(s.key, f)}</div>`;
     h += `</div>`;
   }
@@ -184,26 +191,78 @@ function buildPanel() {
   for (const key of U.live_sections) for (const f of U.sections.find(x => x.key === key).fields) {
     const el = $(key + "." + f.name); el.addEventListener("change", liveEdited); if (f.kind !== "choice" && f.kind !== "bool") el.addEventListener("input", liveEdited);
   }
+  $("side").addEventListener("input", scheduleCheck); $("side").addEventListener("change", scheduleCheck);
+  $("edit").addEventListener("change", () => { saveTargetForm(); EDIT = $("edit").selectedIndex; loadTargetForm(EDIT); syncDesigBox(); });
+  $("desig").addEventListener("click", () => { DESIG = EDIT; refreshTargetLists(); setStatus("Designated " + nameOf(TARGETS[DESIG], DESIG) + ": the tracker follows it and the report scores it."); if (PREVIEW) drawPreview(); });
+  $("target.name").addEventListener("input", () => { saveTargetForm(); refreshTargetLists(); });
+}
+const tsec = () => U.sections.find(x => x.key === "target");
+const nameOf = (t, i) => (t.name || "").trim() || `Target ${i + 1}`;
+function readField(el, f) { if (f.kind === "bool") return el.checked; if (f.kind === "int" || f.kind === "float") { const k = Number(el.dataset.scale || 1); return Number(el.value) / k; } return el.value.trim(); }
+function writeField(el, f, v) { if (f.kind === "bool") el.checked = !!v; else if (f.kind === "int" || f.kind === "float") el.value = fmtNum(el, Number(v) * Number(el.dataset.scale || 1)); else el.value = v ?? ""; }
+function saveTargetForm() { const t = TARGETS[EDIT]; if (!t) return; for (const f of tsec().fields) { const el = $("target." + f.name); if (el) t[f.name] = readField(el, f); } }
+function loadTargetForm(i) { const t = TARGETS[i]; if (!t) return; for (const f of tsec().fields) { const el = $("target." + f.name); if (el && f.name in t) writeField(el, f, t[f.name]); } }
+function refreshTargetLists(di) {
+  if (di !== undefined) DESIG = di;
+  const names = TARGETS.map(nameOf); DESIG = Math.min(Math.max(DESIG, 0), names.length - 1); EDIT = Math.min(Math.max(EDIT, 0), names.length - 1);
+  $("edit").innerHTML = names.map((n, i) => `<option>${i === DESIG ? "* " : ""}${n.replace(/</g, "&lt;")}</option>`).join(""); $("edit").selectedIndex = EDIT;
+  syncDesigBox();
+}
+// one target is always designated, so the box cannot be unticked: tick it on another target instead
+function syncDesigBox() { const on = EDIT === DESIG; $("desig").checked = on; $("desig").disabled = on || !!VIDEO; }
+function scheduleCheck() { if (RUN_ID) return; clearTimeout(CHECK_T); CHECK_T = setTimeout(runCheck, 300); }
+async function runCheck() {
+  if (RUN_ID) return;
+  let j; try { const r = await fetch("api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario: $("scn").value || null, overrides: readForm(), video: VIDEO ? VIDEO.upload : null }) }); if (!r.ok) return; j = await r.json(); } catch (e) { return; }
+  if (RUN_ID) return;
+  const c = $("check"); c.textContent = j.lines.length ? j.lines.join("\n") : "Scenario check: all values inside the PS envelope."; c.style.color = j.lines.length ? COL.signal : COL.faint; c.style.whiteSpace = "pre-wrap";
+  if (j.targets && j.targets.length !== TARGETS.length) { TARGETS = j.targets; EDIT = Math.min(EDIT, TARGETS.length - 1); refreshTargetLists(j.designated); }
+  if (!VIDEO && j.preview) { PREVIEW = j; LAST = null; sceneImg.onload = drawPreview; sceneImg.src = "data:image/jpeg;base64," + j.preview; }
+  else if (VIDEO) showVideoPreview(VIDEO);
+}
+function drawBeacons(x, beacons, names, di, s) {
+  beacons.forEach((b, i) => { if (!b || b[0] === null) return; const des = i === di;
+    circle(x, b[0] * s, b[1] * s, des ? 7 : 5, des ? COL.signal : COL.muted, des ? 1.2 : 1);
+    if (beacons.length > 1 || names.length) { const lab = (names[i] || `Target ${i + 1}`) + (des ? "  (designated)" : ""); x.font = F(10);
+      const tw = x.measureText(lab).width, W = x.canvas.width / (window.devicePixelRatio || 1), lx = b[0] * s + 9 + tw < W - 20 ? b[0] * s + 9 : b[0] * s - 9 - tw;
+      text(x, lx, b[1] * s - 6, lab, des ? COL.signal : COL.muted, F(10), 400); } });
+}
+function drawPreview() {
+  const P = PREVIEW; if (!P || LAST || VIDEO || RUN_ID) return;
+  const [x, W, H] = fit($("scene")); x.clearRect(0, 0, W, H);
+  const s = (Math.min(W, H) - 8) / Math.max(P.screen_w, P.screen_h), pw = P.screen_w * s, ph = P.screen_h * s, ox = (W - pw) / 2, oy = (H - ph) / 2;
+  GEOM = { ox, oy, s, w: P.screen_w, h: P.screen_h };
+  x.save(); x.translate(ox, oy); x.drawImage(sceneImg, 0, 0, pw, ph);
+  drawBeacons(x, P.positions, TARGETS.map(nameOf), DESIG, s);
+  const [x0, y0, ww, wh] = P.window; x.strokeStyle = COL.accent; x.lineWidth = 1.5; x.strokeRect(x0 * s, y0 * s, ww * s, wh * s);
+  bar(x, 0, 20, pw); text(x, 8, 14, "PREVIEW t = 0   click a target to designate it", COL.muted, F(11), pw - 16); x.restore();
+  $("v-scene").classList.add("live");
 }
 const fmtNum = (el, v) => el.dataset.dec !== undefined ? Number(v).toFixed(Number(el.dataset.dec)) : v;
 function fillForm(cfg) {
+  TARGETS = JSON.parse(JSON.stringify(cfg.targets || [])); EDIT = 0;
   for (const s of U.sections) {
-    const obj = s.key === "target" ? cfg.targets[0] : cfg[s.key];
-    for (const f of s.fields) { const el = $(s.key + "." + f.name); if (!el || !(f.name in obj)) continue;
-      if (f.kind === "bool") el.checked = !!obj[f.name]; else el.value = f.kind === "int" || f.kind === "float" ? fmtNum(el, obj[f.name]) : obj[f.name]; }
+    if (s.key === "target") continue;
+    const obj = cfg[s.key];
+    for (const f of s.fields) { const el = $(s.key + "." + f.name); if (el && f.name in obj) writeField(el, f, obj[f.name]); }
   }
+  loadTargetForm(0);
   $("name").value = cfg.name; $("seed").value = cfg.seed; $("duration").value = cfg.duration_s; $("extra").value = Math.max(cfg.targets.length - 1, 0);
+  DMODE = cfg.designation || "auto"; CUE = cfg.designation_cue || ""; $("identical").checked = false;
+  refreshTargetLists(cfg.designated || 0);
 }
 function readForm() {
-  const ov = { name: $("name").value, seed: Number($("seed").value), duration_s: Number($("duration").value), extra_targets: Number($("extra").value) };
-  for (const s of U.sections) { ov[s.key] = {};
-    for (const f of s.fields) { const el = $(s.key + "." + f.name);
-      ov[s.key][f.name] = f.kind === "bool" ? el.checked : (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value; } }
+  saveTargetForm();
+  const ov = { name: $("name").value, seed: Number($("seed").value), duration_s: Number($("duration").value), extra_targets: Number($("extra").value),
+               identical: $("identical").checked, designated: DESIG, designation: VIDEO && CUE ? "cue" : DMODE, designation_cue: VIDEO ? CUE : "",
+               targets: TARGETS };
+  for (const s of U.sections) { if (s.key === "target") continue; ov[s.key] = {};
+    for (const f of s.fields) { const el = $(s.key + "." + f.name); ov[s.key][f.name] = readField(el, f); } }
   return ov;
 }
 function readSection(key) {
   const s = U.sections.find(x => x.key === key), out = {};
-  for (const f of s.fields) { const el = $(key + "." + f.name); out[f.name] = f.kind === "bool" ? el.checked : (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value; }
+  for (const f of s.fields) { const el = $(key + "." + f.name); if (el) out[f.name] = readField(el, f); }   // readField undoes display scaling
   return out;
 }
 // while a run is going only the live sections stay editable (the same rule as the desktop app)
@@ -228,11 +287,11 @@ function liveEdited() {
 function lockForVideo(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const [key, names] of Object.entries(U.video_locked)) {
-    if (key === "run") { set("duration", on); set("extra", on); continue; }
+    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); set("edit", on); syncDesigBox(); continue; }
     const s = U.sections.find(x => x.key === key); if (!s) continue;
     for (const f of s.fields) if (names === "*" || names.includes(f.name)) set(key + "." + f.name, on);
   }
-  $("sim").disabled = !on;
+  $("sim").disabled = !on; $("truth").disabled = !on;
 }
 
 // ------------------------------------------------------------------ tiles, telemetry, status
@@ -269,8 +328,7 @@ function drawScene() {
   line(x, TRAIL.win.slice(-500).map(p => [p[0] * s, p[1] * s]), COL.accent, 0.9, null, 0.5);
   const [x0, y0, ww, wh] = m.win, cx = (x0 + ww / 2) * s, cy = (y0 + wh / 2) * s;
   x.strokeStyle = COL.accent; x.lineWidth = 2; x.strokeRect(x0 * s, y0 * s, ww * s, wh * s); cross(x, cx, cy, 6, COL.accent, 2);
-  if (m.true && m.true[0] !== null) circle(x, m.true[0] * s, m.true[1] * s, 7, COL.signal, 1.2);
-  for (const d of (m.decoys || [])) circle(x, d[0] * s, d[1] * s, 5, COL.muted, 1);
+  if (m.beacons && m.beacons.length) drawBeacons(x, m.beacons, m.names || [], m.di || 0, s);
   if (m.est && m.est[0] !== null) cross(x, m.est[0] * s, m.est[1] * s, 8, COL.good, 1.2);
   bar(x, 0, 20, pw); text(x, 8, 14, m.hud ? m.hud.scene : "", COL.muted, F(11), pw - 16);
   bar(x, ph - 20, 20, pw); let lx = 8;
@@ -309,7 +367,10 @@ function showVideoPreview(info) {
   x.save(); x.translate(ox, oy); x.drawImage(sceneImg, 0, 0, pw, ph); bar(x, 0, 22, pw);
   const tx = text(x, 8, 16, "VIDEO LOADED", COL.good, F(12, true), pw) + 14; text(x, tx, 16, info.preview_header, COL.ink, F(11), pw - tx - 8);
   const cw = Math.min(Number($("camera.width").value), info.width), ch = Math.min(Number($("camera.height").value), info.height);
-  x.strokeStyle = COL.accent; x.lineWidth = 2; x.strokeRect((info.width - cw) / 2 * s, (info.height - ch) / 2 * s, cw * s, ch * s); x.restore();
+  x.strokeStyle = COL.accent; x.lineWidth = 2; x.strokeRect((info.width - cw) / 2 * s, (info.height - ch) / 2 * s, cw * s, ch * s);
+  const cue = CUE.split(",").map(Number);
+  if (CUE && cue.length === 2 && cue.every(isFinite)) { circle(x, cue[0] * s, cue[1] * s, 9, COL.signal, 1.6); text(x, cue[0] * s + 12, cue[1] * s - 8, "designated beacon", COL.signal, F(10), 300); }
+  x.restore(); GEOM = { ox, oy, s, w: info.width, h: info.height };
   $("v-scene").classList.add("live"); $("v-cam").classList.remove("live"); $("cam-idle").textContent = "Press Start to run the tracker on this video";
 }
 
@@ -361,11 +422,11 @@ async function start() {
   if (RUN_ID) return;
   resetRun(); WATCHING = false;
   const t = blankTiles(); t.state = { text: "starting", state: null, unit: "" }; showTiles(t);
-  const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, speed: U.speeds[$("speed").selectedIndex][1] };
+  const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, truth: VIDEO && VIDEO.truth ? VIDEO.truth : null, speed: U.speeds[$("speed").selectedIndex][1] };
   let r; try { r = await fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch (e) { setStatus("Server not reachable."); return; }
   if (!r.ok) { let d = "Could not start."; try { d = (await r.json()).detail || d; } catch (e) {} setStatus(d); return; }
   const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; LIM = j.config.camera.max_pan_rate_deg_s;
-  if (j.config.targets && j.config.targets[0]) { const h = $("target.heading_deg"); if (h) h.value = fmtNum(h, j.config.targets[0].heading_deg); }
+  if (j.config.targets && j.config.targets.length) { TARGETS = j.config.targets; loadTargetForm(Math.min(EDIT, TARGETS.length - 1)); }
   history.replaceState(null, "", "#run=" + RUN_ID); setRunning(true); setStatus(j.status); connect(RUN_ID);
 }
 const post = p => RUN_ID && fetch(p + RUN_ID, { method: "POST" }).then(r => r.json()).catch(() => ({}));
@@ -415,7 +476,7 @@ async function upload(file) {
   const q = `?cam_w=${$("camera.width").value}&cam_h=${$("camera.height").value}&fov_w=${$("camera.fov_w_deg").value}&fov_h=${$("camera.fov_h_deg").value}`;
   let r; try { r = await fetch("api/video" + q, { method: "POST", body: fd }); } catch (e) { setStatus("Upload failed: server not reachable."); return; }
   if (!r.ok) { let d = "Could not read this file."; try { d = (await r.json()).detail || d; } catch (e) {} message("Video", d); setStatus(d); return; }
-  VIDEO = await r.json(); resetRun();
+  VIDEO = await r.json(); CUE = ""; resetRun();
   $("screen.width").value = VIDEO.width; $("screen.height").value = VIDEO.height; $("camera.update_rate_hz").value = Number(VIDEO.fps).toFixed(2);
   $("camera.width").value = Math.min(Number($("camera.width").value), VIDEO.width); $("camera.height").value = Math.min(Number($("camera.height").value), VIDEO.height);
   $("name").value = (VIDEO.original_name || "video").replace(/\.[^.]+$/, "");
@@ -424,7 +485,7 @@ async function upload(file) {
   $("tele").textContent = VIDEO.loaded_text; setStatus(VIDEO.status);
   sceneImg.onload = () => showVideoPreview(VIDEO); sceneImg.src = "data:image/jpeg;base64," + VIDEO.first_frame;
 }
-function clearVideo() { VIDEO = null; lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); }
+function clearVideo() { VIDEO = null; CUE = ""; lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); scheduleCheck(); }
 async function saveScenario() {
   const r = await fetch("api/scenario_yaml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario: $("scn").value || null, overrides: readForm() }) });
   if (!r.ok) { setStatus("Could not build the scenario file."); return; }
@@ -487,12 +548,26 @@ async function init() {
   document.title = "ARGUS  v" + U.version + "  SIH26169";
   buildPanel(); buildTiles(); showTiles(blankTiles()); fillForm(META.defaults); lockForVideo(false);
   $("scn").innerHTML = `<option value="">Custom (edit the panel)</option>` + META.scenarios.map(x => `<option value="${x.name}">${x.label}</option>`).join("");
-  $("scn").addEventListener("change", () => { const x = META.scenarios.find(y => y.name === $("scn").value); if (x) { fillForm(x.config); $("rnd").checked = false; setStatus(U.status_loaded.replace("{path}", "configs/scenarios/" + x.name + ".yaml")); } });
+  $("scn").addEventListener("change", () => { const x = META.scenarios.find(y => y.name === $("scn").value); if (x) { fillForm(x.config); $("rnd").checked = false; setStatus(U.status_loaded.replace("{path}", "configs/scenarios/" + x.name + ".yaml")); scheduleCheck(); } });
   $("speed").innerHTML = U.speeds.map(s => `<option>${s[0]}</option>`).join(""); $("speed").selectedIndex = U.default_speed;
   $("tele").textContent = U.welcome; setStatus(U.status_ready); setRunning(false); drawPlots();
   $("start").onclick = start; $("pause").onclick = pause; $("step").onclick = step; $("stop").onclick = stop;
   $("open").onclick = () => $("file").click(); $("file").onchange = () => { if ($("file").files[0]) upload($("file").files[0]); $("file").value = ""; };
-  $("sim").onclick = clearVideo; $("save").onclick = saveScenario; $("shot").onclick = screenshot; $("results").onclick = resultsDialog;
+  $("scene").addEventListener("click", e => {
+    if (RUN_ID || !GEOM) return;
+    const r = $("scene").getBoundingClientRect(), px = (e.clientX - r.left - GEOM.ox) / GEOM.s, py = (e.clientY - r.top - GEOM.oy) / GEOM.s;
+    if (px < 0 || py < 0 || px >= GEOM.w || py >= GEOM.h) return;
+    if (VIDEO) { CUE = `${Math.round(px)},${Math.round(py)}`; showVideoPreview(VIDEO); scheduleCheck();
+      setStatus(`Beacon marked at ${Math.round(px)},${Math.round(py)} on the first frame: the tracker takes the spot nearest this point.`); return; }
+    if (PREVIEW && PREVIEW.positions) { const d = PREVIEW.positions.map(b => Math.hypot(b[0] - px, b[1] - py)); const i = d.indexOf(Math.min(...d));
+      refreshTargetLists(i); drawPreview(); scheduleCheck(); setStatus("Designated " + nameOf(TARGETS[i], i) + ": the tracker follows it and the report scores it."); }
+  });
+  $("sim").onclick = clearVideo;
+  $("truth").title = U.truth_tip; $("truth").onclick = () => $("tfile").click();
+  $("tfile").onchange = async () => { const f = $("tfile").files[0]; $("tfile").value = ""; if (!f || !VIDEO) return;
+    const fd = new FormData(); fd.append("file", f); let r; try { r = await fetch("api/truth?fps=" + VIDEO.fps, { method: "POST", body: fd }); } catch (e) { setStatus("Upload failed."); return; }
+    const j = await r.json().catch(() => ({})); if (!r.ok) { message("Ground truth", j.detail || "Could not read this file."); return; }
+    VIDEO.truth = j.truth; setStatus(j.status); }; $("save").onclick = saveScenario; $("shot").onclick = screenshot; $("results").onclick = resultsDialog;
   $("manual").onclick = () => window.open("/downloads/USER_MANUAL.pdf", "_blank");
   $("about").onclick = () => message("About ARGUS", U.about);
   $("dl").onclick = () => openDownloads(false);
@@ -504,7 +579,8 @@ async function init() {
     if (mod && k === "s") { e.preventDefault(); saveScenario(); } else if (mod && k === "p") { e.preventDefault(); screenshot(); } else if (mod && k === "o") { e.preventDefault(); if (!RUN_ID) $("file").click(); }
     else if (typing) return; else if (e.code === "Space") { e.preventDefault(); RUN_ID ? pause() : start(); } else if (k === "n") step(); else if (e.key === "Escape") stop();
   });
-  window.addEventListener("resize", () => { if (LAST) { drawScene(); drawCam(); } else if (VIDEO) showVideoPreview(VIDEO); drawPlots(); });
+  window.addEventListener("resize", () => { if (LAST) { drawScene(); drawCam(); } else if (VIDEO) showVideoPreview(VIDEO); else drawPreview(); drawPlots(); });
+  scheduleCheck();
   const mh = location.hash.match(/run=([\w-]+)/);
   if (mh) { attach(mh[1]); return; }
   try { const h = await (await fetch("api/health")).json(); if (h.busy) { attach(h.busy); setStatus("Another run is in progress (" + (h.busy_name || h.busy) + "); watching it. Start becomes available when it ends."); return; } } catch (e) {}

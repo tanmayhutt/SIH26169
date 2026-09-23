@@ -114,11 +114,14 @@ def test_disturbances_change_live_during_a_desktop_run(window, tmp_path):
     assert not window.sp_dur.isEnabled() and not window.act_save.isEnabled()
     window.forms["disturbance"].widgets["atmosphere"].setCurrentText("fog")
     window.forms["disturbance"].widgets["jitter_px"].setValue(6)
+    form = window.forms["disturbance"]              # salt and pepper: 10 in the panel's display unit (%)
+    form.widgets["salt_pepper_frac"].setValue(0.10 * form.scales.get("salt_pepper_frac", 1.0))
     assert wait(lambda: window.sim.changes, 10), "the change did not reach the run"
     sim = window.sim
     assert wait(lambda: window.thread is None, 60), "run did not finish"
     ch = sim.changes[0]["changes"]
     assert ch["atmosphere"] == "fog" and ch["jitter_px"] == 6 and ch["contrast"] == pytest.approx(0.40)
+    assert ch["salt_pepper_frac"] == pytest.approx(0.10)       # 10 % on the panel is a fraction of 0.10 in the run
     assert window.lbl_status.text().startswith("Finished")
     assert sim.summary.segments and sim.summary.segments[-1]["segment"] >= 1
     saved = RunConfig.load(sim.files["scenario"])

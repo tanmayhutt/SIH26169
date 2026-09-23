@@ -50,6 +50,8 @@ def _square_spiral(dx: float, dy: float, pan_lim: float, tilt_lim: float) -> lis
 
 
 class Controller:
+    TURN_MAX = 0.1    # rad: the largest turn of the path over the velocity lead (small-angle limit)
+
     def __init__(self, cfg: TrackerConfig, gimbal: Gimbal, dt: float):
         self.cfg = cfg
         self.g = gimbal
@@ -76,6 +78,15 @@ class Controller:
         # the estimator's delay is a number of frames, so the compensation set in seconds at
         # the 30 Hz reference scales with the frame rate (a 60 fps video halves it)
         ff_lead = lead + cfg.estimator_lag_s * (30.0 / max(g.cfg.update_rate_hz, 1.0))
+        # extrapolating velocity along a straight line is only valid while the path turns
+        # little over the lead: cap the lead so the path turns by at most TURN_MAX rad. Slow or
+        # gently curving targets keep the full lead; a fast, tightly turning one (a circle
+        # near the camera's rate limit) gets a short one instead of being led off its path
+        sp2 = vx * vx + vy * vy
+        if sp2 > 1.0:
+            omega = abs(vx * ay - vy * ax) / sp2
+            if omega > 1e-6:
+                ff_lead = min(ff_lead, max(self.TURN_MAX / omega, lead))
         vx, vy = vx + ax * ff_lead, vy + ay * ff_lead
         # the window also moves during the latency; lead it by its current rate so a
         # constant-velocity target is followed with zero steady-state offset

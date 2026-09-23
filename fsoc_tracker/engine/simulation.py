@@ -18,7 +18,8 @@ from ..control.controller import Controller
 from ..control.tracker import Mode, Tracker, TrackOutput
 from ..perception.egomotion import EgoMotion
 from ..world.camera import Gimbal, RateCommand
-from .config import RunConfig, ScheduledChange, apply_disturbance_changes, describe_disturbance_change, disturbance_diff
+from .checks import check_config
+from .config import RunConfig, ScheduledChange, apply_disturbance_changes, describe_disturbance_change, disturbance_diff, parse_xy
 from .metrics import Summary, summarise
 from .sources import Frame, SyntheticSource, VideoSource, make_source
 from .naming import label_from_dir, output_paths
@@ -38,6 +39,10 @@ class StepResult:
 class Simulation:
     def __init__(self, cfg: RunConfig, out_dir: Path | None = None, write_csv: bool = True):
         self.cfg = cfg
+        # scenario check first: out-of-range values are clamped whatever the front end, and the
+        # notes (beyond the PS, physically impossible) go into the summary and the report
+        self.checks = check_config(cfg)
+        self.di = cfg.designated_index()
         self.source = make_source(cfg)
         self.dt = self.source.dt
         self.h, self.w = self.source.shape
@@ -48,6 +53,16 @@ class Simulation:
         else:
             self.gimbal = Gimbal(cfg.camera, self.w, self.h)
         self.tracker = Tracker(cfg, self.dt, (self.h, self.w))
+        # designation cue: where the designated beacon starts (simulator), or a point the user
+        # gave (a click on the scene or on a video's first frame)
+        mode = cfg.resolved_designation()
+        if mode == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
+            t = self.source.world.targets[self.di]
+            self.tracker.set_cue(t.x0, t.y0)
+        elif mode == "cue":
+            xy = parse_xy(cfg.designation_cue)
+            if xy is not None:
+                self.tracker.set_cue(*xy)
         self.controller = Controller(cfg.tracker, self.gimbal, self.dt)
         self.ego = EgoMotion()
         self.out_dir = out_dir
@@ -146,12 +161,23 @@ class Simulation:
         wall = time.perf_counter() - (self.t_start or time.perf_counter())
         self.telemetry.close()
         self.summary = summarise(self.telemetry.records, self.cfg.camera.ifov_deg, wall, self.changes)
+        self.summary.designation = self.designation_info()
+        self.summary.checks = self.checks
         if self.out_dir is not None:
             cfg = self.effective_config()
             with open(self.files["summary"], "w", encoding="utf-8") as f:
                 json.dump({"config": cfg.to_dict(), **self.summary.to_dict()}, f, indent=2)
             cfg.save(self.files["scenario"])
         return self.summary
+
+    def designation_info(self) -> dict:
+        """Which target was followed and how it was designated, for the summary and the report."""
+        names = self.cfg.target_names()
+        tr = self.tracker
+        mode = self.cfg.resolved_designation()
+        return {"target": names[self.di] if names else "", "index": self.di, "mode": mode + (" (auto)" if self.cfg.designation == "auto" else ""),
+                "cue": self.cfg.designation_cue if self.cfg.designation == "cue" else "",
+                "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations)}
 
     # --------------------------------------------------------------- record
     def _record(self, frame: Frame, out: TrackOutput, cmd: RateCommand, proc_ms: float,
@@ -168,8 +194,8 @@ class Simulation:
         terr = terr_deg = terr_stab = cerr = nan
         pdx = pdy = jdx = jdy = nan
         if frame.truth is not None and frame.truth.beacons:
-            tx, ty = frame.truth.beacons[0]
-            vis = int(frame.truth.visible[0])
+            tx, ty = frame.truth.beacons[self.di]
+            vis = int(frame.truth.visible[self.di])
             inwin = int(x0 <= tx < x0 + w and y0 <= ty < y0 + h)
             terr = math.hypot(tx - wcx, ty - wcy)
             terr_deg = terr * self.cfg.camera.ifov_deg

@@ -28,9 +28,16 @@ camera:                        # PS rows 3 to 6 and 13 to 15
   window_only: false           # hard mode: the tracker sees only the camera window
                                # row 6 (initial camera position, centre) is fixed; row 15 (>= 20 Hz commands) follows the update rate
 
-targets:                       # PS rows 7 to 12; the first entry is the designated beacon, more entries are decoys (row 8)
-  - shape: square              # row 9: square | circle | gaussian (default square)
-    size_px: 10                # row 10: 5 to 20 px (default 10)
+designated: 0                  # which entry of targets is the beacon to follow (0 = the first); the report scores this one
+designation: auto              # auto (by look; by start position too when another target looks the same) | appearance | start | cue
+designation_cue: ""            # "x,y" in screen px for designation cue
+
+targets:                       # PS rows 7 to 12; one entry per target, more than one is row 8 "multiple optional"
+  - name: Remote terminal      # shown in the views, the telemetry and the report
+    shape: square              # row 9: square | circle | gaussian | cross | ring | diamond | custom (default square)
+    size_px: 10                # row 10: width, 5 to 20 px (default 10)
+    height_px: 10              # row 10: height, 5 to 20 px (default 10); unequal sizes make a rectangle or an ellipse
+    mask: ""                   # row 9, shape custom: rows of 0/1 separated by ';', e.g. "010;111;010"
     intensity: 235             # peak grey level 0 to 255
     motion: line               # row 12: line | circular | figure8 | random | spiral | sinusoidal | waypoints | static
     speed_px_s: 120            # along-track speed for line, random, sinusoidal, waypoints
@@ -41,7 +48,7 @@ targets:                       # PS rows 7 to 12; the first entry is the designa
     waypoints: ""              # user-defined path for motion waypoints, e.g. "300,300; 1700,400; 1000,1600"
 
 disturbance:                   # PS rows 21 to 25; all off at the defaults below
-  salt_pepper_frac: 0.0        # row 21, fraction of pixels (0.10 = about 10 percent)
+  salt_pepper_frac: 0.0        # row 21, fraction of pixels (0.10 = about 10 percent; the panels show it as a percentage)
   gaussian_sigma: 0.0          # row 21 and 22, standard deviation in grey levels (max 20 suggested)
   poisson: false               # row 21, shot noise
   jitter_px: 0.0               # row 23, camera jitter, +/- px per frame (max 20 suggested)
