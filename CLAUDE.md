@@ -48,8 +48,9 @@ and the solution completely. On the project owner's machine the workspace rules 
 - The desktop app and the web page are one interface: panel fields, tiles, texts and summaries
   live in `fsoc_tracker/ui_shared.py`. Never change one front end alone.
 - After an engine change: run `python -m pytest`, the regression batch compared with
-  `tools/compare_batches.py` (no run worse), `python webapp/smoke.py`; rebuild the four archives
-  through `.github/workflows/build.yml`, publish them with `bash webapp/publish_builds.sh`, and
-  redeploy with `bash webapp/deploy.sh`. Update `web/progress.json`, `PROGRESS.md`,
+  `tools/compare_batches.py` (no run worse), `python webapp/smoke.py`; rebuild the archives:
+  Windows and Linux through `.github/workflows/build.yml` (run it by hand; it costs Actions
+  minutes) then `bash webapp/publish_builds.sh`, the two macOS ones with `bash tools/build_macos.sh`
+  on an Apple silicon Mac; redeploy with `bash webapp/deploy.sh`. Update `web/progress.json`, `PROGRESS.md`,
   `COMPLIANCE.md`, `docs/HANDOVER.md` and the PDFs (`docs/build_pdfs.py`) so they say what the
   code does.

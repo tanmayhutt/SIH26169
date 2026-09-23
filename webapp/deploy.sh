@@ -48,7 +48,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <li><a href="ARGUS-windows-x64.zip">ARGUS-windows-x64.zip</a> <small>Windows 10 or 11, 64-bit. Run <code>ARGUS.exe</code>; <code>ARGUS-cli.exe</code> is the same program for the command line. SmartScreen: More info, Run anyway (the build is not code-signed).</small></li>
 <li><a href="ARGUS-linux-x64.tar.gz">ARGUS-linux-x64.tar.gz</a> <small>Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora. <code>tar xzf</code>, then <code>./ARGUS/ARGUS</code>.</small></li>
 <li><a href="ARGUS-macos-intel.zip">ARGUS-macos-intel.zip</a> <small>macOS 13 or newer on Intel. If Gatekeeper objects: System Settings, Privacy and Security, Open Anyway.</small></li>
-<li><a href="ARGUS-macos-arm64.zip">ARGUS-macos-arm64.zip</a> <small>macOS 13 or newer on Apple silicon (M1 and later). Built 2026-09-23 from the current code; the other three archives are from the build before the 23 September evening fixes and will be rebuilt with the next GitHub build.</small></li>
+<li><a href="ARGUS-macos-arm64.zip">ARGUS-macos-arm64.zip</a> <small>macOS 13 or newer on Apple silicon (M1 and later).</small></li>
 </ul>
 <h2>Documents</h2><ul>
 <li><a href="USER_MANUAL.pdf">USER_MANUAL.pdf</a> <small>installation on each platform, operation, every parameter, Benchmark 2, metric definitions</small></li>
@@ -56,7 +56,7 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <li><a href="ARGUS_SIH2026_26169.pdf">ARGUS_SIH2026_26169.pdf</a> <small>SIH idea-submission presentation, 8 slides</small></li>
 <li><a href="ARGUS-demo.mp4">ARGUS-demo.mp4</a> <small>demonstration video, about four minutes: eight scenarios and Benchmark 2, composed from the engine's own frames with live specification tiles</small></li>
 </ul>
-<p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
+<p><small>Windows and Linux come from the GitHub build workflow, the two macOS archives from the team's Mac (tools/build_macos.sh); each passed the test suite and a smoke test of the packaged executable on its own platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
 </ul><p><a href="/">Web app</a> &middot; <a href="/about/">Progress and documents</a></p></body></html>
 EOF
 ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
