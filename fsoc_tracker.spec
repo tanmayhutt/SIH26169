@@ -1,6 +1,6 @@
 # PyInstaller spec: builds the standalone desktop application.
 #   .venv/bin/pyinstaller fsoc_tracker.spec
-# Output: dist/FSOC-Tracker/  (one folder, run FSOC-Tracker inside it; FSOC-Tracker-cli.exe on Windows for the terminal)
+# Output: dist/ARGUS/  (one folder, run ARGUS inside it; ARGUS-cli.exe on Windows for the terminal)
 # Built for Windows, Linux and macOS (Intel and Apple silicon) by .github/workflows/build.yml.
 import sys
 from pathlib import Path
@@ -33,12 +33,12 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="FSOC-Tracker",
+    name="ARGUS",
     console=False,
     icon=None,
 )
 extra = []
 if sys.platform == "win32":
     # Windowed executables print nothing on Windows; this second entry point is the command line tool.
-    extra.append(EXE(pyz, a.scripts, [], exclude_binaries=True, name="FSOC-Tracker-cli", console=True, icon=None))
-coll = COLLECT(exe, *extra, a.binaries, a.datas, strip=False, upx=False, name="FSOC-Tracker")
+    extra.append(EXE(pyz, a.scripts, [], exclude_binaries=True, name="ARGUS-cli", console=True, icon=None))
+coll = COLLECT(exe, *extra, a.binaries, a.datas, strip=False, upx=False, name="ARGUS")

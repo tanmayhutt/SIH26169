@@ -57,8 +57,8 @@ jobs:
       - name: Packaged executable smoke test
         shell: bash
         run: |
-          cd dist/FSOC-Tracker
-          if [ "$RUNNER_OS" = "Windows" ]; then EXE=./FSOC-Tracker-cli.exe; else EXE=./FSOC-Tracker; fi
+          cd dist/ARGUS
+          if [ "$RUNNER_OS" = "Windows" ]; then EXE=./ARGUS-cli.exe; else EXE=./ARGUS; fi
           $EXE run -s configs/scenarios/clear_line.yaml --duration 2 --seed 0 --out results/smoke
           ls results/smoke/FSOC_*_report.pdf results/smoke/FSOC_*_frames.csv
           rm -rf results configs models docs      # the launcher recreates these next to the executable on first start
@@ -68,17 +68,17 @@ jobs:
           mkdir -p out
           cd dist
           if [ "${{ matrix.archive }}" = "zip" ]; then
-            if [ "$RUNNER_OS" = "Windows" ]; then 7z a -tzip -r "../out/FSOC-Tracker-${{ matrix.label }}.zip" FSOC-Tracker > /dev/null
-            else zip -qry "../out/FSOC-Tracker-${{ matrix.label }}.zip" FSOC-Tracker; fi
+            if [ "$RUNNER_OS" = "Windows" ]; then 7z a -tzip -r "../out/ARGUS-${{ matrix.label }}.zip" ARGUS > /dev/null
+            else zip -qry "../out/ARGUS-${{ matrix.label }}.zip" ARGUS; fi
           else
-            tar -czf "../out/FSOC-Tracker-${{ matrix.label }}.tar.gz" FSOC-Tracker
+            tar -czf "../out/ARGUS-${{ matrix.label }}.tar.gz" ARGUS
           fi
           ls -l ../out
       - name: Package check (extract the archive as a user would; scenarios, video mode, GUI start)
         shell: bash
-        run: python tests/package_check.py out/FSOC-Tracker-${{ matrix.label }}.${{ matrix.archive }}
+        run: python tests/package_check.py out/ARGUS-${{ matrix.label }}.${{ matrix.archive }}
       - uses: actions/upload-artifact@v4
         with:
-          name: FSOC-Tracker-${{ matrix.label }}
+          name: ARGUS-${{ matrix.label }}
           path: out/*
           retention-days: 90

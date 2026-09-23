@@ -367,7 +367,7 @@ class CameraView(QtWidgets.QLabel):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"FSOC Tracker  v{__version__}  SIH26169")
+        self.setWindowTitle(f"ARGUS  v{__version__}  SIH26169")
         self.resize(1600, 960)
         self.cfg = RunConfig()
         self.thread: QtCore.QThread | None = None
@@ -832,7 +832,7 @@ class MainWindow(QtWidgets.QMainWindow):
         d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)
 
     def help(self):
-        QtWidgets.QMessageBox.information(self, "About FSOC Tracker", about_text())
+        QtWidgets.QMessageBox.information(self, "About ARGUS", about_text())
 
 
 def _open_path(p: Path):
@@ -848,7 +848,7 @@ def _open_path(p: Path):
 def main():
     QtCore.QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
-    app.setApplicationName("FSOC Tracker")
+    app.setApplicationName("ARGUS")
     app.setStyle("Fusion")          # the same widget look on Windows, Linux and macOS
     app.setStyleSheet(STYLESHEET)
     w = MainWindow(); w.show()
