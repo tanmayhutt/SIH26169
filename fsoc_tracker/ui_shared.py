@@ -371,7 +371,8 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"  with vibration removed: {f('tracking_err_stab_mean_px')} px\n"
            f"Centroiding error mean {f('centroid_err_mean_px', '{:.3f}')} px, RMSE {f('centroid_err_rmse_px', '{:.3f}')} px\n"
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
-           f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})\n"
+           f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
+           + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
            f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
