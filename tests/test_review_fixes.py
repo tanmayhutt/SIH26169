@@ -77,14 +77,18 @@ def test_video_ground_truth_gives_errors():
     # the bundled OpenCV lacks an mp4 encoder on some platforms; try the codecs the wheel may carry
     clip = None
     for name, fourcc in (("clip.mp4", "mp4v"), ("clip.avi", "MJPG"), ("clip.mkv", "FFV1")):
-        vw = cv2.VideoWriter(str(d / name), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), False)
-        if vw.isOpened():
+        try:
+            vw = cv2.VideoWriter(str(d / name), cv2.VideoWriter_fourcc(*fourcc), 30, (800, 800), isColor=True)
+            if not vw.isOpened():
+                continue
             for fr in frames:
-                vw.write(fr.image)
+                vw.write(cv2.cvtColor(fr.image, cv2.COLOR_GRAY2BGR))
             vw.release()
-            if (d / name).exists() and (d / name).stat().st_size > 0:
-                clip = d / name
-                break
+        except cv2.error:
+            continue                          # some encoders assert on this build; try the next one
+        if (d / name).exists() and (d / name).stat().st_size > 0:
+            clip = d / name
+            break
     if clip is None:
         import pytest
         pytest.skip("this OpenCV build has no video encoder; reading videos (the Benchmark 2 path) does not need one")
