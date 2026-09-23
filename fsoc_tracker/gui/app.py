@@ -562,6 +562,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if path:
             try:
                 self.apply_cfg(RunConfig.load(path))
+                # a scenario file (an evaluator's Benchmark 1 case) is run exactly as written
+                self.chk_random.setChecked(False)
                 self.lbl_status.setText(status_text("loaded", path=path))
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Load failed", str(e))

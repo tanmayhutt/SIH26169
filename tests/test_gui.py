@@ -71,3 +71,18 @@ def test_desktop_video_run_processes_the_whole_file(window, tmp_path):
     assert cfg.duration_s == 0.0 and len(cfg.targets) == 1
     sim = Simulation(cfg, None, write_csv=False)
     assert sim.source.n_frames == sim.source.info["frames"] == 1200
+
+
+def test_loaded_scenario_runs_with_its_own_seed_and_heading(window):
+    """Benchmark 1: an evaluator's scenario file must run as written. Loading it turns off
+    'New seed each run', which would otherwise replace the seed and a line's heading."""
+    assert window.chk_random.isChecked()            # a fresh window still varies each run
+    i = window.cmb_scn.findData(str(Path("configs/scenarios/clear_line.yaml")))
+    assert i > 0
+    window.cmb_scn.setCurrentIndex(i)
+    assert not window.chk_random.isChecked()
+    cfg = window.read_cfg()
+    assert cfg.seed == 1 and cfg.targets[0].heading_deg == 25.0     # the values in clear_line.yaml
+    window.chk_random.setChecked(True)               # the user can still ask for a fresh run
+    fresh = window.read_cfg()
+    assert (fresh.seed, fresh.targets[0].heading_deg) != (1, 25.0)
