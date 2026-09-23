@@ -1,7 +1,7 @@
 """End-to-end check of a packaged desktop archive, run on the platform it was built for.
 
-    python tests/package_check.py dist/FSOC-Tracker-windows-x64.zip
-    python tests/package_check.py dist/FSOC-Tracker-macos-intel.zip --arch x86_64   # Rosetta on Apple silicon
+    python tests/package_check.py dist/ARGUS-windows-x64.zip
+    python tests/package_check.py dist/ARGUS-macos-intel.zip --arch x86_64   # Rosetta on Apple silicon
 
 Extracts the archive into a fresh folder (as a user would), then:
   1. runs a clear scenario and a full-stress scenario with the executable, checks report and CSV;
@@ -37,7 +37,7 @@ def extract(archive: Path, into: Path) -> Path:
     else:
         with tarfile.open(archive) as t:
             t.extractall(into)
-    return into / "FSOC-Tracker"
+    return into / "ARGUS"
 
 
 def make_video(folder: Path) -> Path | None:
@@ -82,8 +82,8 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="fsoc_pkg_"))
     try:
         folder = extract(archive, tmp)
-        exe = folder / ("FSOC-Tracker-cli.exe" if sys.platform == "win32" else "FSOC-Tracker")
-        gui = folder / ("FSOC-Tracker.exe" if sys.platform == "win32" else "FSOC-Tracker")
+        exe = folder / ("ARGUS-cli.exe" if sys.platform == "win32" else "ARGUS")
+        gui = folder / ("ARGUS.exe" if sys.platform == "win32" else "ARGUS")
         if not exe.exists():
             raise SystemExit(f"executable missing: {exe}")
         prefix = ["arch", f"-{a.arch}"] if a.arch else []

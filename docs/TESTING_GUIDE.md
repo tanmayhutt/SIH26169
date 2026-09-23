@@ -1,7 +1,7 @@
 # Manual testing guide
 
 How to exercise every part of the system by hand, what each input does, and what a correct
-result looks like. Works the same in the desktop application (`FSOC-Tracker`), the web app
+result looks like. Works the same in the desktop application (`ARGUS`), the web app
 (project site) and the command line (`fsoc-tracker`). Values in brackets are the problem
 statement (PS) rows they implement.
 
@@ -188,5 +188,5 @@ Differences that come from the server:
 ```
 python -m pytest                       # 22 tests: geometry, gimbal, paths, centroid, IMM, closed loop, identity, video, PS rows
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
-python tests/package_check.py dist/FSOC-Tracker-<platform>.zip   # a built archive, as a user would run it
+python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

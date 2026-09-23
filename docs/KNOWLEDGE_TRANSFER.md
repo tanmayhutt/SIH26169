@@ -30,7 +30,7 @@ Other documents go deeper on one topic: `docs/HANDOVER.md` (working on the code)
 | YouTube / video link | NA (none given) |
 | Dataset link | NA (none given): no data is supplied, so we must create our own test data |
 | Length | 3 pages. The PDF was produced on 27 August 2026 |
-| Our team and project name | Team Blank Point; project name LAKSHYA (the software is called FSOC Tracker) |
+| Our team and project name | Team Blank Point; project and software name ARGUS (earlier LAKSHYA and FSOC Tracker) |
 
 The mentors listed on the SIH portal for this statement are Pranav Kumar Pandey, Koushik Basak and
 Abhishek Khanna. They are not named in the PDF itself.

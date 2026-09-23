@@ -1,6 +1,6 @@
 # Progress Pipeline
 
-FSOC Tracker for **SIH26169** (Department of Space / ISRO SAC): AI-based virtual camera tracking
+ARGUS for **SIH26169** (Department of Space / ISRO SAC): AI-based virtual camera tracking
 system for coarse alignment of mobile FSOC terminals.
 
 Colour key used in every diagram and table below:
@@ -193,10 +193,10 @@ scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the a
 
 | Target | Runner | Status |
 |---|---|---|
-| Windows x64 (`FSOC-Tracker-windows-x64.zip`, with `FSOC-Tracker-cli.exe`) | windows-latest | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
-| Linux x64 (`FSOC-Tracker-linux-x64.tar.gz`, glibc of Ubuntu 22.04) | ubuntu-22.04 | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
-| macOS Intel (`FSOC-Tracker-macos-intel.zip`) | macos-15-intel | 🟩 runner checks passed; archive also run by hand under Rosetta 2: two scenarios, video mode, GUI start |
-| macOS Apple silicon (`FSOC-Tracker-macos-arm64.zip`) | macos-14 | 🟩 runner checks passed; archive also run by hand natively: two scenarios, video mode, GUI start |
+| Windows x64 (`ARGUS-windows-x64.zip`, with `ARGUS-cli.exe`) | windows-latest | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| Linux x64 (`ARGUS-linux-x64.tar.gz`, glibc of Ubuntu 22.04) | ubuntu-22.04 | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| macOS Intel (`ARGUS-macos-intel.zip`) | macos-15-intel | 🟩 runner checks passed; archive also run by hand under Rosetta 2: two scenarios, video mode, GUI start |
+| macOS Apple silicon (`ARGUS-macos-arm64.zip`) | macos-14 | 🟩 runner checks passed; archive also run by hand natively: two scenarios, video mode, GUI start |
 
 Native code per platform is unavoidable: the bundles carry NumPy, OpenCV, SciPy, Qt and ONNX Runtime.
 The web app is the architecture-neutral path.

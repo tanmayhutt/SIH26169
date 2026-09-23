@@ -336,7 +336,8 @@ def welcome_text() -> str:
 
 def about_text() -> str:
     return (
-        f"FSOC Tracker v{__version__}  (SIH26169, Department of Space / ISRO SAC)\n\n"
+        f"ARGUS v{__version__}  (SIH26169, Department of Space / ISRO SAC)\n"
+        "Acquire, Recognise, Guide, Update, Stabilise\n\n"
         "WHAT YOU SEE\n"
         "Left picture: the whole scene. Cyan box = camera window. Orange circle = true beacon. Green cross = tracker estimate. Grey circles = other targets.\n"
         "Right picture: what the camera window sees. Dashed ring = capture radius (green when locked). "

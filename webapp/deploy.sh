@@ -33,7 +33,7 @@ cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/READ
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/submission/LAKSHYA_SIH2026_26169.pdf" "$STAGE/downloads/" 2>/dev/null || true
-cp "$HERE/docs/demo/FSOC-Tracker-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
+cp "$HERE/docs/demo/ARGUS-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$HERE/docs/HANDOVER.md" "$HERE/docs/KNOWLEDGE_TRANSFER.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
@@ -41,16 +41,16 @@ cat > "$STAGE/downloads/index.html" <<'EOF'
 <style>body{margin:0;background:#0A1117;color:#E3ECF1;font-family:"IBM Plex Sans",-apple-system,sans-serif;padding:40px 22px;max-width:760px;margin:0 auto}h1,h2{font-family:"IBM Plex Sans Condensed",sans-serif}h2{margin-top:28px;font-size:20px}a{color:#52C4DE}li{margin:8px 0}small{color:#8DA1AD}</style></head>
 <body><h1>Downloads and documents</h1>
 <h2>Desktop application</h2><p><small>Download the archive for your platform, extract it to a folder you can write to, run the executable. No installation and no Python needed. Results are written to a <code>results</code> folder next to it.</small></p><ul>
-<li><a href="FSOC-Tracker-windows-x64.zip">FSOC-Tracker-windows-x64.zip</a> <small>Windows 10 or 11, 64-bit. Run <code>FSOC-Tracker.exe</code>; <code>FSOC-Tracker-cli.exe</code> is the same program for the command line. SmartScreen: More info, Run anyway (the build is not code-signed).</small></li>
-<li><a href="FSOC-Tracker-linux-x64.tar.gz">FSOC-Tracker-linux-x64.tar.gz</a> <small>Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora. <code>tar xzf</code>, then <code>./FSOC-Tracker/FSOC-Tracker</code>.</small></li>
-<li><a href="FSOC-Tracker-macos-intel.zip">FSOC-Tracker-macos-intel.zip</a> <small>macOS 13 or newer on Intel. If Gatekeeper objects: System Settings, Privacy and Security, Open Anyway.</small></li>
-<li><a href="FSOC-Tracker-macos-arm64.zip">FSOC-Tracker-macos-arm64.zip</a> <small>macOS 13 or newer on Apple silicon (M1 and later).</small></li>
+<li><a href="ARGUS-windows-x64.zip">ARGUS-windows-x64.zip</a> <small>Windows 10 or 11, 64-bit. Run <code>ARGUS.exe</code>; <code>ARGUS-cli.exe</code> is the same program for the command line. SmartScreen: More info, Run anyway (the build is not code-signed).</small></li>
+<li><a href="ARGUS-linux-x64.tar.gz">ARGUS-linux-x64.tar.gz</a> <small>Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora. <code>tar xzf</code>, then <code>./ARGUS/ARGUS</code>.</small></li>
+<li><a href="ARGUS-macos-intel.zip">ARGUS-macos-intel.zip</a> <small>macOS 13 or newer on Intel. If Gatekeeper objects: System Settings, Privacy and Security, Open Anyway.</small></li>
+<li><a href="ARGUS-macos-arm64.zip">ARGUS-macos-arm64.zip</a> <small>macOS 13 or newer on Apple silicon (M1 and later).</small></li>
 </ul>
 <h2>Documents</h2><ul>
 <li><a href="USER_MANUAL.pdf">USER_MANUAL.pdf</a> <small>installation on each platform, operation, every parameter, Benchmark 2, metric definitions</small></li>
 <li><a href="TECHNICAL_REPORT.pdf">TECHNICAL_REPORT.pdf</a> <small>problem understanding, architecture, methods, tests, measured performance, appendices</small></li>
 <li><a href="LAKSHYA_SIH2026_26169.pdf">LAKSHYA_SIH2026_26169.pdf</a> <small>SIH idea-submission presentation, 8 slides</small></li>
-<li><a href="FSOC-Tracker-demo.mp4">FSOC-Tracker-demo.mp4</a> <small>demonstration video, about four minutes: eight scenarios and Benchmark 2, composed from the engine's own frames with live specification tiles</small></li>
+<li><a href="ARGUS-demo.mp4">ARGUS-demo.mp4</a> <small>demonstration video, about four minutes: eight scenarios and Benchmark 2, composed from the engine's own frames with live specification tiles</small></li>
 </ul>
 <p><small>Every archive comes from one build workflow that runs the test suite and a smoke test of the packaged executable on that platform. Source builds: clone the repository, <code>pip install -e ".[dev]"</code>, <code>pyinstaller fsoc_tracker.spec</code>.</small></p>
 </ul><p><a href="/">Web app</a> &middot; <a href="/about/">Progress and documents</a></p></body></html>
@@ -75,7 +75,7 @@ mkdir -p results/web results/uploads
 # systemd service
 sudo tee /etc/systemd/system/sih26169-web.service >/dev/null <<EOF
 [Unit]
-Description=SIH26169 FSOC Tracker web app
+Description=SIH26169 ARGUS web app
 After=network.target
 [Service]
 User=ubuntu

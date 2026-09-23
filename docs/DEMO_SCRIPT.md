@@ -4,7 +4,7 @@ For the Functional Verification stage of SIH26169. The evaluators want to see ev
 mandatory function work, the GUI, and operational success. This script runs the desktop
 application; the same flow works in the web app if the machine cannot run the executable.
 
-Before the session: extract the archive for the machine, start `FSOC-Tracker` once so the
+Before the session: extract the archive for the machine, start `ARGUS` once so the
 first-start delay is behind you, and have one `.mp4` ready for Benchmark 2. Keep the user
 manual PDF open in another window.
 
