@@ -1,12 +1,38 @@
 # Builds the standalone desktop application for every supported platform, runs the test suite
-# and a smoke test of the packaged executable and of the web app on each one.
-#   Trigger: push of a tag v*, or manually (Actions > Build desktop application > Run workflow).
-#   Fetch the archives afterwards with:  bash webapp/fetch_builds.sh
+# and a smoke test of the packaged executable and of the web app on each one, then publishes:
+#   GitHub Releases   the four archives. A push to main updates the rolling "latest" pre-release;
+#                     a tag v* (git tag v1.0.0 && git push origin v1.0.0) makes a versioned release.
+#   GitHub Packages   ghcr.io/<owner>/argus-desktop  the four archives (oras pull ...)
+#                     ghcr.io/<owner>/argus-web      the web app as a Docker image (amd64, arm64)
+#                     tags: latest and sha-<commit> from main; <version> and stable from a tag.
+# Nothing is published unless every platform build, test and package check passed.
+#   Triggers: a push to main that changes the application, a tag v*, or manually
+#   (Actions > Build desktop application > Run workflow; publishes as a main build when run on main).
+#   Fetch the archives for the project site with:  bash webapp/fetch_builds.sh
 name: Build desktop application
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
+    paths:                        # documentation-only commits do not rebuild (tags always do)
+      - "fsoc_tracker/**"
+      - "webapp/**"
+      - "configs/**"
+      - "models/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "fsoc_tracker.spec"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docs/USER_MANUAL.*"
+      - "docs/TECHNICAL_REPORT.pdf"
+      - ".github/workflows/build.yml"
+permissions:
+  contents: read
+concurrency:                      # a newer push to main supersedes a build still running; tags are never cancelled
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 jobs:
   build:
     strategy:
@@ -82,3 +108,142 @@ jobs:
           name: ARGUS-${{ matrix.label }}
           path: out/*
           retention-days: 90
+
+  # which names this build is published under: a tag gives a version, main gives "latest"
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      kind: ${{ steps.m.outputs.kind }}
+      version: ${{ steps.m.outputs.version }}
+      tags: ${{ steps.m.outputs.tags }}
+      owner: ${{ steps.m.outputs.owner }}
+    steps:
+      - id: m
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"          # registry names must be lower case
+          short="${GITHUB_SHA::7}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            kind=release; version="${GITHUB_REF_NAME}"; tags="${version},stable"
+          elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            kind=latest; version="main-${short}"; tags="latest,sha-${short}"
+          else
+            kind=none; version="${GITHUB_REF_NAME}-${short}"; tags=""
+          fi
+          { echo "kind=$kind"; echo "version=$version"; echo "tags=$tags"; echo "owner=$owner"; } >> "$GITHUB_OUTPUT"
+          echo "publishing as: $kind $version ($tags)"
+
+  # the four archives as a GitHub release and as a package on ghcr.io
+  publish-desktop:
+    needs: [build, meta]
+    if: needs.meta.outputs.kind != 'none'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write               # create or replace the release
+      packages: write               # push to ghcr.io
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KIND: ${{ needs.meta.outputs.kind }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      TAGS: ${{ needs.meta.outputs.tags }}
+      PKG: ghcr.io/${{ needs.meta.outputs.owner }}/argus-desktop
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ARGUS-*
+          path: out
+          merge-multiple: true
+      - name: Check all four archives are present
+        run: |
+          ls -l out
+          for f in ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz ARGUS-macos-intel.zip ARGUS-macos-arm64.zip; do
+            test -s "out/$f" || { echo "missing $f"; exit 1; }
+          done
+      - name: GitHub release
+        run: |
+          notes="ARGUS desktop application, built from ${GITHUB_SHA::7} by the build workflow. Every archive passed the test suite, the web app smoke test and the packaged-application check on its own platform.
+
+          Windows: extract, run ARGUS.exe (ARGUS-cli.exe for the command line). Linux: tar xzf, then ./ARGUS/ARGUS. macOS: extract, run ARGUS (System Settings, Privacy and Security, Open Anyway on first start; the builds are not code-signed)."
+          if [ "$KIND" = release ]; then
+            gh release create "$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "ARGUS $VERSION" --notes "$notes" --verify-tag
+          else
+            # the rolling pre-release always points at the newest main build
+            gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
+            gh release create latest out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "ARGUS latest build (main, ${GITHUB_SHA::7})" --notes "$notes"
+          fi
+      - uses: oras-project/setup-oras@v1
+      - name: GitHub package (ghcr.io/<owner>/argus-desktop)
+        run: |
+          echo "$GH_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cd out
+          oras push "$PKG:${TAGS}" \
+            --artifact-type application/vnd.argus.desktop.v1 \
+            --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --annotation "org.opencontainers.image.description=ARGUS desktop application: Windows x64, Linux x64, macOS Intel and Apple silicon archives" \
+            --annotation "org.opencontainers.image.version=${VERSION}" \
+            --annotation "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            ARGUS-windows-x64.zip ARGUS-linux-x64.tar.gz ARGUS-macos-intel.zip ARGUS-macos-arm64.zip
+
+  # the web app as a Docker image on ghcr.io; started and checked before it is pushed
+  publish-web:
+    needs: [build, meta]
+    if: needs.meta.outputs.kind != 'none'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ needs.meta.outputs.owner }}/argus-web
+      TAGS: ${{ needs.meta.outputs.tags }}
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build for this runner and check it serves a run
+        run: |
+          docker buildx build --load -t argus-web:check .
+          docker run -d --name argus -p 8095:8095 argus-web:check
+          python3 - <<'PY'
+          import json, time, urllib.request
+          base = "http://127.0.0.1:8095"
+          for _ in range(60):
+              try:
+                  if json.load(urllib.request.urlopen(base + "/api/health", timeout=5))["ok"]:
+                      break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("container did not start")
+          req = urllib.request.Request(base + "/api/run", data=json.dumps({"scenario": "clear_line", "overrides": {"duration_s": 3}, "speed": 0}).encode(),
+                                       headers={"Content-Type": "application/json"})
+          rid = json.load(urllib.request.urlopen(req, timeout=30))["run_id"]
+          for _ in range(120):
+              if json.load(urllib.request.urlopen(f"{base}/api/run/{rid}", timeout=10)).get("done"):
+                  break
+              time.sleep(1)
+          else:
+              raise SystemExit("run did not finish")
+          pdf = urllib.request.urlopen(f"{base}/runs/{rid}/report", timeout=10).read()
+          assert pdf.startswith(b"%PDF"), "report is not a PDF"
+          print(f"container ok: run {rid}, report {len(pdf)} bytes")
+          PY
+      - name: Container log
+        if: always()
+        run: docker logs argus 2>&1 | tail -40 || true
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push (linux/amd64 and linux/arm64)
+        run: |
+          args=()
+          IFS=, read -ra t <<< "$TAGS"
+          for x in "${t[@]}"; do args+=(-t "$IMAGE:$x"); done
+          docker buildx build --push --platform linux/amd64,linux/arm64 "${args[@]}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.description=ARGUS web app: the desktop application's engine served to a browser" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" .

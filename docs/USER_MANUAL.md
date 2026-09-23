@@ -34,7 +34,8 @@ Archives are built for every desktop platform in use:
 
 A demonstration video (`ARGUS-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
 
-1. Download the archive for your platform from the downloads page.
+1. Download the archive for your platform from the downloads page, or from the repository's
+   Releases page (`latest` is the newest build; repository access needed).
 2. Extract it anywhere the user can write to (Desktop, Documents, home folder). Do not run it from
    inside the archive.
 3. Run the executable named above. The first start takes a few seconds.

@@ -49,6 +49,21 @@ Run `ARGUS` inside it (no Python needed). With arguments it acts as the command 
 silicon, running the tests and a packaged smoke test on each; `bash webapp/fetch_builds.sh` pulls
 the archives into `dist/` for deployment.
 
+## Releases and packages
+
+Every push to `main` that changes the application rebuilds and republishes, once all four
+platform builds and their checks pass:
+
+| Where | What | Updated |
+|---|---|---|
+| Releases, `latest` (pre-release) | the four archives | every such push to `main` |
+| Releases, `v1.0.0` etc. | the four archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
+| Packages, `argus-desktop` | the four archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
+| Packages, `argus-web` | the web app, `docker run -p 8095:8095 ghcr.io/tanmayhutt/argus-web:latest` | same tags, for linux/amd64 and linux/arm64 |
+
+The repository is private, so the releases and packages are too: pulling needs repository
+access (`docker login ghcr.io` / `oras login ghcr.io` with a GitHub token that can read packages).
+
 ## Layout
 
 ```
