@@ -26,14 +26,17 @@ build() {   # build <label> <python> [arch-prefix...]
   QT_QPA_PLATFORM=offscreen "$@" "$py" tests/package_check.py "out/ARGUS-$label.zip" | tail -1
 }
 
-[ -x .venv/bin/python ] || { echo "no .venv; run: uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -e '.[dev]'"; exit 1; }
+# Both environments are created once and kept (.venv and .venv-intel are ignored by git). Every
+# run brings their packages in line with pyproject.toml; when nothing changed that takes seconds.
+[ -x .venv/bin/python ] || uv venv --python 3.12 .venv
+uv pip install --quiet --python .venv/bin/python -e ".[dev]"
 build macos-arm64 .venv/bin/python
 
-if [ ! -x .venv-intel/bin/python ]; then
+if [ ! -x .venv-intel/bin/python ]; then                 # first run only: the x86_64 Python
   uv python install cpython-3.12-macos-x86_64-none
   uv venv --python cpython-3.12-macos-x86_64-none .venv-intel
-  uv pip install --python .venv-intel/bin/python -e ".[dev]"
 fi
+uv pip install --quiet --python .venv-intel/bin/python -e ".[dev]"
 build macos-intel .venv-intel/bin/python arch -x86_64
 
 ls -l out/ARGUS-macos-*.zip
