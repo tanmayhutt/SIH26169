@@ -443,7 +443,10 @@ from never acquired to 91 to 97.5 percent lock.
   tracking error, centroid error, lock retention with tracked rate, processing), green when the
   specification is met. Centre: the whole scene and the camera view with overlays. Below: four
   plots (errors, gimbal rates with the limit, processing time with the 20 FPS budget, tracker
-  state). Right: telemetry. At the end: a summary dialog and the report.
+  state). Right: telemetry. At the end: a summary dialog and the report. During a run the
+  Disturbances section stays live: noise, weather, jitter or platform sway changed mid-run reach
+  the next frame, the tiles restart from the change and the plots and report mark it; the other
+  sections are locked for the run. The change is saved in the run's scenario so it replays exactly.
 - **Web application**: the same program on a server, same layout and controls, so reviewers need
   nothing installed. Both are generated from one definition in the code, so they cannot drift
   apart.
@@ -457,7 +460,7 @@ published. Nothing needs installing, and it works offline.
 
 ## B14. Step 13: how we know it works
 
-- 29 automated tests, including one per group of PS rows that pins every default to the PS.
+- 41 automated tests, including one per group of PS rows that pins every default to the PS.
 - A regression batch: 13 scenarios x 3 seeds, compared run by run with the previous batch before
   any change is accepted.
 - Package checks on each platform, and hand checks on both macOS builds.
@@ -500,7 +503,8 @@ published. Nothing needs installing, and it works offline.
   with the camera rate (found with a 60 fps phone video, proven on simulated 60 Hz runs). Added the
   tracked rate. Reviewed and fixed the interface.
 - **2026-09-23. One program.** Desktop and web built from one interface definition; handover and
-  this document written.
+  this document written. Disturbances made changeable during a run (and schedulable in a scenario),
+  with per-setting figures in the report.
 
 ## C2. Principles we adopted along the way
 
@@ -581,7 +585,8 @@ benefits, research and references. Its numbers are the measured ones in Part D.
 
 ## E1. The demonstration (Functional Verification, 20%)
 
-Follow `docs/DEMO_SCRIPT.md`: clear line (acquisition, error, report), each motion path,
+Follow `docs/DEMO_SCRIPT.md`: clear line (acquisition, error, report), each motion path, noise,
+fog and shake switched on live in one running scenario,
 disturbances (noise, fog, faint beacon, shake), decoys, hard mode, a video for Benchmark 2, and the
 web app. Keep the report PDF ready to open.
 

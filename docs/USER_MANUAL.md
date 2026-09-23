@@ -201,6 +201,17 @@ suggested range are allowed where the table says "user-defined".
 - Platform motion: none, linear, circular, random, spiral, figure8; speed in pixels per
   frame (up to 20) and period.
 
+**Changing disturbances during a run.** While a run is going, the Disturbances section stays
+editable and every other section is locked (the other settings are fixed for the run). Change
+any disturbance, for example switch the atmosphere to fog or raise the camera jitter, and it
+reaches the camera feed on the next frame, without restarting. The status line says what
+changed and when; the error and gimbal plots get a dotted line at that moment; the tracking
+error, centroid error and lock tiles start again from the change ("since 12.3 s") so the
+effect of the new conditions shows at once. The report adds a page with one row per setting
+(segment) and its own figures. The platform never jumps when its sway is switched on, changed or
+off: the picture moves on from where it was and settles into the new pattern within 1.25 times
+the larger peak speed. Video runs (Benchmark 2) have no live disturbances; the video holds its own.
+
 ### Tracker
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
@@ -255,6 +266,19 @@ fsoc-tracker gui
 `batch` runs every scenario over every seed and writes `envelope.md`, a table of the
 worst and mean results per scenario.
 
+A scenario can also change its disturbances during the run with a `schedule`. Each entry gives
+a time and only the settings that change; an atmosphere preset fills contrast, brightness, blur
+and turbulence unless the entry sets them:
+
+```yaml
+schedule:
+  - {t_s: 10, disturbance: {atmosphere: fog}}
+  - {t_s: 20, disturbance: {jitter_px: 10, platform_motion: linear, platform_px_frame: 12}}
+```
+
+Changes made live in the application are saved in the run's `scenario.yaml` in the same form,
+at the frame they took effect on, so `fsoc-tracker run -s <that file>` repeats the run exactly.
+
 ### Evaluator-supplied files
 
 Benchmark Performance 1 gives you scenario parameters. Copy
@@ -284,10 +308,10 @@ seed and time it belongs to:
 
 | File | Contents |
 |---|---|
-| `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time. |
-| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification. |
-| `<label>_report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. |
-| `<label>_scenario.yaml` | The exact parameters used, so the run can be repeated. |
+| `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time, and `segment` (0 until the first disturbance change, then 1, 2, ...). |
+| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `segments` holds the figures of each disturbance setting when they changed during the run. |
+| `<label>_report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. A run whose disturbances changed has one more page, a row per setting. |
+| `<label>_scenario.yaml` | The exact parameters used, including any disturbance changes as `schedule`, so the run can be repeated. |
 
 With `--out <folder>` on the command line the folder is yours; the files inside are still
 labelled. Batch runs write `results/batch/<time>/<scenario>_seed<N>/` with labelled files and
@@ -305,6 +329,7 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
 | Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
 | FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |
+| Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting
 

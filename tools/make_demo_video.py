@@ -34,7 +34,7 @@ SEGMENTS = [
     ("noisy_line", "3. Salt and pepper, Gaussian and Poisson noise", "All three PS noise kinds at once (rows 21, 22). The matched filter carries the detection."),
     ("fog_circular", "4. Fog", "Contrast and brightness reduced, blur and turbulence (row 24)."),
     ("lowlight_faint", "5. Low light, faint beacon", "3 to 6 sigma per frame: weak detections are linked across frames (track-before-detect)."),
-    ("platform_jitter", "6. Platform sway and camera jitter", "Rows 23 and 25. The picture shift is measured each frame and fed forward to the gimbal."),
+    ("platform_jitter", "6. Platform sway and camera jitter", "Rows 23 and 25. Vibration is measured from the tracker's innovation and smoothed, not chased."),
     ("full_stress", "7. Decoys, haze, noise, sway together", "The designated beacon is kept by its appearance signature among extra targets (row 8)."),
     ("hardmode_line", "8. Hard mode: the tracker sees only the camera window", "A square-spiral sweep at the 5 deg/s limit finds the beacon, then tracking is as before."),
 ]

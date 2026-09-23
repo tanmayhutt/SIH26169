@@ -231,6 +231,14 @@ the simulator for Benchmark 2 and previews the file's first frame and facts befo
 Every run ends with a dialog summarising the specification check and opens the PDF report on
 request.
 
+Disturbances can be changed while a run is going, as the "shall" item on introducing
+disturbances into the camera feed describes: the Disturbances section stays live (the other
+sections are fixed for the run), a change reaches the next frame, the tiles restart from it and
+the plots and report mark it. A scenario can script the same changes with a `schedule`, and a
+change made live is saved in the run's scenario at the frame it took effect on, so the run
+replays exactly. Platform sway switched on, changed or off mid-run never makes the picture
+jump: it settles into the new pattern within 1.25 times the larger peak speed.
+
 ![Figure 6: the application during the multi-target stress scenario](figures/fig6_application.png)
 
 ![Figure 7: a video loaded for Benchmark 2, before Start](figures/fig7_video_preview.png)
@@ -362,6 +370,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
 | Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
+| Segment | When the disturbances change during a run, each setting is a segment; tracking, vibration-removed and centroiding error, lock, tracked rate and FPS are also given per segment. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 
 ## Appendix C. Command line reference

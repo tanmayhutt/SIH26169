@@ -132,6 +132,21 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   tuned on the scenario pack; large changes show up as oscillation on the gimbal plot.
 - Use picture-shift estimate: on by default; off makes vibration handling worse.
 
+## 4a. Changing disturbances during a run
+
+1. Pick clear circular, set Duration 60, press Start and wait for TRACK.
+2. While it runs, change one disturbance at a time (for example Atmosphere fog, then Camera
+   jitter 10, then Platform linear 12 px/frame). Expected: the status line reads "Disturbances
+   changed at t = ... s: ..."; a dotted line appears on the error and gimbal plots; the error,
+   centroid and lock tiles say "since ... s" and restart; the picture changes on the next frame.
+3. Try the other sections: they are locked during the run. Stop: everything unlocks.
+4. Switching the platform sway on, to 20 px/frame and off: the picture never jumps; it glides
+   into the new pattern and back to rest.
+5. The report has an extra page with one row per setting; `summary.json` has `segments`; the
+   CSV has a `segment` column; `scenario.yaml` has a `schedule` with each change and its time.
+   `fsoc-tracker run -s <that scenario.yaml>` repeats the run exactly.
+6. Open a video: the Disturbances section stays locked during the run (the video holds its own).
+
 ## 5. Benchmark 2, video input
 
 1. Prepare an .mp4 (also .avi, .mov, .mkv) that shows a moving bright spot on a noisy
@@ -187,7 +202,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 29 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows
+python -m pytest                       # 41 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, live disturbances, PS rows
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

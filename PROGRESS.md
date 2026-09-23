@@ -156,15 +156,16 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | Camera view with capture ring, error vector, prediction, scale bar | 🟩 |
 | Four live plots with legends | 🟩 |
 | Benchmark 2 video ingest, with first-frame preview and file facts on load | 🟩 |
+| Disturbances changed during a run (live panel, or `schedule` in a scenario); per-setting figures in the report; replayable | 🟩 |
 | New random seed and heading each run, with a pin option; a loaded scenario keeps its own | 🟩 |
 | Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
 
 ### 2.8 Tests  🟩
 
-29 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+41 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
 accuracy, sub-pixel refinement, IMM prediction, re-acquisition metric, closed loop clear, closed
 loop with vibration, multi-target identity, 3 and 8 decoys, video path, desktop panel (video
-runs the whole file, a loaded scenario keeps its seed), PS rows. All pass in about 25 s.
+runs the whole file, a loaded scenario keeps its seed), live disturbance changes, PS rows. All pass in about 25 s.
 
 ### 2.9 AI detector  🟨
 
@@ -188,7 +189,7 @@ of measurements; on a real phone video it supplied half of them. The faint-beaco
 ### 2.10 Executable builds  🟩
 
 Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
-29 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
+41 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
 scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
 `bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
 
