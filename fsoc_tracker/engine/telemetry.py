@@ -58,6 +58,8 @@ class Record:
     platform_dy: float
     jitter_dx: float
     jitter_dy: float
+    # disturbance segment: 0 until the first change during the run, then 1, 2, ...
+    segment: int = 0
 
 
 COLUMNS = [f.name for f in fields(Record)]

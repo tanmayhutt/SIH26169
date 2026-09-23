@@ -28,10 +28,13 @@ class SyntheticSource:
         self.dt = self.world.dt
         self.n_frames = int(round(cfg.duration_s / self.dt))
         self.shape = (self.world.h, self.world.w)
+        self.before_frame = None     # called with (index, time) before each frame is drawn
 
     def __iter__(self):
         for i in range(self.n_frames):
             t = i * self.dt
+            if self.before_frame is not None:
+                self.before_frame(i, t)
             img, truth = self.world.render()
             yield Frame(i, t, img, truth)
 
