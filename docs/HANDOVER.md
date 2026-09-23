@@ -5,7 +5,7 @@ context that otherwise lived in one person's notes: what the software is, why it
 way it is, what was tried and rejected, how to verify a change, and how to release. If you read
 only one file after the problem statement, read this one.
 
-Project: FSOC Tracker, Smart India Hackathon problem statement **SIH26169** (Department of Space,
+Project: ARGUS, Smart India Hackathon problem statement **SIH26169** (Department of Space,
 ISRO Space Applications Centre): an AI-based virtual camera tracking system for coarse alignment
 of mobile Free Space Optical Communication terminals.
 
@@ -64,7 +64,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 30 tests, about 15 s
+.venv/bin/python -m pytest                      # 37 tests, about 15 s
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -244,7 +244,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (30 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (37 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state: all 42 earlier runs identical, 6 new runs from the two new
@@ -259,10 +259,17 @@ files downloaded instead of opened.
 
 ## 9. How to release
 
-1. Push to `main`, then start the build: GitHub, Actions, "Build desktop application", Run
-   workflow (or `gh workflow run build.yml --ref main`, or push a tag `v*`). About 25 minutes. Each
-   of Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel and macOS Apple silicon runs the
-   tests, the web smoke test, packages with PyInstaller and runs the package check.
+1. Push to `main`. A push that changes the application (code, scenarios, model, tests, build
+   files, the bundled manual) starts the build by itself; otherwise start it by hand: GitHub,
+   Actions, "Build desktop application", Run workflow (or `gh workflow run build.yml --ref main`).
+   About 25 minutes. Each of Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel and macOS
+   Apple silicon runs the tests, the web smoke test, packages with PyInstaller and runs the
+   package check. When all four pass, the workflow republishes the rolling `latest` pre-release
+   and the GitHub packages `argus-desktop` (the archives) and `argus-web` (the web app image,
+   started and checked before it is pushed); see README, Releases and packages. For a versioned
+   release push a tag: `git tag v1.0.0 && git push origin v1.0.0`. A newer push to `main` cancels
+   a main build still running. macOS minutes on a private repository count ten times against the
+   Actions allowance, so documentation-only commits do not rebuild.
 2. Publish the archives on the site: `bash webapp/publish_builds.sh` (the server downloads them).
 3. Deploy code, web app, progress page and PDFs: `bash webapp/deploy.sh`. It syncs the repository
    to the server, reinstalls the virtual environment, restarts the service and reloads Caddy.
@@ -313,7 +320,7 @@ files downloaded instead of opened.
 
 | Item | Owner | How |
 |---|---|---|
-| Presentation: fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
+| Presentation: rename the project to ARGUS on every slide (the PDF still says LAKSHYA) and fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
 | Rebuild the four archives for the 2026-09-23 changes, publish and deploy | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |

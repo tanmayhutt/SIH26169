@@ -1,7 +1,11 @@
-# FSOC Tracker (LAKSHYA)
+at - https://sih26169.blankpoint.club/
 
-Team Blank Point. The submission name of the project is **LAKSHYA**; the software and its builds are
-called FSOC Tracker.
+# ARGUS
+
+Team Blank Point. **ARGUS** (Acquire, Recognise, Guide, Update, Stabilise) is the name of the
+project, the desktop application, the web app and the builds. The project was earlier called
+LAKSHYA and the software FSOC Tracker; the Python package and the `fsoc-tracker` command keep
+their original names.
 
 AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
 Communication (FSOC) terminals. Smart India Hackathon problem statement **SIH26169**,
@@ -41,11 +45,26 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/python -m pytest
 ```
 
-Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/FSOC-Tracker/`.
-Run `FSOC-Tracker` inside it (no Python needed). With arguments it acts as the command line tool.
+Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/ARGUS/`.
+Run `ARGUS` inside it (no Python needed). With arguments it acts as the command line tool.
 `.github/workflows/build.yml` builds it for Windows x64, Linux x64, macOS Intel and macOS Apple
 silicon, running the tests and a packaged smoke test on each; `bash webapp/fetch_builds.sh` pulls
 the archives into `dist/` for deployment.
+
+## Releases and packages
+
+Every push to `main` that changes the application rebuilds and republishes, once all four
+platform builds and their checks pass:
+
+| Where | What | Updated |
+|---|---|---|
+| Releases, `latest` (pre-release) | the four archives | every such push to `main` |
+| Releases, `v1.0.0` etc. | the four archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
+| Packages, `argus-desktop` | the four archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
+| Packages, `argus-web` | the web app, `docker run -p 8095:8095 ghcr.io/tanmayhutt/argus-web:latest` | same tags, for linux/amd64 and linux/arm64 |
+
+The repository is private, so the releases and packages are too: pulling needs repository
+access (`docker login ghcr.io` / `oras login ghcr.io` with a GitHub token that can read packages).
 
 ## Layout
 

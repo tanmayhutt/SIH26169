@@ -270,7 +270,7 @@ request.
   sub-pixel refinement on a synthetic Gaussian, IMM prediction on a circle, closed-loop
   specification checks on a clear scenario and on a platform-plus-vibration scenario, a
   Benchmark 2 path that writes a synthetic video and runs the tracker on it, and target tests
-  (width and height, every shape, clamping and PS-envelope notes, designation). 30 tests.
+  (width and height, every shape, clamping and PS-envelope notes, designation). 37 tests.
 - Regression rule: any change to perception, estimation or control is run on the whole pack
   (15 s, seeds 0 to 2) before and after and compared run by run; no run may be worse.
 - Scenario pack (`configs/scenarios/`): the four mandatory motions in clear conditions,
@@ -403,7 +403,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Centroiding error | Distance from the measured centroid to the true centroid over frames with a detection; mean, maximum, RMSE. |
 | Tracked rate | Percentage of frames after acquisition in state TRACK, regardless of centring; separates tracker failure from gimbal limits. |
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
-| Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. Row 19. |
+| Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 

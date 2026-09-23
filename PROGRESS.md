@@ -1,6 +1,6 @@
 # Progress Pipeline
 
-FSOC Tracker for **SIH26169** (Department of Space / ISRO SAC): AI-based virtual camera tracking
+ARGUS for **SIH26169** (Department of Space / ISRO SAC): AI-based virtual camera tracking
 system for coarse alignment of mobile FSOC terminals.
 
 Colour key used in every diagram and table below:
@@ -162,7 +162,7 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | Camera view with capture ring, error vector, prediction, scale bar | 🟩 |
 | Four live plots with legends | 🟩 |
 | Benchmark 2 video ingest, with first-frame preview and file facts on load | 🟩 |
-| New random seed and heading each run, with a pin option | 🟩 |
+| New random seed and heading each run, with a pin option; a loaded scenario keeps its own | 🟩 |
 | Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
 | Run section: Identical look, Designated, Designation, Cue (x,y), Edit target; preview at t = 0 with named targets, click to designate; click a video's first frame to cue | 🟩 |
 | Scenario check shown live, at Start, in the end dialog, in the report and the summary: Corrected, Beyond the PS, Cannot be met | 🟩 |
@@ -171,12 +171,13 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 
 ### 2.8 Tests  🟩
 
-30 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
-accuracy, sub-pixel refinement, IMM prediction, closed loop clear, closed loop with
-vibration, multi-target identity, video path, PS rows, and targets (width and height, every
-shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra
-targets, the designated target is scored, identical decoys need a cue, typed start). 30 of 30
-pass locally. Regression batch over the 15-scenario pack: the 42 earlier runs identical, 6 new.
+37 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+accuracy, sub-pixel refinement, IMM prediction, re-acquisition metric, closed loop clear, closed
+loop with vibration, multi-target identity, 3 and 8 decoys, video path, desktop panel (video
+runs the whole file, a loaded scenario keeps its seed), PS rows, and targets (width and height,
+every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical
+extra targets, the designated target is scored, identical decoys need a cue, typed start).
+37 of 37 pass locally. Regression batch over the 15-scenario pack: the 42 earlier runs identical, 6 new.
 
 ### 2.9 AI detector  🟨
 
@@ -200,7 +201,7 @@ of measurements; on a real phone video it supplied half of them. The faint-beaco
 ### 2.10 Executable builds  🟩
 
 Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
-tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
+37 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
 scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
 `bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
 
@@ -208,10 +209,10 @@ The four-platform run below predates the 2026-09-23 changes and will be repeated
 
 | Target | Runner | Status |
 |---|---|---|
-| Windows x64 (`FSOC-Tracker-windows-x64.zip`, with `FSOC-Tracker-cli.exe`) | windows-latest | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
-| Linux x64 (`FSOC-Tracker-linux-x64.tar.gz`, glibc of Ubuntu 22.04) | ubuntu-22.04 | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
-| macOS Intel (`FSOC-Tracker-macos-intel.zip`) | macos-15-intel | 🟩 runner checks passed; archive also run by hand under Rosetta 2: two scenarios, video mode, GUI start |
-| macOS Apple silicon (`FSOC-Tracker-macos-arm64.zip`) | macos-14 | 🟩 runner checks passed; archive also run by hand natively: two scenarios, video mode, GUI start |
+| Windows x64 (`ARGUS-windows-x64.zip`, with `ARGUS-cli.exe`) | windows-latest | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| Linux x64 (`ARGUS-linux-x64.tar.gz`, glibc of Ubuntu 22.04) | ubuntu-22.04 | 🟩 tests, web smoke and packaged smoke passed on the runner; archive contents inspected |
+| macOS Intel (`ARGUS-macos-intel.zip`) | macos-15-intel | 🟩 runner checks passed; archive also run by hand under Rosetta 2: two scenarios, video mode, GUI start |
+| macOS Apple silicon (`ARGUS-macos-arm64.zip`) | macos-14 | 🟩 runner checks passed; archive also run by hand natively: two scenarios, video mode, GUI start |
 
 Native code per platform is unavoidable: the bundles carry NumPy, OpenCV, SciPy, Qt and ONNX Runtime.
 The web app is the architecture-neutral path.

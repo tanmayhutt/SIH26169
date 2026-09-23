@@ -1,17 +1,17 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 15 \u00b7 tests 30 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 15 \u00b7 tests 37 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-23",
   "verification": {
     "title": "Build verification: September 23, 2026",
-    "summary": "30 of 30 automated checks pass locally after the September 23 changes (designation, target names, shapes and sizes, scenario check, input validation). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
+    "summary": "37 of 37 automated checks pass locally after the September 23 changes (designation, target names, shapes and sizes, scenario check, input validation). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
       {
         "name": "Automated tests",
         "status": "pass",
-        "text": "30 of 30 pytest checks locally: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point, and 8 target tests (width and height, every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra targets, the designated target is the one scored, identical decoys need a cue, typed start). The earlier 22 passed on the Windows, Linux, Intel Mac and Apple silicon runners; that run will be repeated for the new tests."
+        "text": "37 of 37 pytest checks locally: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point, and 8 target tests (width and height, every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra targets, the designated target is the one scored, identical decoys need a cue, typed start). The earlier 22 passed on the Windows, Linux, Intel Mac and Apple silicon runners; that run will be repeated for the new tests."
       },
       {
         "name": "Scenario pack",
@@ -954,7 +954,7 @@
       "blurb": "Tests that fail if the system drifts from the problem statement.",
       "groups": [
         {
-          "caption": "tests, 30 passing",
+          "caption": "tests, 37 passing",
           "items": [
             {
               "name": "Geometry and gimbal limits",

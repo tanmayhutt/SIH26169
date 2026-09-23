@@ -1,7 +1,7 @@
 # Manual testing guide
 
 How to exercise every part of the system by hand, what each input does, and what a correct
-result looks like. Works the same in the desktop application (`FSOC-Tracker`), the web app
+result looks like. Works the same in the desktop application (`ARGUS`), the web app
 (project site) and the command line (`fsoc-tracker`). Values in brackets are the problem
 statement (PS) rows they implement.
 
@@ -67,8 +67,9 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 | beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | acquisition 0.73 to 0.83 s, error 6.1 to 7.1 px, lock 99.5 to 100% |
 | TEMPLATE_evaluator | every field labelled by PS row, PS defaults | behaves like clear line; copy it to enter evaluator values |
 
-Tick "random seed" to get a different starting position and noise each run; untick and set
-Seed to repeat a run exactly.
+Picking a scenario runs it exactly as written: its seed and paths are kept and "New seed each
+run" is switched off. Tick it to get a different starting position and noise each run; untick
+it and set Seed to repeat a run exactly.
 
 ## 4. Every input you can change, and what to look for
 
@@ -219,7 +220,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 30 tests: geometry, gimbal, paths, centroid, IMM, closed loop, identity, video, PS rows, targets and designation
+python -m pytest                       # 37 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
-python tests/package_check.py dist/FSOC-Tracker-<platform>.zip   # a built archive, as a user would run it
+python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

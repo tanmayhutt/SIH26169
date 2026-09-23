@@ -29,7 +29,8 @@ DEFINITIONS = {
     "acquisition_time_s": "Acquisition time: first frame in TRACK with the tracked beacon within the capture radius (default 30 px) of the window centre, from t = 0. Spec row 16: <= 2 s.",
     "reacq_count": "Number of times lock was lost and regained.",
     "reacq_time_mean_s": "Mean time from losing lock to regaining it.",
-    "reacq_time_max_s": "Maximum time from losing lock to regaining it. Spec row 19: <= 1 s.",
+    "reacq_time_max_s": "Maximum time from losing lock to regaining it; a loss not regained by the end of the run counts with its length so far. Spec row 19: <= 1 s.",
+    "lock_lost_at_end_s": "Length of a lock loss still open when the run ended (0 if the run ended locked).",
     "tracking_err_mean_px": "Tracking error: mean distance from the true beacon to the window centre over frames after acquisition. Spec row 17: <= 10 px.",
     "tracking_err_max_px": "Maximum tracking error over frames after acquisition.",
     "tracking_err_rmse_px": "Root mean square tracking error over frames after acquisition.",
@@ -104,9 +105,14 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
             elif not good[i] and not losing:
                 losing = True
                 t_lost = t[i]
+        # a loss still open when the run ends was never re-acquired; it has lasted at least
+        # until the last frame, so it bounds the maximum re-acquisition time from below
+        dt = float(t[1] - t[0]) if n > 1 else 0.0
+        open_loss = float(t[-1] - t_lost + dt) if losing else 0.0
         v["reacq_count"] = len(re_times)
         v["reacq_time_mean_s"] = float(np.mean(re_times)) if re_times else 0.0
-        v["reacq_time_max_s"] = float(np.max(re_times)) if re_times else 0.0
+        v["reacq_time_max_s"] = float(max(re_times + [open_loss])) if (re_times or losing) else 0.0
+        v["lock_lost_at_end_s"] = open_loss
         v["lock_retention_pct"] = float(100 * good[after].mean())
         v["target_loss_pct"] = 100 - v["lock_retention_pct"]
         v["tracked_pct"] = float(100 * np.mean([r.mode == "TRACK" for r in records[first:]]))

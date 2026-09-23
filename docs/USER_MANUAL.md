@@ -1,4 +1,4 @@
-# FSOC Tracker: User Manual
+# ARGUS: User Manual
 
 AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
 Communication (FSOC) terminals. Smart India Hackathon problem statement SIH26169,
@@ -27,14 +27,15 @@ Archives are built for every desktop platform in use:
 
 | Platform | Archive | Run |
 |---|---|---|
-| Windows 10 or 11, 64-bit | `FSOC-Tracker-windows-x64.zip` | `FSOC-Tracker.exe` (window); `FSOC-Tracker-cli.exe` for the command line |
-| Linux, 64-bit (Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora) | `FSOC-Tracker-linux-x64.tar.gz` | `./FSOC-Tracker` |
-| macOS 13 or newer, Intel | `FSOC-Tracker-macos-intel.zip` | `FSOC-Tracker` |
-| macOS 13 or newer, Apple silicon | `FSOC-Tracker-macos-arm64.zip` | `FSOC-Tracker` |
+| Windows 10 or 11, 64-bit | `ARGUS-windows-x64.zip` | `ARGUS.exe` (window); `ARGUS-cli.exe` for the command line |
+| Linux, 64-bit (Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora) | `ARGUS-linux-x64.tar.gz` | `./ARGUS` |
+| macOS 13 or newer, Intel | `ARGUS-macos-intel.zip` | `ARGUS` |
+| macOS 13 or newer, Apple silicon | `ARGUS-macos-arm64.zip` | `ARGUS` |
 
-A demonstration video (`FSOC-Tracker-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
+A demonstration video (`ARGUS-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
 
-1. Download the archive for your platform from the downloads page.
+1. Download the archive for your platform from the downloads page, or from the repository's
+   Releases page (`latest` is the newest build; repository access needed).
 2. Extract it anywhere the user can write to (Desktop, Documents, home folder). Do not run it from
    inside the archive.
 3. Run the executable named above. The first start takes a few seconds.
@@ -46,9 +47,9 @@ Platform notes:
 - Linux: the archive carries Qt and all Python libraries. The system needs the usual X11 or
   Wayland client libraries, present on every desktop install. On a minimal server image
   install `libxcb-cursor0 libxkbcommon-x11-0 libegl1` (Debian and Ubuntu names). If the file
-  is not executable after extraction, run `chmod +x FSOC-Tracker`.
+  is not executable after extraction, run `chmod +x ARGUS`.
 - macOS: Gatekeeper may say the application cannot be verified. Open System Settings, Privacy
-  and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine FSOC-Tracker`
+  and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine ARGUS`
   on the extracted folder once.
 
 Results are written to a `results` folder next to the executable. Every archive is produced by
@@ -111,7 +112,7 @@ Optional, to retrain the AI detector: `pip install -e ".[train]"` then
 
 | Control | Action |
 |---|---|
-| Scenario | Pick a ready-made test case from `configs/scenarios`. "Custom" keeps whatever is in the panel. |
+| Scenario | Pick a ready-made test case from `configs/scenarios`. "Custom" keeps whatever is in the panel. A picked scenario runs as written: its seed and paths are kept and "New seed each run" is switched off. |
 | Start / Pause / Step / Stop | Run control. Space starts or pauses, N steps one frame while paused, Esc stops. |
 | Speed | 0.25x to 4x real time, or Max speed (shows the true processing rate). |
 | Open video (Benchmark 2) | Choose an `.mp4`; the simulator is bypassed and the video frames become the scene. Ctrl+O. |
@@ -349,7 +350,7 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Centroiding error | Distance from the measured beacon centre to the true centre. |
 | Tracked | Percentage of frames after acquisition in which the tracker held the beacon (state TRACK), whether or not the camera had it centred. A high tracked rate with a low lock rate means the camera, not the tracker, could not keep up. |
 | Lock retention | Percentage of frames after acquisition in TRACK with the beacon inside the capture radius. Target loss is 100 minus this. Spec: loss under 5 percent. |
-| Re-acquisition time | Time from losing lock to regaining it. Spec: 1 s or less. |
+| Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
 | FPS | 1 divided by per-frame processing time, averaged. Spec: 20 or more. |
 
 ## 9. Troubleshooting
