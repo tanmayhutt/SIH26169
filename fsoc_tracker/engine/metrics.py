@@ -56,18 +56,20 @@ class Summary:
     truth_available: bool = True
     designation: dict = field(default_factory=dict)   # which target was followed, and how it was designated
     checks: list = field(default_factory=list)        # scenario check notes (engine/checks.py)
+    segments: list = field(default_factory=list)      # one entry per disturbance setting during the run
 
     def to_dict(self):
         return {"values": self.values, "passed": self.passed, "truth_available": self.truth_available,
                 "designation": self.designation, "checks": self.checks,
-                "definitions": {k: DEFINITIONS[k] for k in self.values if k in DEFINITIONS}}
+                "definitions": {k: DEFINITIONS[k] for k in self.values if k in DEFINITIONS},
+                "segments": self.segments}
 
 
 def _pct(a, q):
     return float(np.percentile(a, q)) if len(a) else float("nan")
 
 
-def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
+def summarise(records: list[Record], ifov_deg: float, wall_s: float, changes: list[dict] | None = None) -> Summary:
     s = Summary()
     if not records:
         return s
@@ -148,6 +150,8 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
     sat = np.array([(r.sat_pan or r.sat_tilt) for r in records])
     v["slew_saturation_pct"] = float(100 * sat.mean())
     v["cnn_frames_pct"] = float(100 * np.mean([r.tier == "cnn" for r in records]))
+    if changes:
+        s.segments = segment_summaries(records, good, changes)
     # pass / fail
     for k, (op, lim) in SPEC.items():
         if k not in v or (isinstance(v[k], float) and math.isnan(v[k])):
@@ -156,3 +160,42 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float) -> Summary:
         x = v[k]
         s.passed[k] = {"<=": x <= lim, "<": x < lim, ">=": x >= lim}[op]
     return s
+
+
+SEGMENT_DEFINITION = ("When the disturbances change during a run, each setting is a segment. Per segment: tracking, "
+                      "vibration-removed and centroiding error means, lock retention and tracked rate over its frames "
+                      "after the first acquisition of the run, and FPS as frames over processing time. The run's overall figures "
+                      "above span every segment.")
+
+
+def _mean(a) -> float | None:
+    a = np.asarray(a, float)
+    a = a[np.isfinite(a)]
+    return float(a.mean()) if len(a) else None
+
+
+def segment_summaries(records: list[Record], good: np.ndarray, changes: list[dict]) -> list[dict]:
+    """Metrics for each disturbance setting of a run that changed during the run."""
+    seg = np.array([r.segment for r in records])
+    t = np.array([r.t_sim for r in records])
+    dt = float(t[1] - t[0]) if len(t) > 1 else 0.0
+    acquired = np.flatnonzero(good)
+    first = int(acquired[0]) if len(acquired) else len(records)
+    what = {c["segment"]: c["what"] for c in changes}
+    out = []
+    for k in sorted(set(seg.tolist())):
+        idx = np.flatnonzero(seg == k)
+        after = idx[idx >= first]
+        pick = lambda name: [getattr(records[i], name) for i in after]
+        out.append({
+            "segment": int(k), "t_start_s": float(t[idx[0]]), "t_end_s": float(t[idx[-1]] + dt), "frames": int(len(idx)),
+            "change": what.get(k, "settings at the start of the run"),
+            "tracking_err_mean_px": _mean(pick("tracking_err_px")),
+            "tracking_err_stab_mean_px": _mean(pick("tracking_err_stab_px")),
+            "centroid_err_mean_px": _mean([records[i].centroid_err_px for i in idx]),
+            "lock_retention_pct": float(100 * good[after].mean()) if len(after) else None,
+            "tracked_pct": float(100 * np.mean([records[i].mode == "TRACK" for i in after])) if len(after) else None,
+            # frames over processing time, as fps_mean for the whole run
+            "fps_mean": 1000.0 / max(float(np.mean([records[i].proc_ms for i in idx])), 1e-6),
+        })
+    return out

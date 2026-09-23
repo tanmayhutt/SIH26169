@@ -59,6 +59,12 @@ disturbance:                   # PS rows 21 to 25; all off at the defaults below
   platform_px_frame: 0.0       # row 25, platform speed in px per frame (max 20 suggested)
   platform_period_s: 20        # period of the platform sway pattern
 
+# Disturbances may change during the run: each entry gives a time and only the settings that
+# change (an atmosphere preset fills contrast, brightness, blur and turbulence unless given).
+schedule: []
+#  - {t_s: 10, disturbance: {atmosphere: fog}}
+#  - {t_s: 20, disturbance: {jitter_px: 10, platform_motion: linear, platform_px_frame: 12}}
+
 # Benchmark Performance 2 (a video file replaces the simulator) needs no scenario file:
 #   fsoc-tracker video path/to/their_file.mp4
 # or drop the file on the web app or use "Open video" in the desktop application. The screen

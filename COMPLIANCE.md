@@ -49,7 +49,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | Detect the target beacon automatically | `perception/detect.py` | green detection box | 🟩 |
 | Track the beacon continuously using computer vision | `perception/estimator.py`, `control/tracker.py` | estimate cross, prediction, state | 🟩 |
 | Control and reposition the virtual camera | `control/controller.py`, `Gimbal` | gimbal command plot, pan/tilt readout | 🟩 |
-| Generate and introduce disturbances (turbulence, vibration, camera motion, noise) in the virtual camera feed | `world/disturbance.py` | Disturbances section | 🟩 |
+| Generate and introduce disturbances (turbulence, vibration, camera motion, noise) in the virtual camera feed | `world/disturbance.py`; changes during a run: `DisturbanceModel.update`, `Simulation.request_disturbance`, scenario `schedule` | Disturbances section, live while a run is going; changes marked on the plots and in the report | 🟩 |
 | Display tracking performance and statistics in real time | `gui/app.py` tiles, plots, telemetry | whole window | 🟩 |
 
 ## Deliverables

@@ -65,7 +65,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 45 tests
+.venv/bin/python -m pytest                      # 57 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -112,7 +112,8 @@ Every run writes one folder `results/FSOC_<sim|video>_<name>_seed<N>_<YYYYMMDD-H
 
 ```
 fsoc_tracker/
-  engine/config.py       every setting as a dataclass, one field per PS row; presets; YAML load/save
+  engine/config.py       every setting as a dataclass, one field per PS row; presets; YAML load/save;
+                         ScheduledChange and the helpers that clean, apply and describe disturbance changes
   engine/simulation.py   the frame loop: source -> tracker -> controller -> gimbal -> telemetry
   engine/sources.py      frame sources: the simulator or a video file (probe_video calibrates from the file)
   engine/telemetry.py    the per-frame Record and the CSV writer
@@ -275,7 +276,8 @@ file".
 
 `fsoc_tracker/ui_shared.py` defines the parameter panel (sections, labels, tooltips, ranges,
 choices), the six tiles and their pass rules, telemetry lines, view captions, end-of-run summary,
-help and welcome text, decoy generation, the seed rule and the camera display stretch. The
+help and welcome text, decoy generation, the seed rule, the camera display stretch, and which
+sections stay editable during a run (LIVE_SECTIONS: the disturbances, sent after LIVE_DEBOUNCE_MS). The
 desktop app draws it with Qt; the web server sends it to the page at `/api/ui` and computes tiles,
 telemetry and captions with the same functions. To add or change a setting, change it in
 `engine/config.py` and, if it needs a label or tooltip, in `ui_shared.py`; both front ends pick it
@@ -287,7 +289,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (45 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (57 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-23, after the PS audit fixes, against the previous
@@ -413,4 +415,6 @@ and width guards (seed 7), and the deck was renamed ARGUS. That night the target
 redone as one picker and one Designated tick box with an automatic designation mode, and, with
 the free Actions minutes gone (macOS minutes cost 10x), the workflow was cut to Windows and Linux
 by hand while `tools/build_macos.sh` builds both macOS archives locally (Intel through Rosetta).
+Then disturbances were made changeable during a run (live in both apps, or a `schedule` in a
+scenario), replayed exactly from the saved scenario, with per-setting figures in the report.
 The full commit history is in git.

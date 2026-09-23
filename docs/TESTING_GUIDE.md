@@ -166,6 +166,21 @@ Start from clear line and watch the notes below the Run section:
 The same notes appear at Start in the status bar, in the end dialog, on page 1 of the report
 and in the summary `checks`.
 
+## 4a. Changing disturbances during a run
+
+1. Pick clear circular, set Duration 60, press Start and wait for TRACK.
+2. While it runs, change one disturbance at a time (for example Atmosphere fog, then Camera
+   jitter 10, then Platform linear 12 px/frame). Expected: the status line reads "Disturbances
+   changed at t = ... s: ..."; a dotted line appears on the error and gimbal plots; the error,
+   centroid and lock tiles say "since ... s" and restart; the picture changes on the next frame.
+3. Try the other sections: they are locked during the run. Stop: everything unlocks.
+4. Switching the platform sway on, to 20 px/frame and off: the picture never jumps; it glides
+   into the new pattern and back to rest.
+5. The report has an extra page with one row per setting; `summary.json` has `segments`; the
+   CSV has a `segment` column; `scenario.yaml` has a `schedule` with each change and its time.
+   `fsoc-tracker run -s <that scenario.yaml>` repeats the run exactly.
+6. Open a video: the Disturbances section stays locked during the run (the video holds its own).
+
 ## 5. Benchmark 2, video input
 
 1. Prepare an .mp4 (also .avi, .mov, .mkv) that shows a moving bright spot on a noisy
@@ -233,7 +248,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 45 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track)
+python -m pytest                       # 57 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances)
 python tools/ps_audit.py               # every PS item measured by running the code; writes docs/PS_AUDIT.md; 39 of 39 pass, exit 1 on a failure
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it

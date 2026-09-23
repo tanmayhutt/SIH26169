@@ -45,18 +45,34 @@ Optional: scenario fast circular. "A 450 px circle at 4 deg/s, 80 percent of the
 turn rate. The scenario check says Near the limit." The error stays at 4.6 to 5.3 px with
 100 percent lock.
 
-## 4. Disturbances (3 min)
+## 4. Disturbances, live, in one run (3 min)
 
-- Scenario: noisy line. "Ten percent salt and pepper, Gaussian sigma 20 and Poisson noise,
-  all three PS noise kinds at once." Tracking error stays at 2.4 to 3.7 px, specification 10.
-- Scenario: fog circular. "Contrast reduced, brightness reduced, blur, turbulence."
-- Scenario: lowlight faint. "The beacon is at three to six sigma per frame. A single frame
-  cannot find it; the tracker links weak detections across frames and only promotes a
-  chain with consistent motion." Show the acquisition in two seconds or less (0.80 to 2.00 s
-  over ten seeds).
-- Scenario: platform jitter. "Camera jitter and platform sway, both from row 23 and 25.
-  The picture shift is measured every frame and fed forward to the gimbal." Point out the
-  vibration-removed error in the report later.
+Scenario: clear circular, Duration 60, speed 1x. Press Start and let it lock. Then, without
+stopping, change the Disturbances section one step at a time and let each settle for about
+ten seconds. Each change shows in the status line, as a dotted line on the plots, and the
+error and lock tiles restart from it ("since ... s").
+
+1. Salt and pepper 0.10, Gaussian sigma 20, Poisson on. "All three PS noise kinds (rows 21
+   and 22), switched on while it tracks." The error stays well under 10 px.
+2. Atmosphere: fog. "Contrast and brightness reduced, blur and turbulence (row 24)."
+3. Camera jitter 10, platform linear 12 px/frame. "Rows 23 and 25. The picture starts to sway
+   smoothly, it does not jump." The raw error rises with the shake; the report gives the
+   vibration-removed error beside it.
+4. Everything back to zero and clear. The picture settles back and the error returns.
+
+Stop, open the report: page 2 has one row per setting with its own error, lock and FPS. Say:
+"every change is also saved in this run's scenario file, so the same run can be replayed
+exactly from the command line."
+
+Then two scenarios on their own:
+- lowlight faint. "The beacon is at three to six sigma per frame. A single frame cannot find
+  it; the tracker links weak detections across frames and only promotes a chain with
+  consistent motion." Show the acquisition in two seconds or less (0.80 to 2.00 s over ten
+  seeds).
+- platform max. "Both at the PS maximum. The vibration is measured from the tracker's own
+  innovation and treated as measurement noise, so the filter smooths it instead of chasing
+  it; a random jump every frame cannot be followed by any gimbal, which is why the report
+  prints the vibration-removed error." Point it out in the report.
 
 ## 5. Multiple targets and identity (2 min)
 

@@ -504,7 +504,10 @@ order, identical results), so the 99th-percentile frame time on the faint beacon
   the scenario check notes. Centre: the whole scene (before a run, a preview at t = 0
   with every target named; click one to designate it) and the camera view with overlays. Below: four
   plots (errors, gimbal rates with the limit, processing time with the 20 FPS budget, tracker
-  state). Right: telemetry. At the end: a summary dialog and the report.
+  state). Right: telemetry. At the end: a summary dialog and the report. During a run the
+  Disturbances section stays live: noise, weather, jitter or platform sway changed mid-run reach
+  the next frame, the tiles restart from the change and the plots and report mark it; the other
+  sections are locked for the run. The change is saved in the run's scenario so it replays exactly.
 - **Web application**: the same program on a server, same layout and controls, so reviewers need
   nothing installed. Both are generated from one definition in the code, so they cannot drift
   apart.
@@ -529,7 +532,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 45 automated tests, including one per group of PS rows that pins every default to the PS.
+- 57 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -619,6 +622,13 @@ repository has its own free minutes, so a build can also be run there and publis
   both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
   and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
   monthly reset, or a build on a teammate's fork.
+- **2026-09-23 night. Disturbances during a run.** The PS asks the software to introduce
+  disturbances into the camera feed; they were fixed for a whole run. Now the Disturbances
+  section stays live while a run is going (the other sections are locked), a change reaches the
+  next frame, the tiles restart from it, the plots and the report mark it, and the report gives
+  each setting its own figures. A scenario can script the same changes with a `schedule`, and a
+  live change is saved into the run's scenario so the run replays exactly. Switching platform
+  sway on or off never makes the picture jump. Runs without changes are unchanged.
 
 ## C2. Principles we adopted along the way
 
@@ -714,7 +724,8 @@ benefits, research and references. Its numbers are the measured ones in Part D.
 
 ## E1. The demonstration (Functional Verification, 20%)
 
-Follow `docs/DEMO_SCRIPT.md`: clear line (acquisition, error, report), each motion path,
+Follow `docs/DEMO_SCRIPT.md`: clear line (acquisition, error, report), each motion path, noise,
+fog and shake switched on live in one running scenario,
 disturbances (noise, fog, faint beacon, shake), decoys, hard mode, a video for Benchmark 2, and the
 web app. Keep the report PDF ready to open.
 
@@ -751,6 +762,11 @@ web app. Keep the report PDF ready to open.
 - **How do you know every PS item is met?** `tools/ps_audit.py` measures each one by running the
   code (rows 1 to 25, the eight "shall" functions, the deliverables, both benchmarks) and writes
   `docs/PS_AUDIT.md`; 39 of 39 pass, and the build runs it.
+- **Can the disturbances change while it tracks?** Yes: during a run the Disturbances section
+  stays live, so noise, fog, jitter or platform sway can be switched on or off without a restart;
+  the next frame carries it, the tiles restart from the change and the report scores each setting
+  separately. The change is saved in the run's scenario, so the run replays exactly, and a
+  scenario file can script such changes with `schedule`.
 - **Can it be used with real hardware?** Yes: the frame source and the gimbal are separate
   interfaces, so a real camera and pan-tilt unit can replace the simulated ones.
 
