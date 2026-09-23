@@ -241,10 +241,17 @@ files downloaded instead of opened.
 
 ## 9. How to release
 
-1. Push to `main`, then start the build: GitHub, Actions, "Build desktop application", Run
-   workflow (or `gh workflow run build.yml --ref main`, or push a tag `v*`). About 25 minutes. Each
-   of Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel and macOS Apple silicon runs the
-   tests, the web smoke test, packages with PyInstaller and runs the package check.
+1. Push to `main`. A push that changes the application (code, scenarios, model, tests, build
+   files, the bundled manual) starts the build by itself; otherwise start it by hand: GitHub,
+   Actions, "Build desktop application", Run workflow (or `gh workflow run build.yml --ref main`).
+   About 25 minutes. Each of Windows x64, Linux x64 (Ubuntu 22.04 glibc), macOS Intel and macOS
+   Apple silicon runs the tests, the web smoke test, packages with PyInstaller and runs the
+   package check. When all four pass, the workflow republishes the rolling `latest` pre-release
+   and the GitHub packages `argus-desktop` (the archives) and `argus-web` (the web app image,
+   started and checked before it is pushed); see README, Releases and packages. For a versioned
+   release push a tag: `git tag v1.0.0 && git push origin v1.0.0`. A newer push to `main` cancels
+   a main build still running. macOS minutes on a private repository count ten times against the
+   Actions allowance, so documentation-only commits do not rebuild.
 2. Publish the archives on the site: `bash webapp/publish_builds.sh` (the server downloads them).
 3. Deploy code, web app, progress page and PDFs: `bash webapp/deploy.sh`. It syncs the repository
    to the server, reinstalls the virtual environment, restarts the service and reloads Caddy.
