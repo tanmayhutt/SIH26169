@@ -36,8 +36,13 @@ def main() -> int:
                 time.sleep(1)
         else:
             print("server did not start"); return 1
-        j = post("/api/run", {"scenario": "clear_line", "overrides": {"duration_s": 3}, "speed": 0})
+        # a real-time run, with the disturbances changed while it is going
+        j = post("/api/run", {"scenario": "clear_line", "overrides": {"duration_s": 5}, "speed": 1.0, "random_seed": False})
         rid = j["run_id"]
+        time.sleep(2)
+        d = post(f"/api/disturb/{rid}", {"disturbance": {"atmosphere": "fog", "jitter_px": 6}})
+        if not d.get("queued"):
+            print("live disturbance change refused:", d); return 1
         for _ in range(120):
             st = get(f"/api/run/{rid}")
             if st.get("done"):
@@ -45,11 +50,17 @@ def main() -> int:
             time.sleep(1)
         else:
             print("run did not finish"); return 1
+        segs = st.get("summary", {}).get("segments") or []
+        if len(segs) < 2 or "fog" not in segs[1]["change"]:
+            print("live disturbance change not in the summary:", segs); return 1
+        with urllib.request.urlopen(f"{BASE}/runs/{rid}/scenario", timeout=10) as r:
+            if b"atmosphere: fog" not in r.read():
+                print("live disturbance change not saved in the scenario"); return 1
         with urllib.request.urlopen(f"{BASE}/runs/{rid}/report", timeout=10) as r:
             pdf = r.read()
         if not pdf.startswith(b"%PDF"):
             print("report is not a PDF"); return 1
-        print(f"web app ok: run {rid}, report {len(pdf)} bytes, state {st.get('summary', {}).get('final_state', '?')}")
+        print(f"web app ok: run {rid}, report {len(pdf)} bytes, live change at {segs[1]['t_start_s']:.2f} s ({segs[1]['change'][:40]}...)")
         return 0
     finally:
         srv.terminate()

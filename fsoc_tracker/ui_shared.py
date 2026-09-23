@@ -97,6 +97,12 @@ SPEEDS = [("0.25x", 0.25), ("0.5x", 0.5), ("1x real time", 1.0), ("2x", 2.0), ("
 DEFAULT_SPEED_INDEX = 2
 DURATION_RANGE = (1, 3600)
 EXTRA_TARGETS_MAX = 8
+# While a run is going only these panel sections stay editable; their changes reach the running
+# simulation (PS "shall": introduce disturbances in the virtual camera feed). Every other
+# setting is fixed for the run and locked, so nothing on the panel pretends to apply when it
+# does not. A burst of edits (typing 20 goes through 2) is sent once, after this pause.
+LIVE_SECTIONS = ("disturbance",)
+LIVE_DEBOUNCE_MS = 400
 
 # (form key, title, PS reference, hint)
 SECTIONS = [
@@ -230,18 +236,31 @@ def blank_tiles() -> dict:
 
 
 class LiveTiles:
-    """Live specification tiles from the frames seen so far; the same rules in both apps."""
+    """Live specification tiles from the frames seen so far; the same rules in both apps.
+
+    When the disturbances change during the run, the error and lock tiles start again from the
+    change, so the effect of the new conditions is visible at once; their unit line says so.
+    Acquisition stays the time of the run's first lock. After the run the tiles show the
+    report's figures for the whole run (final_tiles)."""
 
     def __init__(self):
         self.acq_t = None
+        self.segment, self.seg_t = 0, 0.0
+        self.last = None
+        self.proc = deque(maxlen=60)
+        self._reset_segment()
+
+    def _reset_segment(self) -> None:
         self.n_after = self.lock_after = self.track_after = 0
         self.terr_sum = 0.0; self.terr_n = 0
         self.cerr_sum = 0.0; self.cerr_n = 0
-        self.proc = deque(maxlen=60)
-        self.last = None
 
     def push(self, r) -> None:
         self.last = r
+        seg = getattr(r, "segment", 0)
+        if seg != self.segment:
+            self.segment, self.seg_t = seg, r.t_sim
+            self._reset_segment()
         if self.acq_t is None and r.locked:
             self.acq_t = r.t_sim
         if self.acq_t is not None:
@@ -261,21 +280,32 @@ class LiveTiles:
             return T
         state = "pass" if r.mode == "TRACK" and r.locked else ("warn" if r.mode in ("COAST", "REACQUIRE") else None)
         T["state"] = {"text": r.mode, "state": state, "unit": "locked" if r.locked else "not locked"}
+        since = f"since {self.seg_t:.1f} s" if self.segment else None
         if self.acq_t is not None:
             T["acq"].update(text=f"{self.acq_t:.2f} s", state="pass" if self.acq_t <= SPEC["acquisition_time_s"][1] else "fail")
             if self.terr_n:
                 m = self.terr_sum / self.terr_n
                 T["terr"].update(text=f"{m:.1f} px", state="pass" if m <= SPEC["tracking_err_mean_px"][1] else "fail")
+                if since:
+                    T["terr"]["unit"] = f"mean {since}"
+            elif self.segment:
+                T["terr"].update(text="-", unit=since)
             else:
                 T["terr"].update(text="n/a", unit="no truth in video")
-            lk = 100.0 * self.lock_after / max(self.n_after, 1)
-            trk = 100.0 * self.track_after / max(self.n_after, 1)
-            T["lock"].update(text=f"{lk:.1f} %", state="pass" if 100 - lk < SPEC["target_loss_pct"][1] else "fail", unit=f"tracked {trk:.0f}%")
+            if self.n_after:
+                lk = 100.0 * self.lock_after / self.n_after
+                trk = 100.0 * self.track_after / self.n_after
+                T["lock"].update(text=f"{lk:.1f} %", state="pass" if 100 - lk < SPEC["target_loss_pct"][1] else "fail",
+                                 unit=f"tracked {trk:.0f}%" + (f", {since}" if since else ""))
         else:
             T["acq"].update(text="searching", state="warn")
         if self.cerr_n:
             m = self.cerr_sum / self.cerr_n
             T["cerr"].update(text=f"{m:.3f} px", state="pass" if m < 2 else "warn")
+            if since:
+                T["cerr"]["unit"] = f"mean {since}"
+        elif self.segment:
+            T["cerr"].update(text="-", unit=since)
         else:
             T["cerr"].update(text="n/a", unit="no truth in video")
         fps = 1000.0 / max(float(np.mean(self.proc)), 1e-3)
@@ -337,6 +367,7 @@ def welcome_text() -> str:
         "1  Pick a scenario in the toolbar,", "   or set values on the left.",
         "2  Press Start, or Space.", "3  Watch the tiles: green meets", "   the specification, amber not", "   yet.",
         "4  When the run ends the summary", "   opens. Every run writes the CSV,", "   summary, PDF report and the", "   scenario file.", "",
+        "While a run is going", "", "Change any Disturbances value:", "it reaches the camera feed on the", "next frame and is logged. The", "tiles restart from the change.", "",
         "Benchmark 2", "", "Open video, then Start. The video", "replaces the simulated scene.", "",
         "Keys", "", "Space   start or pause", "N       one frame while paused", "Esc     stop",
         "Ctrl+S  save scenario", "Ctrl+P  screenshot", "Ctrl+O  open video", "",
@@ -353,7 +384,9 @@ def about_text() -> str:
         "Right picture: what the camera window sees. Dashed ring = capture radius (green when locked). "
         "Green box = this frame's detection. Orange dot = prediction with uncertainty ring. Line from centre = pointing error.\n"
         "Tiles: live specification check while running, the report's final numbers after. Tracked = share of frames in TRACK; lock also needs the beacon centred.\n"
-        "Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n\n"
+        "Plots: errors, gimbal command with its limit, processing time with the 20 FPS budget, tracker state.\n"
+        "During a run the Disturbances section stays live: a change reaches the camera feed on the next frame, is marked on the plots and in the report, "
+        "and is saved in the run's scenario file so the run can be replayed exactly. The other settings are fixed for the run.\n\n"
         "OUTPUT\nEvery run writes a folder FSOC_<sim|video>_<name>_seed<N>_<date-time>/ holding <label>_frames.csv, _summary.json, _report.pdf and _scenario.yaml.\n\n"
         "The desktop application and the web app are the same program: the same engine, panel, tiles, plots and report.")
 
@@ -414,6 +447,8 @@ def status_text(kind: str, **kw) -> str:
         "loaded": f"Loaded {kw.get('path', '')}. Its seed and paths are used as written; tick New seed each run for a fresh one. Press Start.",
         "running": f"Running '{kw.get('name', '')}' seed {kw.get('seed', '')}  ->  {kw.get('out', '')}",
         "finished": f"Finished. Report written to {kw.get('out', '')}",
+        "changing": "Applying the new disturbances on the next frame...",
+        "changed": f"Disturbances changed at t = {kw.get('t', 0.0):.2f} s: {kw.get('what', '')}",
     }[kind]
 
 
@@ -424,5 +459,6 @@ def front_end_bundle() -> dict:
         "default_speed": DEFAULT_SPEED_INDEX, "duration_range": DURATION_RANGE, "extra_max": EXTRA_TARGETS_MAX,
         "presets": ATMOSPHERE_PRESETS, "video_locked": VIDEO_LOCKED, "legend": SCENE_LEGEND,
         "welcome": welcome_text(), "about": about_text(), "status_ready": status_text("ready"),
+        "live_sections": list(LIVE_SECTIONS), "live_debounce_ms": LIVE_DEBOUNCE_MS, "status_changing": status_text("changing"),
         "status_loaded": status_text("loaded", path="{path}"),
     }
