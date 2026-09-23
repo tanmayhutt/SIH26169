@@ -411,7 +411,7 @@ def status_text(kind: str, **kw) -> str:
     return {
         "ready": "Simulator input. Pick a scenario or set values, then press Start.",
         "video": f"Benchmark 2 input: {kw.get('path', '')}  (simulator bypassed). Press Start.",
-        "loaded": f"Loaded {kw.get('path', '')}. Press Start.",
+        "loaded": f"Loaded {kw.get('path', '')}. Its seed and paths are used as written; tick New seed each run for a fresh one. Press Start.",
         "running": f"Running '{kw.get('name', '')}' seed {kw.get('seed', '')}  ->  {kw.get('out', '')}",
         "finished": f"Finished. Report written to {kw.get('out', '')}",
     }[kind]
@@ -424,4 +424,5 @@ def front_end_bundle() -> dict:
         "default_speed": DEFAULT_SPEED_INDEX, "duration_range": DURATION_RANGE, "extra_max": EXTRA_TARGETS_MAX,
         "presets": ATMOSPHERE_PRESETS, "video_locked": VIDEO_LOCKED, "legend": SCENE_LEGEND,
         "welcome": welcome_text(), "about": about_text(), "status_ready": status_text("ready"),
+        "status_loaded": status_text("loaded", path="{path}"),
     }
