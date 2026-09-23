@@ -1,4 +1,4 @@
-# FSOC Tracker (SIH26169) rules for agents
+# ARGUS (SIH26169) rules for agents
 
 These rules apply to every contributor and every AI agent working in this repository. Start with
 `docs/HANDOVER.md`: it holds the full project context (design reasons, tried-and-rejected ideas,

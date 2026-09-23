@@ -7,6 +7,7 @@ Part D; never round a limit away.
 
 | Slide | Must say |
 |---|---|
+| All | Project name ARGUS on every slide (the current PDF still says LAKSHYA) |
 | 1 | Team ID (still to fill in) |
 | 2 | OBSERVE: the tracker watches the whole 2000 x 2000 px (12.5 degree) scene because the PS asks it to "observe the environment"; hard mode limits it to the camera window |
 | 4 | Engine: one config field per PS row, all 25 rows |

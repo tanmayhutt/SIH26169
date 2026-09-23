@@ -5,7 +5,7 @@ context that otherwise lived in one person's notes: what the software is, why it
 way it is, what was tried and rejected, how to verify a change, and how to release. If you read
 only one file after the problem statement, read this one.
 
-Project: FSOC Tracker, Smart India Hackathon problem statement **SIH26169** (Department of Space,
+Project: ARGUS, Smart India Hackathon problem statement **SIH26169** (Department of Space,
 ISRO Space Applications Centre): an AI-based virtual camera tracking system for coarse alignment
 of mobile Free Space Optical Communication terminals.
 
@@ -292,7 +292,7 @@ files downloaded instead of opened.
 
 | Item | Owner | How |
 |---|---|---|
-| Presentation: fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
+| Presentation: rename the project to ARGUS on every slide (the PDF still says LAKSHYA) and fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
 | Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |

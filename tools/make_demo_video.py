@@ -2,7 +2,7 @@
 engine: title cards, then one segment per scenario showing the scene view, the camera view,
 the live specification tiles and the telemetry, and a Benchmark 2 segment on a video file.
 
-    .venv/bin/python tools/make_demo_video.py                # docs/demo/FSOC-Tracker-demo.mp4
+    .venv/bin/python tools/make_demo_video.py                # docs/demo/ARGUS-demo.mp4
     .venv/bin/python tools/make_demo_video.py --seconds 20   # shorter segments
 
 The picture is drawn with OpenCV from the same frames the application renders, so what the
@@ -143,13 +143,13 @@ def make_benchmark_video(path: Path) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seconds", type=float, default=24.0, help="length of each scenario segment")
-    ap.add_argument("--out", default=str(ROOT / "docs" / "demo" / "FSOC-Tracker-demo.mp4"))
+    ap.add_argument("--out", default=str(ROOT / "docs" / "demo" / "ARGUS-demo.mp4"))
     a = ap.parse_args()
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
     vw = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), FPS, (W, H))
     if not vw.isOpened():
         raise SystemExit("cannot open the video writer")
-    card([("FSOC Tracker", 1.6, INK), ("AI-based virtual camera tracking for coarse alignment of mobile FSOC terminals", 0.7, MUTED),
+    card([("ARGUS", 1.6, INK), ("AI-based virtual camera tracking for coarse alignment of mobile FSOC terminals", 0.7, MUTED),
           ("SIH26169  |  Department of Space, ISRO SAC", 0.6, ACCENT), ("A simulated scene, a moving laser beacon, disturbances, and a tracker that steers", 0.55, MUTED),
           ("a rate-limited virtual pan-tilt camera to keep the beacon centred.", 0.55, MUTED)], 6, vw)
     card([("What the video shows", 1.2, INK), ("Eight scenarios from the problem statement, then Benchmark 2 (video input).", 0.6, MUTED),

@@ -1,4 +1,4 @@
-# FSOC Tracker: User Manual
+# ARGUS: User Manual
 
 AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
 Communication (FSOC) terminals. Smart India Hackathon problem statement SIH26169,
@@ -27,12 +27,12 @@ Archives are built for every desktop platform in use:
 
 | Platform | Archive | Run |
 |---|---|---|
-| Windows 10 or 11, 64-bit | `FSOC-Tracker-windows-x64.zip` | `FSOC-Tracker.exe` (window); `FSOC-Tracker-cli.exe` for the command line |
-| Linux, 64-bit (Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora) | `FSOC-Tracker-linux-x64.tar.gz` | `./FSOC-Tracker` |
-| macOS 13 or newer, Intel | `FSOC-Tracker-macos-intel.zip` | `FSOC-Tracker` |
-| macOS 13 or newer, Apple silicon | `FSOC-Tracker-macos-arm64.zip` | `FSOC-Tracker` |
+| Windows 10 or 11, 64-bit | `ARGUS-windows-x64.zip` | `ARGUS.exe` (window); `ARGUS-cli.exe` for the command line |
+| Linux, 64-bit (Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora) | `ARGUS-linux-x64.tar.gz` | `./ARGUS` |
+| macOS 13 or newer, Intel | `ARGUS-macos-intel.zip` | `ARGUS` |
+| macOS 13 or newer, Apple silicon | `ARGUS-macos-arm64.zip` | `ARGUS` |
 
-A demonstration video (`FSOC-Tracker-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
+A demonstration video (`ARGUS-demo.mp4`, about four minutes, composed from the engine's own frames) and a 10 to 15 minute live demo script (`docs/DEMO_SCRIPT.md`) accompany the builds.
 
 1. Download the archive for your platform from the downloads page.
 2. Extract it anywhere the user can write to (Desktop, Documents, home folder). Do not run it from
@@ -46,9 +46,9 @@ Platform notes:
 - Linux: the archive carries Qt and all Python libraries. The system needs the usual X11 or
   Wayland client libraries, present on every desktop install. On a minimal server image
   install `libxcb-cursor0 libxkbcommon-x11-0 libegl1` (Debian and Ubuntu names). If the file
-  is not executable after extraction, run `chmod +x FSOC-Tracker`.
+  is not executable after extraction, run `chmod +x ARGUS`.
 - macOS: Gatekeeper may say the application cannot be verified. Open System Settings, Privacy
-  and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine FSOC-Tracker`
+  and Security, and choose Open Anyway, or run `xattr -dr com.apple.quarantine ARGUS`
   on the extracted folder once.
 
 Results are written to a `results` folder next to the executable. Every archive is produced by
