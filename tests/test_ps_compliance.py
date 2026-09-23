@@ -68,7 +68,7 @@ def test_rows_21_to_25_disturbances():
     assert set(ATMOSPHERE_PRESETS) == {"clear", "haze", "fog", "rain", "lowlight"}
     assert hasattr(d, "contrast") and hasattr(d, "brightness")
     # row 25: platform motion +/- 20 px per frame max; linear mandatory; others optional
-    psrc = inspect.getsource(disturbance.DisturbanceModel._platform)
+    psrc = inspect.getsource(disturbance.DisturbanceModel._platform) + inspect.getsource(disturbance.DisturbanceModel._pattern)
     for m in ("linear", "circular", "figure8", "spiral"):
         assert f'"{m}"' in psrc, m
     assert "random" in psrc
