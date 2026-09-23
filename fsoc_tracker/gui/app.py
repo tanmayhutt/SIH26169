@@ -27,7 +27,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
-                         new_random_seed, section_object)
+                         new_random_seed, prepare_video_run, section_object)
 
 
 # ----------------------------------------------------------------------------- form helpers
@@ -590,6 +590,8 @@ class MainWindow(QtWidgets.QMainWindow):
             cfg.seed = self.sp_seed.value()
         cfg.targets = extra_targets(cfg.targets[0], cfg.targets, self.sp_extra.value(), cfg.seed)
         cfg.video = self.video_path
+        if cfg.video:
+            prepare_video_run(cfg)
         return cfg
 
     def _preset_changed(self, name):

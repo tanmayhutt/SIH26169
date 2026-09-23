@@ -162,6 +162,16 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
     return targets
 
 
+def prepare_video_run(cfg: RunConfig) -> RunConfig:
+    """A video run (Benchmark 2) processes the whole file, and the file already holds the scene,
+    its beacons and disturbances. Duration and Extra targets are locked in video mode, so their
+    panel values must not reach the run: a 30 s duration would cut a longer video short, and
+    decoys would switch on the identity audit for spots that are not in the configuration."""
+    cfg.duration_s = 0.0
+    cfg.targets = cfg.targets[:1]
+    return cfg
+
+
 def new_random_seed(cfg: RunConfig) -> None:
     """'New seed each run': a fresh seed, and a fresh heading for line and sinusoidal paths."""
     cfg.seed = int(np.random.default_rng().integers(0, 10 ** 6))
