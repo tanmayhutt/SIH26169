@@ -98,6 +98,39 @@ def test_imm_tracks_circle_and_predicts():
     assert imm.mu.sum() == pytest.approx(1.0)
 
 
+# ------------------------------------------------------------------ metrics
+def _records(locked_frames: list[bool], dt: float = 1 / 30):
+    """Minimal per-frame records: locked or not, beacon in the window, nothing else."""
+    import dataclasses
+    from fsoc_tracker.engine.telemetry import Record
+    out = []
+    for i, lk in enumerate(locked_frames):
+        vals = {f.name: (0 if f.type in ("int", int) else float("nan")) for f in dataclasses.fields(Record)}
+        vals.update(frame=i, t_sim=i * dt, proc_ms=5.0, fps_inst=200.0, mode="TRACK" if lk else "SEARCH", locked=int(lk),
+                    tier="classical", in_window=1, true_x=0.0, tracking_err_px=2.0, tracking_err_stab_px=2.0)
+        out.append(Record(**vals))
+    return out
+
+
+def test_reacquisition_counts_a_loss_that_is_never_regained():
+    """PS row 19: lock at 1 s, lost at 2 s and never regained over the last 8 s must fail."""
+    from fsoc_tracker.engine.metrics import summarise
+    s = summarise(_records([False] * 30 + [True] * 30 + [False] * 240), 4 / 640, 10.0)
+    assert s.values["reacq_count"] == 0
+    assert s.values["lock_lost_at_end_s"] == pytest.approx(8.0)
+    assert s.values["reacq_time_max_s"] == pytest.approx(8.0)
+    assert s.passed["reacq_time_max_s"] is False
+
+
+def test_reacquisition_of_regained_losses_is_unchanged():
+    from fsoc_tracker.engine.metrics import summarise
+    s = summarise(_records([True] * 60 + [False] * 15 + [True] * 60), 4 / 640, 5.0)
+    assert s.values["reacq_count"] == 1
+    assert s.values["reacq_time_max_s"] == pytest.approx(0.5)
+    assert s.values["lock_lost_at_end_s"] == 0.0
+    assert s.passed["reacq_time_max_s"] is True
+
+
 # ------------------------------------------------------------------ closed loop
 def test_closed_loop_clear_meets_spec():
     cfg = RunConfig.load(Path(__file__).parent.parent / "configs/scenarios/clear_line.yaml")
