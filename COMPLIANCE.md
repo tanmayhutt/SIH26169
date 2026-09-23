@@ -18,7 +18,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 5 | Camera update rate | 30 Hz min | 30 Hz, editable upward; lag compensation scales with the rate | `CameraConfig.update_rate_hz`, `Controller.step` | `test_rows_1_to_6`, 60 Hz runs of the pack | 🟩 |
 | 6 | Initial camera position | centre of the screen | centre | `Gimbal.window_centre_px()` at pose 0 | `test_rows_1_to_6` | 🟩 |
 | 7 | Target type | beacon spot | rendered spot with PSF | `World._sprite` | visual, `test_centroid_accuracy_on_clean_frame` | 🟩 |
-| 8 | Number of targets | 1 mandatory, multiple optional | 1; N via list or "Extra targets" | `RunConfig.targets` | `test_rows_7_to_12`, `test_multi_target_identity_held` | 🟩 |
+| 8 | Number of targets | 1 mandatory, multiple optional | 1; N via list or "Extra targets" | `RunConfig.targets` | `test_rows_7_to_12`, `test_multi_target_identity_held`, `test_many_decoys_from_the_panel_track_the_designated_beacon` | 🟩 |
 | 9 | Target shape | user-defined, default square | square; circle, gaussian | `TargetConfig.shape` | `test_rows_7_to_12` | 🟩 |
 | 10 | Target size | 5 to 20 px, default 10 x 10 | 10, editable | `TargetConfig.size_px` | `test_rows_7_to_12` | 🟩 |
 | 11 | Initial target location | user-defined, default random | random; centre; "x,y" | `TargetConfig.start` | `test_rows_7_to_12` | 🟩 |

@@ -172,7 +172,7 @@ picture, the camera physically cannot keep up. This single number shapes much of
 | 16 | Acquisition Time | ≤ 2 sec | From the start, the beacon must be found and locked within 2 seconds | Time of the first "locked" frame |
 | 17 | Tracking Error | ≤ 10 pixels | While tracking, the beacon must stay within 10 px of the camera centre on average | Mean distance, true beacon to camera-window centre, after acquisition |
 | 18 | Target Loss | < 5% | The beacon may be lost in fewer than 5 percent of the frames | 100 minus lock retention |
-| 19 | Re-acquisition Time | ≤ 1 sec | If lost, it must be found again within 1 second | Longest gap between losing and regaining lock |
+| 19 | Re-acquisition Time | ≤ 1 sec | If lost, it must be found again within 1 second | Longest gap between losing and regaining lock; a loss never regained counts with its length |
 | 20 | Processing Speed | ≥ 20 FPS | The software must process at least 20 frames per second | Mean of 1 / processing time per frame |
 
 The PDF does not define "lock", "tracking error" or "centroiding error" precisely. Our definitions
@@ -457,7 +457,7 @@ published. Nothing needs installing, and it works offline.
 
 ## B14. Step 13: how we know it works
 
-- 22 automated tests, including one per group of PS rows that pins every default to the PS.
+- 29 automated tests, including one per group of PS rows that pins every default to the PS.
 - A regression batch: 13 scenarios x 3 seeds, compared run by run with the previous batch before
   any change is accepted.
 - Package checks on each platform, and hand checks on both macOS builds.
@@ -588,8 +588,8 @@ web app. Keep the report PDF ready to open.
 ## E2. On the day of the benchmarks
 
 - **Benchmark 1:** copy `configs/scenarios/TEMPLATE_evaluator.yaml`, fill in their values (every
-  field is labelled with its PS row), save it in `configs/scenarios/`, pick it, Start. The report and
-  CSV appear automatically.
+  field is labelled with its PS row), save it in `configs/scenarios/`, pick it, Start. Picking it keeps its seed and paths exactly as
+  written. The report and CSV appear automatically.
 - **Benchmark 2:** open each video directly. Check the calibration line (size, frame rate, frames).
   Hand over the CSV (`det_x`, `det_y` per frame) and the report.
 
