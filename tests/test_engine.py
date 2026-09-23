@@ -131,6 +131,19 @@ def test_multi_target_identity_held():
     assert v["lock_retention_pct"] >= 80.0, v
 
 
+@pytest.mark.parametrize("extra", [3, 8])
+def test_many_decoys_from_the_panel_track_the_designated_beacon(extra):
+    """Extra targets from the panel (up to 8): with three or more strong spots in view before
+    the first lock, the unrefined candidates must be refined on the current frame."""
+    from fsoc_tracker.ui_shared import extra_targets
+    cfg = RunConfig(seed=0, duration_s=4)
+    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, extra, cfg.seed)
+    v = Simulation(cfg, None, write_csv=False).run().values
+    assert v["acquisition_time_s"] <= 2.0, v
+    assert v["centroid_err_mean_px"] < 1.0, v      # measuring the designated beacon, not a decoy
+    assert v["lock_retention_pct"] >= 95.0, v
+
+
 def test_video_source_runs(tmp_path: Path):
     """Benchmark 2 path: write a small synthetic video, then run the tracker on it."""
     cfg = RunConfig(duration_s=3.0)
