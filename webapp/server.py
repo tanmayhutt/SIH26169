@@ -41,7 +41,7 @@ from fsoc_tracker.engine.report import write_report
 from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.engine.sources import probe_video
 from fsoc_tracker.ui_shared import (DURATION_RANGE, SPEEDS, LiveTiles, camera_bottom, camera_crop, camera_top, extra_targets,
-                                    final_tiles, front_end_bundle, new_random_seed, scene_header, status_text, summary_text,
+                                    final_tiles, front_end_bundle, new_random_seed, prepare_video_run, scene_header, status_text, summary_text,
                                     telemetry_lines, video_loaded_lines, video_preview_header)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -250,7 +250,8 @@ async def start_run(body: dict):
             p = UPLOADS / Path(vid).name
             if not p.exists():
                 raise HTTPException(404, "uploaded video not found; upload it again")
-            cfg.video = str(p); cfg.duration_s = 0.0; cfg.name = p.stem[:40]
+            cfg.video = str(p); cfg.name = p.stem[:40]
+            prepare_video_run(cfg)
         cfg.duration_s = min(max(cfg.duration_s, DURATION_RANGE[0]), DURATION_RANGE[1]) if not cfg.video else 0.0
         cfg.output_dir = str(RUNS)
         run_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
