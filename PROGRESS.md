@@ -12,7 +12,7 @@ Colour key used in every diagram and table below:
 | 🟥 red | Blocked or failing |
 | ⬜ grey | Not started |
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 ---
 
@@ -79,7 +79,8 @@ will not have their video while building, and only our own scene knows the true 
 | Item | Status | Notes |
 |---|---|---|
 | Scene 2000 x 2000 with starfield, terrain, gradient, flat | 🟩 | rows 1, 2 |
-| Beacon shapes square, circle, gaussian; 5 to 20 px | 🟩 | rows 7 to 10 |
+| Beacon shapes square, circle, gaussian, cross, ring, diamond, custom (0/1 mask or PNG); width and height set separately, 5-20 x 5-20 px | 🟩 | rows 7 to 10; one sprite module for renderer and detector, the three original shapes byte-identical to before |
+| Named targets; start random, centre or typed x,y in the panel | 🟩 | rows 8, 11 |
 | Paths: line, circular, figure of 8, random, spiral, sinusoidal | 🟩 | row 12; line turns back smoothly at edges |
 | Rate-limited gimbal with acceleration limit and latency | 🟩 | rows 13 to 15; window centre can reach any screen pixel |
 | Disturbances in physical order: extinction, turbulence, blur, platform sway, vibration, Poisson, Gaussian, salt and pepper | 🟩 | rows 21 to 25; sway amplitude capped at 20% of screen so the beacon stays in the field |
@@ -108,6 +109,8 @@ flowchart LR
 | Acquisition | 🟩 | 0.6 to 1.4 s on every full-view scenario (spec 2 s) |
 | Vibration handled as measurement noise, not motion | 🟩 | innovation-based, capped at 25 px |
 | Identity among decoys | 🟩 | one seed in five swaps in the hardest stress case |
+| Designation of the target to follow: appearance, start cue or point cue (click or typed); the designated target is the one scored; ambiguous frames counted | 🟩 | row 8; identical decoys starting apart: 1 of 5 runs acquired by appearance only, 5 of 5 with the start cue |
+| Search re-measures candidates on the current frame (was a stale or missing picture after a loss; a crash at 50% salt and pepper) | 🟩 | regression batch unchanged: 42 of 42 runs identical |
 | Hard mode (tracker sees only the window) | 🟩 | square-spiral search; acquisition 3 to 12 s, physics-limited |
 
 ### 2.4 Controller  🟩
@@ -131,6 +134,8 @@ flowchart LR
 | Platform at PS maximum 20 + 20 px/f | 25 to 27 px (23 vibration removed) | 76 to 88% | 🟥 physical limit: measured the same at the allowed 10 deg/s (slew saturation 2%), so the random 20 px per-frame vibration is the limit, not the motor |
 | Multi-target stress with haze, noise, sway | 13.6 to 14.4 px | 98 to 99% | 🟩 identity held on every seed (fitted width, refined association, frozen signature at crossings) |
 | Hard mode | 6.5 to 8.9 px after acquisition | 100% | 🟩 acquisition 3 to 12 s |
+| Identical decoys, designation start (5 seeds) | 5.9 to 7.0 px | 100% | 🟩 acquisition 0.60 to 0.73 s |
+| Beacon shapes: 8 x 18 px rectangle among other shapes (5 seeds) | 6.1 to 7.1 px | 99.5 to 100% | 🟩 acquisition 0.73 to 0.83 s |
 | Faint beacon at 3 to 6 sigma | 6.7 to 12.3 px | 91 to 97.5% on all 10 seeds | 🟩 track-before-detect on a moving-target residual; acquisition 1.3 to 2.8 s on 9 seeds, 5.5 s on one |
 
 Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
@@ -141,7 +146,8 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 |---|---|
 | `frames.csv`, one row per frame, about 45 columns | 🟩 |
 | `summary.json` with every metric and its printed definition, pass/fail against PS rows 16 to 20 | 🟩 |
-| `report.pdf`, three pages: spec check, time series, paths and histograms | 🟩 |
+| `report.pdf`: spec check with the Targets and Followed lines and the scenario check notes, time series, paths and histograms; text wrapped line by line, metrics list continued on a second page | 🟩 |
+| `summary.json` carries `designation` and `checks` | 🟩 |
 | Vibration-removed tracking error alongside the raw one | 🟩 |
 | Batch runner with multi-seed envelope table | 🟩 |
 
@@ -158,12 +164,19 @@ Processing: 65 to 250 FPS at 2000 x 2000 on a laptop CPU (spec 20).
 | Benchmark 2 video ingest, with first-frame preview and file facts on load | 🟩 |
 | New random seed and heading each run, with a pin option | 🟩 |
 | Automatic report on finish, open report / folder; advice when the gimbal was rate-limited | 🟩 |
+| Run section: Identical look, Designated, Designation, Cue (x,y), Edit target; preview at t = 0 with named targets, click to designate; click a video's first frame to cue | 🟩 |
+| Scenario check shown live, at Start, in the end dialog, in the report and the summary: Corrected, Beyond the PS, Cannot be met | 🟩 |
+| Salt and pepper in percent on both panels; every numeric input clamped in the engine (the web page had taken 13 as a fraction) | 🟩 |
+| Video mode: target appearance (name, shape, width, height, mask, intensity) editable; motion locked | 🟩 |
 
 ### 2.8 Tests  🟩
 
-15 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+30 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
 accuracy, sub-pixel refinement, IMM prediction, closed loop clear, closed loop with
-vibration, multi-target identity, video path. All pass in about 20 s.
+vibration, multi-target identity, video path, PS rows, and targets (width and height, every
+shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra
+targets, the designated target is scored, identical decoys need a cue, typed start). 30 of 30
+pass locally. Regression batch over the 15-scenario pack: the 42 earlier runs identical, 6 new.
 
 ### 2.9 AI detector  🟨
 
@@ -187,9 +200,11 @@ of measurements; on a real phone video it supplied half of them. The faint-beaco
 ### 2.10 Executable builds  🟩
 
 Built by `.github/workflows/build.yml` (GitHub Actions matrix). Each job installs the project, runs the
-21 tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
+tests, the web app smoke test, packages with PyInstaller and runs the packaged executable on a
 scenario before uploading the archive. `bash webapp/fetch_builds.sh` pulls the archives into `dist/`,
 `bash webapp/deploy.sh` publishes them under /downloads/ on the project site.
+
+The four-platform run below predates the 2026-09-23 changes and will be repeated for them.
 
 | Target | Runner | Status |
 |---|---|---|
@@ -269,3 +284,8 @@ One assumption: one screen pixel equals one camera pixel, so the 2000 px screen 
 3. 🟩 Technical report and user manual exported to PDF; demo video composed from the engine (`tools/make_demo_video.py`); demo script in `docs/DEMO_SCRIPT.md`.
 4. 🟩 Multi-target identity: candidates ranked by fitted width (noise-independent) instead of blob area; the stress seed that swapped now holds 99% lock.
 5. 🟩 Faint beacon: track-before-detect on a moving-target residual; 10 seeds all hold 91 to 97.5% lock, acquisition under 2.8 s on nine of them.
+6. 🟩 PS row 8 designation, target names, shapes and separate width and height, typed start, scenario check, salt and pepper in percent with clamped inputs, video appearance fields, search fix.
+7. 🟨 Repeat the four-platform build and package check for the 2026-09-23 changes.
+8. ⬜ Proposed, not required by the PS: switching the designated target mid-run (scored in segments), changing the scenario live during a run, manual camera control. Tracking every beacon at once was dropped as not required.
+
+Known limit: look-alikes that start at the same point as the designated beacon cannot be told apart at the start; even with the start cue those runs held 8 to 25% lock.

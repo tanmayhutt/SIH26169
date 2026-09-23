@@ -1,0 +1,17 @@
+# PS row 8 (multiple targets optional) with the hardest case: three more beacons that look
+# exactly like the designated one. By appearance alone they cannot be told apart, so the tracker
+# is told where the designated beacon starts (designation: start), as an operator or a GPS or
+# ephemeris cue would. Paths cross the designated beacon's path.
+name: decoys_identical
+seed: 3
+duration_s: 30
+designated: 0
+designation: start
+targets:
+  - {name: Remote terminal, shape: square, size_px: 10, motion: figure8, radius_px: 350, period_s: 14, start: centre}
+  - {name: Look-alike A, shape: square, size_px: 10, motion: circular, radius_px: 300, period_s: 9, start: "1500,500"}
+  - {name: Look-alike B, shape: square, size_px: 10, motion: line, speed_px_s: 120, heading_deg: 200, start: "1600,1500"}
+  - {name: Look-alike C, shape: square, size_px: 10, motion: random, speed_px_s: 90, start: "450,1550"}
+disturbance:
+  gaussian_sigma: 6
+  poisson: true

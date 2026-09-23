@@ -54,6 +54,7 @@ that steers the camera, live statistics, and an automatically generated performa
 | Meaning of "tracking error" and "centroiding error" | Tracking: true beacon to window centre. Centroiding: measured to true centroid. Both logged with printed definitions | The PS uses both terms without defining them |
 | Meaning of "lock" | TRACK state with the estimate within 30 px of the window centre | Acquisition needs a capture criterion; 20 px was tried and only lowered retention under vibration without lowering error |
 | A sustained 20 px per frame platform shift | A bounded sway with that peak speed, amplitude at most 20% of the screen | A sustained shift leaves the screen in seconds |
+| How the "designated moving target" is designated (row 8) | By appearance (default), by a start cue (as an operator or GPS/ephemeris cue would give) or by a point (a click or typed x,y) | The PS does not say; identical look-alikes cannot be told apart by appearance alone |
 | Role of AI | Classical detector first; CNN fills gaps and targets faint beacons; trained on the simulator's exact labels | Keeps frame rate and reliability independent of the model |
 
 ### 1.5 Numbers that shape the design
@@ -102,6 +103,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `world/camera.py` | Gimbal: pose in degrees, rate and acceleration limits, command latency, IFOV conversions. |
 | `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, Poisson, Gaussian and salt-and-pepper noise, in physical order. |
 | `world/renderer.py` | Draws the scene with sub-pixel beacon placement; returns ground truth. |
+| `world/sprites.py` | Beacon shapes (square, circle, gaussian, cross, ring, diamond, custom mask) at width x height, shared by the renderer and the detector's width calibration. |
 | `perception/detect.py` | Classical detector (median, background subtraction, matched filter, adaptive threshold, connected components, shape filters), sub-pixel centroid (centre of gravity plus 2D Gaussian fit), CNN heat-map detector (ONNX). |
 | `perception/estimator.py` | IMM over constant velocity, constant acceleration and coordinated turn. |
 | `perception/egomotion.py` | Frame-to-frame picture shift by phase correlation. |
@@ -109,6 +111,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `control/controller.py` | Feedforward plus PID rate controller with latency lead, deadband and anti-windup. |
 | `engine/simulation.py` | The run loop and telemetry record. |
 | `engine/metrics.py` | Metric definitions and specification pass/fail. |
+| `engine/checks.py` | Scenario check: clamped inputs, values beyond the PS, physical limits. |
 | `engine/report.py` | PDF report. |
 | `gui/app.py` | Desktop application. |
 | `cli.py` | `run`, `video`, `batch`, `gui` commands. |
@@ -165,7 +168,25 @@ whose appearance signature (area, peak, PSF width) differs strongly from the bea
 followed, which holds identity through crossings with decoys. COAST propagates the
 prediction through short dropouts; REACQUIRE widens the search with the growing uncertainty
 and falls back to SEARCH if it exceeds the screen. In hard mode (tracker restricted to the
-window) SEARCH drives an outward spiral.
+window) SEARCH drives an outward spiral. While searching, candidates are re-measured on the
+current frame (before 2026-09-23 a stale or missing picture was used after a loss; fixed with
+the regression batch unchanged).
+
+Designation (row 8, "a designated moving target"). Every target has a name; all are detected,
+`targets[designated]` is followed and scored. Mode `appearance` picks it by configured shape,
+size and brightness; `start` also gives its start position; `cue` gives a point near it (a
+click on the preview or on a video's first frame, or typed). With a cue the search takes the
+strong candidate nearest the cue, and after a loss the last estimate becomes the cue. In
+appearance mode, search frames where another spot scored within 0.15 of the chosen one are
+counted as ambiguous frames and reported. Tracking every beacon at once was not built: the PS
+metrics are for one target and one camera.
+
+Scenario check. Every numeric input is clamped to its accepted range in the engine, so no front
+end can pass an impossible value (a web test had taken salt and pepper 13, meant as 13%, as a
+fraction and blacked out the frame). `engine/checks.py` then notes values beyond the PS, with the
+row named, and physical limits: a beacon faster than the camera turns (800 px/s at 5 deg/s),
+jitter plus platform above 26.7 px/frame, look-alikes in appearance mode. The notes appear in
+the panel, at Start, in the end dialog, on page 1 of the report and in the summary.
 
 Figure 1 shows both error terms on a clear circular path: the window settles within about
 a second and holds 6 to 8 px while the centroid stays within 0.01 px of the truth.
@@ -225,9 +246,14 @@ time, mean tracking error, mean centroiding error, lock retention, FPS); a scene
 whole screen with the camera window, trails, a 2 degree grid and a legend; a camera view of
 what the window sees with the capture ring, the pointing-error vector, the detection box, the
 prediction with its uncertainty ring and a 1 degree scale bar; four live plots; and a telemetry
-column with every internal quantity. A scenario picker, playback speed control and keyboard
+column with every internal quantity. The Run section chooses the designated target by name, the
+designation mode and cue, an identical look for extra targets, and which target the Target
+section edits; below it the scenario check is shown live. Before a run the scene view previews
+t = 0 with every target named, and a click makes a target the designated one. A scenario picker, playback speed control and keyboard
 shortcuts support the ten to fifteen minute functional demonstration. "Open video" bypasses
-the simulator for Benchmark 2 and previews the file's first frame and facts before the run.
+the simulator for Benchmark 2 and previews the file's first frame and facts before the run; the
+target's appearance stays editable as the description of what to look for, and a click on the
+first frame sets a designation cue.
 Every run ends with a dialog summarising the specification check and opens the PDF report on
 request.
 
@@ -242,11 +268,14 @@ request.
 - Unit tests (`tests/`): IFOV and pose conversions, gimbal saturation and pose limits,
   determinism and screen bounds of every motion type, centroid accuracy on clean frames,
   sub-pixel refinement on a synthetic Gaussian, IMM prediction on a circle, closed-loop
-  specification checks on a clear scenario and on a platform-plus-vibration scenario, and a
-  Benchmark 2 path that writes a synthetic video and runs the tracker on it.
+  specification checks on a clear scenario and on a platform-plus-vibration scenario, a
+  Benchmark 2 path that writes a synthetic video and runs the tracker on it, and target tests
+  (width and height, every shape, clamping and PS-envelope notes, designation). 30 tests.
+- Regression rule: any change to perception, estimation or control is run on the whole pack
+  (15 s, seeds 0 to 2) before and after and compared run by run; no run may be worse.
 - Scenario pack (`configs/scenarios/`): the four mandatory motions in clear conditions,
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
-  and hard mode.
+  identical decoys, mixed beacon shapes and hard mode: 15 scenarios plus an evaluator template.
 - Batch envelope: `fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-N`
   runs every scenario over N seeds and writes `envelope.md` with mean and worst values.
 - Every metric has a printed definition (section 8 of the user manual) so the numbers can be
@@ -298,6 +327,15 @@ Discussion.
   the 30 px lock criterion flickers. No controller design removes this; a wider FOV or a
   sensor larger than the 640 x 480 window (electronic stabilisation) would, and neither is
   within the PS. Documented, not tuned away.
+- Designation (15 s, seeds 0 to 4). `decoys_identical` (three identical look-alikes starting
+  apart, designation start): acquisition 0.60 to 0.73 s, 5.9 to 7.0 px, 100% lock.
+  `beacon_shapes` (an 8 x 18 px rectangle among other shapes, appearance): 0.73 to 0.83 s,
+  6.1 to 7.1 px, 99.5 to 100% lock. Before the designation modes, identical decoys starting
+  apart with appearance only (20 s) gave the designated beacon in 1 of 5 runs and never
+  acquired it in 3; with the start cue 5 of 5 pass (0.60 to 0.73 s, 5.7 to 6.6 px, 100%).
+  Limit: look-alikes that start at the same point cannot be told apart at the start; even with
+  the start cue those runs held 8 to 25% lock. After these changes all 42 earlier batch runs
+  are identical.
 - Identity among decoys holds in four seeds of five; the failing seed loses the beacon during a
   sway excursion and re-locks a similar decoy. The designation audit recovers some cases; a
   stronger appearance model is future work.
@@ -313,6 +351,9 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
   and none on the simulated scenes, where the classical detector never loses the beacon.
 
 ## 9. Future improvements
+
+- Switching the designated target in the middle of a run (scored in segments), changing the
+  scenario live during a run, and manual camera control. Not built; the PS does not ask for them.
 
 - Reinforcement-learned gain scheduling on top of the classical controller, trained in the
   same simulator.
@@ -347,6 +388,8 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | platform_max_10degs.yaml | the same with the gimbal at the allowed 10 deg/s | circular, centred | shows the motor is not the binding limit |
 | full_stress.yaml | rows 8, 21, 23, 24, 25 together | figure of 8 plus two decoys | haze, salt and pepper 5%, Gaussian 12, Poisson, circular sway, vibration 10 |
 | hardmode_line.yaml | tracker restricted to the window | line | none |
+| decoys_identical.yaml | row 8, designation start | Remote terminal plus three identical look-alikes starting apart, paths crossing | Gaussian 6, Poisson |
+| beacon_shapes.yaml | rows 9 and 10, designation appearance | 8 x 18 px rectangle among a 16 px cross, 18 px ring, 14 px diamond, 12 px custom | none |
 
 ## Appendix B. Metric definitions printed in every report
 
@@ -389,10 +432,10 @@ the run can be repeated). `batch` adds `envelope.md` and `envelope.json`.
 | 5 | Camera update rate | 30 Hz min | `CameraConfig.update_rate_hz` |
 | 6 | Initial camera position | centre of the screen | gimbal pose 0 at the screen centre |
 | 7 | Target type | beacon spot | rendered spot with PSF |
-| 8 | Number of targets | 1 mandatory, multiple optional | `RunConfig.targets` list; the first is designated |
-| 9 | Target shape | user-defined, default square | square, circle, gaussian |
-| 10 | Target size | 5 to 20 px, default 10 x 10 | `TargetConfig.size_px` |
-| 11 | Initial target location | user-defined, default random | random, centre, or "x,y" |
+| 8 | Number of targets | 1 mandatory, multiple optional | `RunConfig.targets`, named; `designated` picks the one followed and scored; `designation` appearance, start or cue |
+| 9 | Target shape | user-defined, default square | square, circle, gaussian, cross, ring, diamond, custom mask |
+| 10 | Target size | 5-20 x 5-20 px, default 10 x 10 | `TargetConfig.size_px` (width) and `height_px` |
+| 11 | Initial target location | user-defined, default random | random, centre, or "x,y" (panel or file) |
 | 12 | Motion | line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, a user-defined waypoint path, and static |
 | 13, 14 | Max pan and tilt speed | 5 to 10 deg/s, default 5 | enforced in the gimbal model |
 | 15 | Update interval | >= 20 Hz | commands every frame at 30 Hz |
@@ -401,7 +444,7 @@ the run can be repeated). `batch` adds `envelope.md` and `envelope.json`.
 | 18 | Target loss | < 5% | measured, pass or fail printed |
 | 19 | Re-acquisition time | <= 1 s | measured, pass or fail printed |
 | 20 | Processing speed | >= 20 FPS | measured, pass or fail printed |
-| 21 | Image noise | salt and pepper about 10%, Gaussian, Poisson; one or more | three independent switches |
+| 21 | Image noise | salt and pepper about 10%, Gaussian, Poisson; one or more | three independent switches; salt and pepper shown in percent |
 | 22 | Max standard deviation of noise | 20, user-defined | `gaussian_sigma` |
 | 23 | Max camera jitter | +/- 20 px per frame, user-defined | `jitter_px`, applied to the picture |
 | 24 | Atmospheric disturbance | clear, haze, fog, rain, low light; user-defined contrast and brightness reduction | five presets plus editable contrast, brightness, blur, turbulence |

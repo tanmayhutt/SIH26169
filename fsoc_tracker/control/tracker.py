@@ -59,8 +59,12 @@ class Tracker:
         self.h, self.w = screen_shape
         # the configured beacon size (PS row 10, default 10 px) is the matched-filter prior;
         # for a video it is the user's statement of what to look for, not ground truth
-        exp = cfg.targets[0].size_px if cfg.targets else None
-        self.classical = ClassicalDetector(self.tc, exp, cfg.targets[0].shape if cfg.targets else "square")
+        # the designated target (RunConfig.designated) is the one whose appearance is the prior
+        t = cfg.designated_target()
+        if t is not None:
+            self.classical = ClassicalDetector(self.tc, None, t.shape, t.dims, t.mask)
+        else:
+            self.classical = ClassicalDetector(self.tc, None, "square")
         self.cnn = CNNDetector(self.tc.cnn_model) if self.tc.detector in ("cnn", "hybrid") else None
         if self.cnn is not None:
             self.cnn.warm_up()          # pay the model start-up here, not in the middle of a track
@@ -89,8 +93,21 @@ class Tracker:
         self._acc = np.zeros(2)
         self._audit_strikes = 0
         self.redesignations = 0
+        # designation cue: a point near the designated beacon (its start, or a click). While
+        # searching, the candidate nearest the cue is taken, so identical-looking decoys cannot
+        # be confused with it. After a loss the last estimate becomes the cue.
+        self.cue: tuple[float, float] | None = None
+        self._cue_mode = False
+        self.ambiguous_frames = 0     # search frames in which another spot looked just like the designated one
+        self.ambiguous = False
 
     JITTER_CAP = 25.0   # px; the PS maximum vibration is 20 px/frame
+    AMBIGUOUS_MARGIN = 0.15   # appearance scores closer than this cannot tell two spots apart
+
+    def set_cue(self, x: float, y: float) -> None:
+        """Tell the tracker where the designated beacon is (or starts)."""
+        self.cue = (float(x), float(y))
+        self._cue_mode = True
 
     def observe_ego(self, dx: float, dy: float, conf: float = 1.0):
         """Picture shift measured by phase correlation. Only trusted when the correlation
@@ -146,6 +163,10 @@ class Tracker:
                 det_img = img
                 cands = self.classical.detect(img, roi)
             tier = "classical" if cands else "none"
+            # candidates are re-measured on this frame's picture (before, a search after a loss
+            # re-measured them on the last tracked frame, and a first search with several strong
+            # candidates had no picture at all)
+            self._det_img = det_img
             chosen = self._pick_new(cands)
             # the faint path needs a still picture to build its moving-target residual; in hard
             # mode the window sweeps the screen, so the path is off there
@@ -233,6 +254,8 @@ class Tracker:
                 elif self.mode == Mode.COAST and self.miss_count > self.tc.coast_frames:
                     self._set(Mode.REACQUIRE)
                 elif self.mode == Mode.REACQUIRE and (self.imm.uncertainty_px() > 0.5 * max(self.w, self.h) or self.miss_count > 6 * self.tc.coast_frames):
+                    if self._cue_mode:
+                        self.cue = self.imm.position()
                     self._set(Mode.SEARCH)
                     self.imm.initialised = False
                     self.faint = False
@@ -283,7 +306,8 @@ class Tracker:
         # of the picture (a quarter of the work); the spots it keeps are then re-measured at
         # full resolution, so sizes and widths are compared on the real pixels
         if self._audit_det is None:
-            self._audit_det = ClassicalDetector(self.tc, (self.classical.expected_size_px or 10) / 2.0, self.classical.expected_shape)
+            dims = self.classical.expected_dims or (10.0, 10.0)
+            self._audit_det = ClassicalDetector(self.tc, None, self.classical.expected_shape, (dims[0] / 2.0, dims[1] / 2.0), self.classical.expected_mask)
         small = img[::2, ::2]
         coarse = self._audit_det.detect(small, refine=0, limit=8)
         if len(coarse) < 2:
@@ -344,11 +368,14 @@ class Tracker:
         cands = strong
         self.provisional = False
         self.faint = False
+        if self.cue is not None:
+            # designated by a cue: the strong candidate nearest to it (VERIFY then confirms it)
+            return min(cands, key=lambda c: np.hypot(c.x - self.cue[0], c.y - self.cue[1]))
         if len(cands) == 1 and self._det_img is not None:
             c = self.classical.refine(self._det_img, cands[0])
             return c if c.sigma >= self.MIN_SIGMA else None
-        # The designated target is the first configured target. Its expected appearance
-        # (size, shape) is known from config, so prefer candidates matching it.
+        # The designated target's expected appearance (size, shape) is known from config,
+        # so prefer candidates matching it.
         exp_sigma = self.classical.expected_sigma()
         if exp_sigma is not None and len(cands) > 1:
             # the designated beacon is described by its configured size and shape; among
@@ -358,8 +385,11 @@ class Tracker:
             cands = [self.classical.refine(self._det_img, c) for c in cands[:6]]
             cands = [c for c in cands if c.sigma >= self.MIN_SIGMA] or cands   # a hot pixel is not a beacon
             peak_max = max(c.peak for c in cands) or 1.0
-            cands = sorted(cands, key=lambda c: self._config_score(c, peak_max))
-            return cands[0]
+            scored = sorted(((self._config_score(c, peak_max), c) for c in cands), key=lambda sc: sc[0])
+            self.ambiguous = len(self.cfg.targets) > 1 and len(scored) > 1 and scored[1][0] - scored[0][0] < self.AMBIGUOUS_MARGIN
+            if self.ambiguous:
+                self.ambiguous_frames += 1
+            return scored[0][1]
         return cands[0]
 
     # ------------------------------------------------------- faint beacon path

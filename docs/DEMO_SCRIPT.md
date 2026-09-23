@@ -52,10 +52,17 @@ that spiral, sinusoidal and a user-defined waypoint path are there too.
   The picture shift is measured every frame and fed forward to the gimbal." Point out the
   vibration-removed error in the report later.
 
-## 5. Multiple targets and identity (1 min)
+## 5. Multiple targets and identity (2 min)
 
-Scenario: full stress. Extra targets are decoys. The tracker keeps the designated beacon
-by its appearance signature and audits the designation every half second.
+- Scenario: full stress. Point at the names on the scene view: the designated one is marked
+  "(designated)". The tracker keeps it by its appearance signature and audits the designation
+  every half second. The telemetry's first line says "following <name>".
+- Scenario: decoys identical. "Three look-alikes with the same shape, size and brightness. By
+  appearance alone no tracker can tell them apart; the scenario check says so. Designation
+  start tells it where the Remote terminal starts, as an operator or GPS cue would." Start: the
+  designated one is held as the paths cross.
+- Click to designate: before Start, click another target on the preview. It becomes the
+  designated one, and the report's "Followed" line names it.
 
 ## 6. Hard mode (1 min)
 

@@ -18,10 +18,10 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 5 | Camera update rate | 30 Hz min | 30 Hz, editable upward; lag compensation scales with the rate | `CameraConfig.update_rate_hz`, `Controller.step` | `test_rows_1_to_6`, 60 Hz runs of the pack | 🟩 |
 | 6 | Initial camera position | centre of the screen | centre | `Gimbal.window_centre_px()` at pose 0 | `test_rows_1_to_6` | 🟩 |
 | 7 | Target type | beacon spot | rendered spot with PSF | `World._sprite` | visual, `test_centroid_accuracy_on_clean_frame` | 🟩 |
-| 8 | Number of targets | 1 mandatory, multiple optional | 1; N via list or "Extra targets" | `RunConfig.targets` | `test_rows_7_to_12`, `test_multi_target_identity_held` | 🟩 |
-| 9 | Target shape | user-defined, default square | square; circle, gaussian | `TargetConfig.shape` | `test_rows_7_to_12` | 🟩 |
-| 10 | Target size | 5 to 20 px, default 10 x 10 | 10, editable | `TargetConfig.size_px` | `test_rows_7_to_12` | 🟩 |
-| 11 | Initial target location | user-defined, default random | random; centre; "x,y" | `TargetConfig.start` | `test_rows_7_to_12` | 🟩 |
+| 8 | Number of targets | 1 mandatory, multiple optional | 1; N named targets via list or "Extra targets" (optionally identical look); all detected, the designated one followed and scored; designation by appearance, start cue or point (click or typed) | `RunConfig.targets/designated/designation/designation_cue`, `TargetConfig.name`, `Tracker` | `test_rows_7_to_12`, `test_multi_target_identity_held`, `test_designated_target_is_the_one_scored`, `test_identical_decoys_need_a_cue`, `decoys_identical.yaml` | 🟩 |
+| 9 | Target shape | user-defined, default square | square; circle, gaussian, cross, ring, diamond, custom (0/1 mask or PNG) | `TargetConfig.shape/mask`, `world/sprites.py` | `test_rows_7_to_12`, `test_width_and_height_separate`, `beacon_shapes.yaml` | 🟩 |
+| 10 | Target size | 5-20 x 5-20 px, default 10 x 10 | 10 x 10; width and height editable separately | `TargetConfig.size_px/height_px` | `test_rows_7_to_12`, `test_width_and_height_separate` | 🟩 |
+| 11 | Initial target location | user-defined, default random | random; centre; "x,y" typed in the panel or the file | `TargetConfig.start` | `test_rows_7_to_12`, `test_user_defined_start` | 🟩 |
 | 12 | Motion | at least line, circular, figure of 8, random; optional spiral, sinusoidal, user-defined | all six, user-defined waypoint path, static | `Target.state`, `Target._waypoints` | `test_targets_stay_on_screen_and_are_deterministic` (7 paths) | 🟩 |
 | 13 | Max pan speed | 5 to 10 deg/s, default 5 | 5, editable | `CameraConfig.max_pan_rate_deg_s`, enforced in `Gimbal.apply` | `test_rows_13_to_15`, `test_gimbal_rate_and_pose_limits` | 🟩 |
 | 14 | Max tilt speed | 5 to 10 deg/s, default 5 | 5, editable | same | same | 🟩 |
@@ -31,7 +31,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | 18 | Target loss | < 5% | 0 to 2% on full-view scenarios | same | same | 🟩 |
 | 19 | Re-acquisition time | <= 1 s | 0.07 to 0.4 s measured | same | `test_closed_loop_with_disturbance_keeps_lock` | 🟩 |
 | 20 | Processing speed | >= 20 FPS | 65 to 250 FPS at 2000 x 2000 | same | all closed-loop tests | 🟩 |
-| 21 | Image noise | salt and pepper (~10%), Gaussian, Poisson; one or more selectable | all three, independent switches | `DisturbanceModel.apply_image` | `test_rows_21_to_25`, `noisy_line.yaml` | 🟩 |
+| 21 | Image noise | salt and pepper (~10%), Gaussian, Poisson; one or more selectable | all three, independent switches; salt and pepper shown in percent on both panels, stored as a fraction; inputs clamped, above 10% flagged by the scenario check | `DisturbanceModel.apply_image`, `engine/checks.py` | `test_rows_21_to_25`, `test_salt_and_pepper_shown_in_percent`, `test_scenario_check_clamps_and_warns`, `noisy_line.yaml` | 🟩 |
 | 22 | Max standard deviation of noise | 20 px, user-defined | `gaussian_sigma` up to any value | `DisturbanceConfig.gaussian_sigma` | `test_rows_21_to_25` | 🟩 |
 | 23 | Max camera jitter | +/- 20 px per frame, user-defined | `jitter_px`, applied to the whole picture | `DisturbanceModel.step` | `platform_jitter.yaml` | 🟩 |
 | 24 | Atmospheric disturbance | Clear, Haze, Fog, Rain, Low light; user-defined reduction in contrast and brightness | five presets plus editable contrast, brightness, blur, turbulence | `ATMOSPHERE_PRESETS`, `apply_image` | `test_rows_21_to_25`, `fog_circular.yaml`, `lowlight_figure8.yaml` | 🟩 |
@@ -78,5 +78,6 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | Screen pixels to degrees | one screen pixel = one camera pixel, so the screen is 12.5 deg wide | a setting; the only anchor the PS gives is 4 deg over 640 px |
 | What "tracking error" and "centroiding error" mean | tracking: true beacon to window centre; centroiding: measured centre to true centre. Both logged with printed definitions | the PS uses both terms without defining them |
 | What "lock" means | TRACK state with the estimate within 30 px of the window centre | acquisition needs a capture criterion |
+| How the "designated" target is designated | appearance (default), start cue or point cue (click or typed); tracking every beacon at once not built | the PS says "a designated moving target" but not how; its metrics are for one target |
 | A sustained 20 px per frame platform shift | modelled as a bounded sway with that peak speed | a sustained shift leaves the screen in seconds |
 | AI role | classical detector first; CNN fills gaps and handles faint beacons; trained on the simulator's exact labels | keeps FPS and reliability independent of the model |

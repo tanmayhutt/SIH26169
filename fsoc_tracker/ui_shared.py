@@ -15,13 +15,15 @@ from pathlib import Path
 import numpy as np
 
 from . import __version__
-from .engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConfig
+from .engine.checks import check_config, check_lines
+from .engine.config import ATMOSPHERE_PRESETS, LIMITS, RunConfig, TargetConfig, target_name
 from .engine.metrics import SPEC
 
 # ----------------------------------------------------------------------------- panel
 CHOICES = {
     "background": ["starfield", "terrain", "gradient", "flat"],
-    "shape": ["square", "circle", "gaussian"],
+    "shape": ["square", "circle", "gaussian", "cross", "ring", "diamond", "custom"],
+    "designation": ["appearance", "start", "cue"],
     "motion": ["line", "circular", "figure8", "random", "spiral", "sinusoidal", "waypoints", "static"],
     "start": ["random", "centre"],
     "atmosphere": list(ATMOSPHERE_PRESETS.keys()),
@@ -32,9 +34,10 @@ LABELS = {
     "width": "Width (px)", "height": "Height (px)", "fov_w_deg": "FOV width (deg)", "fov_h_deg": "FOV height (deg)",
     "update_rate_hz": "Update rate (Hz)", "max_pan_rate_deg_s": "Max pan (deg/s)", "max_tilt_rate_deg_s": "Max tilt (deg/s)",
     "max_accel_deg_s2": "Max accel (deg/s2)", "command_latency_frames": "Latency (frames)",
-    "window_only": "Hard mode: see window only", "size_px": "Size (px)", "intensity": "Peak intensity",
+    "window_only": "Hard mode: see window only", "name": "Name", "size_px": "Width (px)", "height_px": "Height (px)",
+    "mask": "Custom shape (0/1 rows)", "intensity": "Peak intensity",
     "speed_px_s": "Speed (px/s)", "radius_px": "Radius (px)", "period_s": "Period (s)", "heading_deg": "Heading (deg)",
-    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper", "gaussian_sigma": "Gaussian sigma",
+    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper (%)", "gaussian_sigma": "Gaussian sigma",
     "poisson": "Poisson shot noise", "jitter_px": "Camera jitter (px/frame)", "atmosphere": "Atmosphere preset",
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
     "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
@@ -56,13 +59,17 @@ TIPS = {
     "max_accel_deg_s2": "Our gimbal model: how fast the turn rate can change.",
     "command_latency_frames": "Our gimbal model: frames between a command and the motion. The controller leads the target by this.",
     "window_only": "Hard mode. The tracker sees only the inside of the camera window and must sweep a spiral to find the beacon.",
-    "shape": "PS row 9. Default square.", "size_px": "PS row 10. 5 to 20 px, default 10.", "intensity": "Peak grey level of the beacon, 0-255.",
+    "name": "A name for this target, shown on the views, in the telemetry and in the report.",
+    "shape": "PS row 9, user-defined, default square. Square and circle become a rectangle and an ellipse when width and height differ; custom draws your own 0/1 pattern.",
+    "size_px": "PS row 10: width, 5 to 20 px, default 10.", "height_px": "PS row 10: height, 5 to 20 px, default 10 (0 = same as the width).",
+    "mask": "PS row 9, user-defined shape (shape = custom): rows of 0 and 1 separated by ';', stretched to width x height. Example 010;111;010 is a plus. A PNG path also works.",
+    "intensity": "Peak grey level of the beacon, 0-255.",
     "motion": "PS row 12. Straight line, circular, figure of 8 and random are mandatory; spiral, sinusoidal and user-defined waypoints optional.",
     "speed_px_s": "Along-track speed for line, random, sinusoidal and waypoint paths.", "radius_px": "Radius for circular, figure of 8, spiral; half-amplitude for sinusoidal.",
-    "period_s": "Time for one loop of the path.", "heading_deg": "Direction of a line or sinusoidal path.", "start": "PS row 11. Default random.",
+    "period_s": "Time for one loop of the path.", "heading_deg": "Direction of a line or sinusoidal path.", "start": "PS row 11, user-defined, default random: random, centre, or type x,y in screen pixels (for example 400,1500).",
     "blink_hz": "Optional intensity modulation of the beacon.",
     "waypoints": "PS row 12, user-defined path: points in screen pixels for motion 'waypoints', followed at Speed and looped. Example 300,300; 1700,400; 1000,1600.",
-    "salt_pepper_frac": "PS row 21. 0.10 means 10 percent of pixels are set to black or white.",
+    "salt_pepper_frac": "PS row 21: percent of pixels set to black or white. The PS says around 10%; accepted 0 to 50.",
     "gaussian_sigma": "PS row 21 and 22. Read-noise standard deviation in grey levels, up to 20.",
     "poisson": "PS row 21. Shot noise that grows with brightness.",
     "jitter_px": "PS row 23. Random shift of the whole picture each frame, up to 20 px.",
@@ -84,14 +91,12 @@ TIPS = {
 }
 HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "verify_n", "verify_m", "coast_frames",
           "search_roi_px", "gate_px"}
-RANGES = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "intensity": (20, 255), "salt_pepper_frac": (0, 0.5),
-          "gaussian_sigma": (0, 60), "jitter_px": (0, 60), "platform_px_frame": (0, 60), "contrast": (0.05, 2.0),
-          "brightness": (-120, 120), "turbulence": (0, 1), "blur_sigma": (0, 8), "fov_w_deg": (0.2, 60), "fov_h_deg": (0.2, 60),
-          "update_rate_hz": (5, 120), "max_pan_rate_deg_s": (0.5, 60), "max_tilt_rate_deg_s": (0.5, 60), "speed_px_s": (0, 2000),
-          "radius_px": (10, 3000), "period_s": (1, 600), "heading_deg": (-360, 360), "background_level": (0, 120),
-          "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2), "deadband_px": (0, 20),
-          "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10), "blink_hz": (0, 15),
-          "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1)}
+RANGES = LIMITS          # accepted input ranges live in the engine, so every front end clamps alike
+# fields shown in other units than they are stored: salt and pepper is a fraction in the engine
+# (0.10) and a percentage on the panel (10), the way the PS states it
+SCALE = {"salt_pepper_frac": 100.0}
+# choices that also accept typed text: PS row 11 lets the user give the start as "x,y"
+EDITABLE_CHOICES = {"start"}
 MODES = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
 SPEEDS = [("0.25x", 0.25), ("0.5x", 0.5), ("1x real time", 1.0), ("2x", 2.0), ("4x", 4.0), ("Max speed", 0.0)]
 DEFAULT_SPEED_INDEX = 2
@@ -102,12 +107,13 @@ EXTRA_TARGETS_MAX = 8
 SECTIONS = [
     ("screen", "Screen", "PS rows 1-2", "The whole scene the tracker observes."),
     ("camera", "Camera", "PS rows 3-6, 13-15", "The window the terminal points at, and how fast it can turn."),
-    ("target", "Designated target", "PS rows 7-12", "The beacon to follow."),
+    ("target", "Target", "PS rows 7-12", "Settings of the target chosen in 'Edit target' above. Which one the tracker follows is set by 'Designated'."),
     ("disturbance", "Disturbances", "PS rows 21-25", "Everything that degrades the picture. All zero is a clear sky."),
     ("tracker", "Tracker", "", "How the software finds and follows the beacon. The defaults are tuned; change with care."),
 ]
 # while a video is loaded the scene, beacons and disturbances come from the file
-VIDEO_LOCKED = {"target": "*", "disturbance": "*", "screen": ["width", "height", "background", "background_level", "star_density"],
+# (the target's appearance stays editable: for a video it is what the tracker looks for, not ground truth)
+VIDEO_LOCKED = {"target": ["motion", "speed_px_s", "radius_px", "period_s", "start", "heading_deg", "blink_hz", "waypoints"], "disturbance": "*", "screen": ["width", "height", "background", "background_level", "star_density"],
                 "camera": ["update_rate_hz"], "run": ["extra", "duration"]}
 
 
@@ -119,6 +125,10 @@ def field_spec(name: str, value) -> dict | None:
     """The widget a field gets, identical in both front ends."""
     lo, hi = RANGES.get(name, (-1e9, 1e9))
     spec = {"name": name, "label": LABELS.get(name, name.replace("_", " ").capitalize()), "tip": TIPS.get(name, "")}
+    if name in SCALE:
+        k = SCALE[name]
+        spec.update(kind="float", min=lo * k, max=hi * k, decimals=1, step=1.0, scale=k)
+        return spec
     if isinstance(value, bool):
         spec.update(kind="bool")
     elif isinstance(value, int):
@@ -127,7 +137,7 @@ def field_spec(name: str, value) -> dict | None:
         narrow = hi - lo <= 2
         spec.update(kind="float", min=lo, max=hi, decimals=3 if narrow else 2, step=0.01 if narrow else 1.0)
     elif isinstance(value, str) and name in CHOICES:
-        spec.update(kind="choice", choices=CHOICES[name])
+        spec.update(kind="choice", choices=CHOICES[name], editable=name in EDITABLE_CHOICES)
     elif isinstance(value, str):
         spec.update(kind="text")
     else:
@@ -146,8 +156,10 @@ def schema(cfg: RunConfig | None = None) -> list[dict]:
     return out
 
 
-def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int) -> list[TargetConfig]:
-    """The designated target plus `extra` decoys: scenario decoys first, then generated ones."""
+def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int, identical: bool = False) -> list[TargetConfig]:
+    """Target 1 plus `extra` more: scenario targets first, then generated decoys. With
+    `identical` the generated decoys copy target 1's shape, size and brightness, so only a
+    designation cue (start position or a click) can tell them apart."""
     rng = np.random.default_rng(seed + 99)
     motions = ["circular", "line", "figure8", "random", "sinusoidal"]
     targets = [t0]
@@ -155,11 +167,37 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
         if i + 1 < len(existing):
             targets.append(existing[i + 1])
         else:
-            targets.append(TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
-                                        intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
-                                        speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
-                                        period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre"))
+            t = TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
+                             intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
+                             speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
+                             period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre")
+            if identical:
+                t.shape, t.size_px, t.height_px, t.mask, t.intensity = t0.shape, t0.size_px, t0.height_px, t0.mask, t0.intensity
+                t.start = "random"
+            targets.append(t)
     return targets
+
+
+def target_labels(cfg: RunConfig) -> list[str]:
+    """Names for the 'Designated' and 'Edit target' pickers."""
+    return [target_name(t, i) for i, t in enumerate(cfg.targets)]
+
+
+def scenario_check(cfg: RunConfig) -> list[str]:
+    """The scenario check as text lines, without changing `cfg` (see engine/checks.py)."""
+    import copy
+    return check_lines(check_config(copy.deepcopy(cfg)))
+
+
+RUN_TIPS = {
+    "extra": "More targets besides target 1 (PS row 8: multiple optional). Generated ones get random paths.",
+    "identical": "Generated targets copy target 1's shape, size and brightness. Only a start or click cue can then tell the designated one apart.",
+    "designated": "The target the tracker must follow (PS: 'a designated moving target'). The report scores this one.",
+    "designation": "How the tracker is told which one it is. appearance: by its configured shape, size and brightness. "
+                   "start: also told where it starts, as an operator or GPS cue would. cue: a point you give; click the beacon on the scene or on a video's first frame.",
+    "cue": "x,y of the designated beacon in screen pixels, for designation 'cue'. Set by clicking the scene; you can also type it.",
+    "edit": "Which target the Target section below shows and edits.",
+}
 
 
 def new_random_seed(cfg: RunConfig) -> None:
@@ -303,9 +341,9 @@ def final_tiles(v: dict, passed: dict) -> dict:
 
 
 # ----------------------------------------------------------------------------- text
-def telemetry_lines(r) -> str:
+def telemetry_lines(r, following: str = "") -> str:
     shift = (f"shift      {r.ego_dx:+6.2f} {r.ego_dy:+6.2f} px" if max(abs(r.ego_dx), abs(r.ego_dy)) <= 60 else "shift      unreliable, ignored")
-    return "\n".join([
+    return "\n".join(([f"following  {following}"] if following else []) + [
         f"frame      {r.frame}", f"t          {r.t_sim:8.2f} s", f"state      {r.mode}", f"locked     {'yes' if r.locked else 'no'}",
         f"detector   {r.tier}", f"candidates {r.n_candidates}", f"confidence {r.confidence:8.2f}", f"snr        {r.snr:8.1f}",
         f"psf sigma  {r.sigma:8.2f} px", "",
@@ -347,13 +385,16 @@ def about_text() -> str:
         "The desktop application and the web app are the same program: the same engine, panel, tiles, plots and report.")
 
 
-def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str = "") -> str:
+def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str = "", designation: dict | None = None,
+                 checks: list | None = None) -> str:
     """The end-of-run summary shown in the 'Run complete' dialog of both apps."""
     def f(k, fmt="{:.2f}"):
         x = _num(v, k)
         return "n/a" if x is None else fmt.format(x)
     pf = lambda k: {True: "PASS", False: "FAIL", None: "n/a"}[passed.get(k)]
-    msg = (f"Frames {v.get('frames')}    duration {f('duration_s')} s\n"
+    d = designation or {}
+    head = f"Followed {d.get('target', '')} (designation: {d.get('mode', 'appearance')})\n" if d.get("target") else ""
+    msg = head + (f"Frames {v.get('frames')}    duration {f('duration_s')} s\n"
            f"FPS mean {f('fps_mean', '{:.1f}')}  ({pf('fps_mean')})\n"
            f"Acquisition {f('acquisition_time_s')} s  ({pf('acquisition_time_s')})\n"
            f"Tracking error mean {f('tracking_err_mean_px')} px, max {f('tracking_err_max_px')} px  ({pf('tracking_err_mean_px')})\n"
@@ -364,6 +405,11 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
+    if d.get("ambiguous_frames"):
+        msg += (f"\n\nNote: in {d['ambiguous_frames']} search frames another target looked just like {d.get('target', 'the designated one')}; "
+                f"by appearance alone the tracker may pick the wrong one. Use designation 'start' or click the beacon.")
+    if checks:
+        msg += "\n\nScenario check:\n" + "\n".join("  " + x for x in check_lines(checks))
     sat = v.get("slew_saturation_pct") or 0.0
     if sat > 20:
         msg += (f"\n\nNote: the gimbal was at its rate limit in {sat:.0f}% of frames, so the target moved faster than the camera can turn. "
@@ -410,6 +456,7 @@ def front_end_bundle() -> dict:
     return {
         "version": __version__, "sections": schema(), "tiles": TILES, "modes": MODES, "speeds": SPEEDS,
         "default_speed": DEFAULT_SPEED_INDEX, "duration_range": DURATION_RANGE, "extra_max": EXTRA_TARGETS_MAX,
+        "run_tips": RUN_TIPS, "designations": CHOICES["designation"],
         "presets": ATMOSPHERE_PRESETS, "video_locked": VIDEO_LOCKED, "legend": SCENE_LEGEND,
         "welcome": welcome_text(), "about": about_text(), "status_ready": status_text("ready"),
     }

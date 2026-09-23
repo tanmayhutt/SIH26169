@@ -1,27 +1,27 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 · shall items 8 · deliverables 6 · scenarios 13 · tests 22 · 2 PDFs · 4 platform builds · web app",
+  "stats": "PS rows 25 \u00b7 shall items 8 \u00b7 deliverables 6 \u00b7 scenarios 15 \u00b7 tests 30 \u00b7 2 PDFs \u00b7 4 platform builds \u00b7 web app",
   "updated": "2026-09-23",
   "verification": {
-    "title": "Build verification: September 22, 2026",
-    "summary": "22 of 22 automated checks pass locally and on Windows, Linux, macOS Intel and macOS Apple silicon runners. Each desktop archive was extracted and run on its own platform: two scenarios, video mode, GUI start. Both macOS archives were also run by hand. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
+    "title": "Build verification: September 23, 2026",
+    "summary": "30 of 30 automated checks pass locally after the September 23 changes (designation, target names, shapes and sizes, scenario check, input validation). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
       {
         "name": "Automated tests",
         "status": "pass",
-        "text": "22 of 22 pytest checks in about 15 s: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point. The same suite passes on the Windows, Linux, Intel Mac and Apple silicon runners."
+        "text": "30 of 30 pytest checks locally: geometry, gimbal limits, every path on screen and deterministic (seven kinds incl. user-defined waypoints), centroid accuracy, IMM prediction, closed loop clear, closed loop with vibration, identity under decoys, video path, PS rows 1 to 25 point by point, and 8 target tests (width and height, every shape, clamping and PS-envelope notes, physical-limit note, percent display, identical extra targets, the designated target is the one scored, identical decoys need a cue, typed start). The earlier 22 passed on the Windows, Linux, Intel Mac and Apple silicon runners; that run will be repeated for the new tests."
       },
       {
         "name": "Scenario pack",
         "status": "pass",
-        "text": "13 scenarios (incl. the platform maximum at 10 deg/s), 15 s each, 3 seeds, compared run by run with the September 19 baseline: no run worse, four better. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.7 to 12.3 px at 91 to 97.5% over ten seeds (was not acquired at all). Multi-target stress 13.6 to 14.4 px at 98 to 99% on every seed (one seed was 69%). Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep."
+        "text": "15 scenarios (incl. the platform maximum at 10 deg/s), 15 s each, 3 seeds, compared run by run with the September 19 baseline: no run worse, four better. Clear line, circle and figure of 8: 6.4 to 8.2 px mean tracking error at 100% lock. Heavy noise 7.3 to 8.2 px, fog 6.6 to 7.3 px, low light 6.9 to 8.0 px, all 100%. Faint beacon 6.7 to 12.3 px at 91 to 97.5% over ten seeds (was not acquired at all). Multi-target stress 13.6 to 14.4 px at 98 to 99% on every seed (one seed was 69%). Acquisition 0.7 to 2.0 s everywhere except hard mode's 3 to 12 s sweep. September 23: all 42 earlier runs identical after the designation, shape and search changes (same 42, better 0, worse 0), 6 new runs. decoys_identical (three identical look-alikes, designation start), seeds 0 to 4: acquisition 0.60 to 0.73 s, 5.9 to 7.0 px, 100% lock. beacon_shapes (8 x 18 px rectangle among other shapes): 0.73 to 0.83 s, 6.1 to 7.1 px, 99.5 to 100% lock."
       },
       {
         "name": "Multi-seed envelope",
         "status": "pass",
-        "text": "3 seeds per scenario, all 13 scenarios; the faint scenario over 10 seeds. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum holds 76 to 88% lock at 5 and at 10 deg/s alike: the random per-frame vibration is the physical limit."
+        "text": "3 seeds per scenario, all 13 scenarios of the September 22 pack; the faint scenario over 10 seeds. Clear, noise, fog, low light and faint pass every seed. The multi-target stress seed that swapped to a decoy now holds 98.8% lock at 14 px (candidates ranked by fitted width, which does not move with the noise level). Platform sway at the PS maximum holds 76 to 88% lock at 5 and at 10 deg/s alike: the random per-frame vibration is the physical limit."
       },
       {
         "name": "Truth independence",
@@ -81,7 +81,27 @@
       {
         "name": "Desktop and web are one interface",
         "status": "pass",
-        "text": "Both front ends are generated from fsoc_tracker/ui_shared.py: the panel (all 52 fields in the same sections, labels, tooltips and ranges), the six tiles and their pass rules, the telemetry lines, the view captions, the end-of-run summary, help and welcome text, decoy generation and the camera contrast stretch. The web page has the desktop toolbar with Pause, Step, Save scenario, Screenshot, Results, Manual and About, all four plots and the same keys. Verified in Chrome: a full run with pause, one-frame step, resume and stop, a video run, and the return to the simulator. Remaining differences are the server's: views sent at about 15 fps, one run per server, files downloaded rather than opened."
+        "text": "Both front ends are generated from fsoc_tracker/ui_shared.py: the panel (every field in the same sections, labels, tooltips and ranges), the six tiles and their pass rules, the telemetry lines, the view captions, the end-of-run summary, help and welcome text, decoy generation and the camera contrast stretch. The web page has the desktop toolbar with Pause, Step, Save scenario, Screenshot, Results, Manual and About, all four plots and the same keys. Verified in Chrome: a full run with pause, one-frame step, resume and stop, a video run, and the return to the simulator. Remaining differences are the server's: views sent at about 15 fps, one run per server, files downloaded rather than opened."
+      },
+      {
+        "name": "Designated target (PS row 8)",
+        "status": "pass",
+        "text": "The tracker follows targets[designated] and the report scores it. Designation by appearance, by a start cue (as an operator or GPS cue would give) or by a point (a click on the preview or a video's first frame, or typed). Identical decoys starting apart, appearance only (20 s, seeds 0 to 4): the designated beacon was acquired in 1 of 5 runs and never in 3. With the start cue: 5 of 5 pass, acquisition 0.60 to 0.73 s, 5.7 to 6.6 px, 100% lock. Limit: look-alikes that start at the same point cannot be told apart at the start; even with the start cue those runs held 8 to 25% lock. Tracking every beacon at once was dropped as not required."
+      },
+      {
+        "name": "Scenario check and input validation",
+        "status": "pass",
+        "text": "Every numeric input is clamped in the engine for every front end, and the scenario check notes Corrected values, values Beyond the PS (row named) and what Cannot be met (physical limits). Root cause of a failed web-app test: salt and pepper 13 (meant as 13%) was taken as a fraction and every pixel went black, so the beacon was never acquired. With 0.13 the same settings give acquisition 1.40 s, 99.4% lock, 11.9 px (above 10 px because jitter 10, turbulence 0.92 and 13% salt and pepper exceed the PS). Salt and pepper is now shown in percent on both panels."
+      },
+      {
+        "name": "Tracker search fix",
+        "status": "pass",
+        "text": "While searching, candidates were re-measured on the last tracked frame's picture after a loss, or on no picture at all when several strong candidates appeared before the first lock (a crash, exposed by 50% salt and pepper). Now they are re-measured on the current frame. The regression batch is unchanged. Benchmark 2 sample video after the changes: acquisition 0.70 s, lock 100%, 194 FPS."
+      },
+      {
+        "name": "Four-platform rerun",
+        "status": "partial",
+        "text": "The build workflow and per-platform package check will be repeated for the September 23 changes; the archives on the site predate them."
       }
     ]
   },
@@ -536,7 +556,7 @@
               "tag": "rows 1-2"
             },
             {
-              "name": "Beacon shapes square, circle, gaussian",
+              "name": "Beacon shapes square, circle, gaussian, cross, ring, diamond, custom mask; width and height separate",
               "status": "done",
               "tag": "rows 7-10"
             },
@@ -551,9 +571,14 @@
               "tag": "row 12"
             },
             {
-              "name": "Several targets with a designated one",
+              "name": "Several named targets; the designated one by appearance, start cue or click",
               "status": "done",
               "tag": "row 8"
+            },
+            {
+              "name": "Start random, centre or typed x,y in the panel",
+              "status": "done",
+              "tag": "row 11"
             }
           ]
         },
@@ -607,6 +632,11 @@
               "name": "Salt and pepper, Gaussian, Poisson noise",
               "status": "done",
               "tag": "rows 21-22"
+            },
+            {
+              "name": "Salt and pepper shown in percent; every input clamped in the engine",
+              "status": "done",
+              "tag": "row 21"
             }
           ]
         },
@@ -687,6 +717,10 @@
             {
               "name": "Hard mode square-spiral search",
               "status": "done"
+            },
+            {
+              "name": "Search re-measures candidates on the current frame",
+              "status": "done"
             }
           ]
         },
@@ -704,6 +738,23 @@
             {
               "name": "Identity by fitted width: the stress seed that swapped now holds 99% lock",
               "status": "done"
+            },
+            {
+              "name": "Designation cue: nearest strong candidate while searching; last estimate after a loss",
+              "status": "done",
+              "tag": "row 8"
+            },
+            {
+              "name": "Ambiguous frames counted in appearance mode",
+              "status": "done"
+            },
+            {
+              "name": "Switching the designated target mid-run, scored in segments (proposed, not required)",
+              "status": "backlog"
+            },
+            {
+              "name": "Tracking every beacon at once: dropped as not required",
+              "status": "backlog"
             }
           ]
         }
@@ -756,7 +807,7 @@
               "status": "done"
             },
             {
-              "name": "report.pdf, three pages",
+              "name": "report.pdf with Targets and Followed lines, scenario check notes, wrapped text",
               "status": "done"
             },
             {
@@ -769,6 +820,10 @@
             },
             {
               "name": "Tracked rate beside lock retention in every output",
+              "status": "done"
+            },
+            {
+              "name": "summary.json designation and checks",
               "status": "done"
             }
           ]
@@ -810,6 +865,16 @@
               "name": "Faint beacon at 3 to 6 sigma: track-before-detect, 10 seeds all at 91 to 97.5% lock, acquisition under 2.8 s on nine",
               "status": "done",
               "tag": "needs cnn"
+            },
+            {
+              "name": "Identical decoys with designation start: 5.9 to 7.0 px, 100% lock, 5 seeds",
+              "status": "done",
+              "tag": "row 8"
+            },
+            {
+              "name": "Beacon shapes, 8 x 18 px rectangle among others: 6.1 to 7.1 px, 99.5 to 100% lock, 5 seeds",
+              "status": "done",
+              "tag": "rows 9-10"
             }
           ]
         }
@@ -837,6 +902,23 @@
             {
               "name": "Open video for Benchmark 2, with preview",
               "status": "done"
+            },
+            {
+              "name": "Designated, Designation, Cue, Identical look, Edit target; click the preview to designate",
+              "status": "done",
+              "tag": "row 8"
+            },
+            {
+              "name": "Scenario check shown live: Corrected, Beyond the PS, Cannot be met",
+              "status": "done"
+            },
+            {
+              "name": "Video mode: target appearance editable, click the first frame to cue",
+              "status": "done"
+            },
+            {
+              "name": "Changing the scenario live during a run; manual camera control (proposed, not required)",
+              "status": "backlog"
             }
           ]
         },
@@ -872,7 +954,7 @@
       "blurb": "Tests that fail if the system drifts from the problem statement.",
       "groups": [
         {
-          "caption": "tests, 22 passing",
+          "caption": "tests, 30 passing",
           "items": [
             {
               "name": "Geometry and gimbal limits",
@@ -907,6 +989,10 @@
               "name": "Truth-removed run is identical",
               "status": "done",
               "tag": "no cheating"
+            },
+            {
+              "name": "Targets: shapes, sizes, clamping, designation",
+              "status": "done"
             }
           ]
         }

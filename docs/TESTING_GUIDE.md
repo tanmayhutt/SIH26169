@@ -14,7 +14,7 @@ statement (PS) rows they implement.
    that scene where a virtual pan-tilt gimbal points it. The gimbal can turn at most 5 deg/s
    (26.7 px per frame at 30 Hz), starts at the screen centre, and reacts one frame late.
 3. **Tracker.** Each frame the tracker detects bright compact spots, chooses the designated
-   beacon by its configured size and shape, measures its centre to a fraction of a pixel,
+   beacon by its configured size and shape (or by a start or click cue, section 4), measures its centre to a fraction of a pixel,
    predicts its motion with three motion models (constant velocity, acceleration, turn), and
    holds an identity so decoys are not followed. Its state machine reads SEARCH, VERIFY,
    TRACK, COAST, REACQUIRE.
@@ -63,6 +63,8 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 | platform_max_10degs | the same with the gimbal at 10 deg/s | the same result: the motor is not the limit, the random jump is |
 | full_stress | three beacons, haze, noise, sway, vibration (row 8) | designated beacon held, error 13 to 15 px, lock 98% |
 | hardmode_line | tracker sees only the window; must sweep | acquisition 3 to 12 s (spiral sweep), then as clear line |
+| decoys_identical | Remote terminal plus three identical look-alikes starting apart, paths crossing; designation start (row 8) | acquisition 0.60 to 0.73 s, error 5.9 to 7.0 px, 100% lock |
+| beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | acquisition 0.73 to 0.83 s, error 6.1 to 7.1 px, lock 99.5 to 100% |
 | TEMPLATE_evaluator | every field labelled by PS row, PS defaults | behaves like clear line; copy it to enter evaluator values |
 
 Tick "random seed" to get a different starting position and noise each run; untick and set
@@ -91,9 +93,23 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 - Hard mode (window only): the tracker sees only the window. Expect SEARCH with a square
   spiral, then TRACK. Acquisition depends on where the beacon started, 3 to 12 s.
 
-### Designated target (rows 7 to 12)
-- Shape: square (default), circle, gaussian. The detector's size prior follows the shape.
-- Size (px): 5 to 20 per the PS, 10 default. Faint and small (5 px, intensity 100) is the
+### Run section: designation (row 8)
+- Extra targets, Identical look: tick Identical look and set 3 extra targets. The scenario check
+  shows "Cannot be met: ... look the same as the designated ..." while Designation is
+  appearance. Switch Designation to start: the note goes and the designated target is followed.
+- Designated: pick another target by name. The scene view marks it "(designated)"; the report
+  line "Followed" and the error tiles refer to it.
+- Click to designate: before Start, click a target on the preview; it becomes the designated one.
+- Designation cue: choose cue and click near a beacon, or type x,y in Cue (x,y). Cue without a
+  point gives a "Cannot be met" note.
+- Edit target: choose which target the Target section shows and edits.
+
+### Target (rows 7 to 12)
+- Name: appears on the scene view, the telemetry first line ("following <name>") and the report.
+- Shape: square (default), circle, gaussian, cross, ring, diamond, custom. The detector's size
+  prior follows the shape. For custom, type a mask such as 010;111;010 (a plus).
+- Width, Height (px): set separately, 5 to 20 per the PS, 10 x 10 default. Width 8, Height 18
+  draws a rectangle; a circle with unequal sides is an ellipse. Faint and small (5 px, intensity 100) is the
   hardest; large and bright the easiest.
 - Peak intensity (0 to 255): 235 default. Below about 120 on a dark sky the faint path
   engages (watch "detector" in telemetry stay classical, acquisition 1.5 to 3 s).
@@ -102,14 +118,14 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   saturates; the report then prints a note about it.
 - Radius (px), Period (s): size and speed of the circular, figure-8, spiral and sinusoidal
   paths. Short periods with large radii raise the acceleration and the tracking error.
-- Start: random, centre, or "x,y" in screen pixels.
+- Start: random, centre, or "x,y" typed in screen pixels (for example 400,1500).
 - Waypoints: for motion waypoints, "x,y; x,y; ..." in screen pixels, looped at Speed.
 - Extra targets (decoys): 0 to 8. Each decoy has a different size, brightness and path. The
   first target stays designated; the identity check re-designates if a decoy is followed.
 
 ### Disturbances (rows 21 to 25)
-- Salt and pepper (0 to 0.5): 0.10 is the PS "around 10%". At 0.3 the picture is mostly
-  specks and the median filter still holds lock.
+- Salt and pepper (%, 0 to 50): 10 is the PS "around 10%" (files store 0.10). At 30 the
+  picture is mostly specks and the median filter still holds lock.
 - Gaussian sigma (grey levels): 20 is the PS maximum; 40 is beyond it and still tracks.
 - Poisson: shot noise proportional to brightness.
 - Camera jitter (px/frame): 20 is the PS maximum. Above 8 the raw tracking error rises with
@@ -131,6 +147,18 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   tuned on the scenario pack; large changes show up as oscillation on the gimbal plot.
 - Use picture-shift estimate: on by default; off makes vibration handling worse.
 
+### Scenario check
+Start from clear line and watch the notes below the Run section:
+- Salt and pepper 13 %: "Beyond the PS: ... above the PS 'around 10%' (row 21)". The run
+  still acquires.
+- Camera jitter 25: "Beyond the PS" (row 23). Add linear platform motion at 10 px/frame: also
+  "Cannot be met", because 35 px/frame is more than the camera's 26.7 px/frame turn.
+- Target speed 900 px/s on a line: "Cannot be met: ... moves at up to 900 px/s but the camera
+  turns at most 800 px/s". 600 px/s gives the 70 percent warning.
+- A scenario file with `salt_pepper_frac: 13`: "Corrected: ... set to 0.5".
+The same notes appear at Start in the status bar, in the end dialog, on page 1 of the report
+and in the summary `checks`.
+
 ## 5. Benchmark 2, video input
 
 1. Prepare an .mp4 (also .avi, .mov, .mkv) that shows a moving bright spot on a noisy
@@ -148,7 +176,8 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 
 Things to try: a phone video (variable frame rate is handled and flagged), a video with the
 beacon leaving and re-entering the frame (watch COAST, REACQUIRE, then TRACK), and a video
-with several bright spots (set Size to the real beacon's size so the designation prefers it).
+with several bright spots (set Width and Height and the shape to the real beacon's, which stay
+editable in video mode, or click the beacon on the first frame to set a designation cue).
 
 ## 6. Things that should fail, and how they fail
 
@@ -158,6 +187,10 @@ with several bright spots (set Size to the real beacon's size so the designation
   acquisition n/a. This is correct behaviour: the beacon is not visible.
 - A video with no bright spot at all: SEARCH throughout, lock 0%.
 - Hard mode with Max pan at 5 deg/s and a beacon in a far corner: acquisition up to 12 s.
+- Look-alikes that start at the same point as the designated beacon: they cannot be told apart
+  at the start; even with designation start these runs held 8 to 25% lock.
+- Impossible values (salt and pepper 13 in a file, a negative size): clamped to the accepted
+  range and shown as "Corrected" in the scenario check, never run as typed.
 
 ## 7. Command line and batch
 
@@ -186,7 +219,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 22 tests: geometry, gimbal, paths, centroid, IMM, closed loop, identity, video, PS rows
+python -m pytest                       # 30 tests: geometry, gimbal, paths, centroid, IMM, closed loop, identity, video, PS rows, targets and designation
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 python tests/package_check.py dist/FSOC-Tracker-<platform>.zip   # a built archive, as a user would run it
 ```

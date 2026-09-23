@@ -134,7 +134,10 @@ tiles read "n/a" because the video carries no ground truth.
 
 The whole scene, downscaled, with a 2 degree grid. Cyan rectangle: the camera window and its
 centre. Orange circle: the true beacon (simulator only). Green cross: the tracker's estimate.
-Grey circles: other targets. Faint trails: where the beacon and the window have been. The
+Grey circles: other targets. Every target carries its name; the designated one is marked
+"(designated)" in the signal colour, the others are muted. Before a run the view shows a
+preview of the scene at t = 0 with every target named; click a target to make it the designated
+one. Faint trails: where the beacon and the window have been. The
 legend is printed along the bottom edge.
 
 ### Camera view (right picture)
@@ -164,12 +167,25 @@ truth, errors and timing. Before a run it shows a short how-to.
 ## 4. Parameters
 
 Every row of the problem statement parameter table has a control. Values outside the
-suggested range are allowed where the table says "user-defined".
+suggested range are allowed where the table says "user-defined". Every numeric input is
+clamped to its accepted range in the engine, for both applications, and the scenario check
+(section 4.1) says what a value means.
 
 ### Run
 - Name, Seed: the seed makes a run exactly repeatable.
 - Duration (s): length of a simulator run. Ignored for video input (the whole video runs).
 - Extra targets: number of additional beacons (decoys) added with random paths.
+- Identical look: the generated extra targets copy target 1's shape, size and brightness. Only a
+  start or click cue can then tell the designated one apart.
+- Designated: the target the tracker must follow (PS: "a designated moving target"). The report
+  scores this one. The list shows the target names.
+- Designation: how the tracker is told which one it is. `appearance`: by its configured shape,
+  size and brightness. `start`: also told where it starts, as an operator or GPS cue would.
+  `cue`: a point you give.
+- Cue (x,y): the point for designation `cue`, in screen pixels. Clicking the scene sets it; you
+  can also type it. While searching, the tracker takes the strong candidate nearest the cue;
+  after a loss its last estimate becomes the cue.
+- Edit target: which target the Target section below shows and edits.
 
 ### Screen (rows 1 to 2)
 - Width, Height: scene size in pixels. Default 2000 x 2000.
@@ -184,16 +200,24 @@ suggested range are allowed where the table says "user-defined".
 - Max accel, Command latency: gimbal realism.
 - Hard mode: the tracker sees only the pixels inside the window and must search.
 
-### Designated target (rows 7 to 12)
-- Shape: square (default), circle, gaussian. Size in pixels (default 10). Peak intensity.
+### Target (rows 7 to 12)
+Shows the target chosen in Edit target.
+- Name: shown on the views, in the telemetry and in the report. Empty means "Target N".
+- Shape: square (default), circle, gaussian, cross, ring, diamond, custom. Width and Height in
+  pixels, set separately (default 10 x 10; the PS range is 5-20 x 5-20). A square with unequal
+  sides is a rectangle, a circle an ellipse. Peak intensity.
+- Custom shape (0/1 rows): for shape `custom`, rows of 0 and 1 separated by `;`, stretched to
+  width x height. `010;111;010` is a plus. A PNG path also works.
 - Motion: line, circular, figure8, random, spiral, sinusoidal, waypoints, static. For
   `waypoints`, the Waypoints field takes screen-pixel points as `x,y; x,y; ...`; the beacon
   follows them at Speed and loops (the PS row 12 user-defined path).
-- Speed, Radius, Period, Heading: path parameters. Start: random or centre.
+- Speed, Radius, Period, Heading: path parameters. Start: random, centre, or a typed `x,y` in
+  screen pixels (for example `400,1500`).
 - Blink: optional intensity modulation in Hz. 0 is steady.
 
 ### Disturbances (rows 21 to 25)
-- Salt and pepper fraction (0.10 = 10 percent), Gaussian sigma (up to 20), Poisson.
+- Salt and pepper in percent of pixels (10 = 10 percent; accepted 0 to 50; scenario files store
+  it as a fraction, 0.10), Gaussian sigma (up to 20), Poisson.
 - Camera jitter: pixels per frame, up to 20.
 - Atmosphere preset: clear, haze, fog, rain, lowlight. Selecting a preset fills contrast,
   brightness, blur and turbulence; each can then be edited.
@@ -210,13 +234,30 @@ suggested range are allowed where the table says "user-defined".
   dim beacons in low light; a static dim beacon is not covered by this path.
 - Hard mode (Camera section) restricts the tracker to the window; SEARCH then flies an expanding square spiral of window-sized cells at the rate limit. A full sweep of a 2000 px screen at 5 deg/s takes about 12 s, so acquisition in hard mode is 3 to 12 s depending on where the beacon is.
 
+### 4.1 Scenario check
+
+Below the Run section, both applications show notes on the current values. They also appear in
+the status bar at Start, in the end-of-run dialog, on page 1 of the report and in the summary.
+Values inside the PS envelope give no note.
+
+| Note | Meaning |
+|---|---|
+| Corrected | A value was outside the accepted range and was clamped, for example salt and pepper 13 (a fraction) becomes 0.5. |
+| Beyond the PS | A value is outside the PS table, and the row is named: screen below 2000 x 2000 (row 1), update rate below 30 Hz (row 5) or 20 Hz (row 15), pan or tilt outside 5 to 10 deg/s (rows 13, 14), size outside 5-20 x 5-20 (row 10), custom shape without a mask, salt and pepper above about 10% (row 21), Gaussian sigma above 20 (row 22), jitter above 20 px/frame (row 23), platform above 20 px/frame (row 25), turbulence above 0.6, contrast below 0.4. The PS targets are not promised for it. |
+| Cannot be met | A physical limit: the designated beacon moves faster than the camera turns (800 px/s at 5 deg/s and the default FOV), or above 70 percent of it; jitter plus platform motion above the camera's turn per frame (26.7 px/frame at the defaults); salt and pepper at 50%; designation `cue` without a point; designation `start` with a video; other targets that look the same as the designated one in appearance mode. |
+
 ## 5. Running Benchmark 2 (video input)
 
 1. Click "Open video (Benchmark 2)" and choose the `.mp4` file. The application reads the
    file's real facts (displayed size with any rotation tag applied, average frame rate with a
    variable-rate warning, exact frame count, length) and calibrates the settings to them:
-   the screen becomes the video's size and the update rate its frame rate. Target and
-   disturbance settings are locked, because the video already contains them.
+   the screen becomes the video's size and the update rate its frame rate. Disturbance settings
+   and the target's motion fields are locked, because the video already contains them.
+   The target's appearance (name, shape, width, height, mask, intensity) stays editable: for a
+   video it is the statement of what to look for. Set it to the beacon in the video. Only the
+   designated target's look is used.
+   To point the tracker at one beacon, click it on the first frame: this sets a designation cue
+   and Designation switches to `cue`.
 2. Set the camera window size, FOV and rate limits if the graders specify them; these are
    not in the file. Degree readouts depend on the FOV you set.
 3. Click Start. The video frames are used as the scene; nothing is drawn by the simulator.
@@ -236,11 +277,17 @@ name: fog_circular
 seed: 6
 duration_s: 30
 targets:
-  - {shape: square, size_px: 10, motion: circular, radius_px: 400, period_s: 15}
+  - {name: Remote terminal, shape: square, size_px: 10, height_px: 10, motion: circular, radius_px: 400, period_s: 15}
 disturbance:
   atmosphere: fog
   gaussian_sigma: 8
 ```
+
+Target fields: `name`, `shape`, `size_px` (width), `height_px` (0 = same as the width), `mask`
+(for `custom`), `intensity`, `motion` and its path fields, `start` (`random`, `centre` or
+`"x,y"`). Run fields for designation: `designated` (index of the target to follow, default 0),
+`designation` (`appearance`, `start` or `cue`) and `designation_cue` (`"x,y"` in screen pixels).
+`disturbance.salt_pepper_frac` is a fraction (0.10 = 10 percent).
 
 Commands:
 
@@ -284,8 +331,8 @@ seed and time it belongs to:
 | File | Contents |
 |---|---|
 | `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time. |
-| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification. |
-| `<label>_report.pdf` | Three pages: specification check and metric table; time series; paths, histograms and model probabilities. |
+| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `designation` (followed target, index, mode, cue, all target names, ambiguous frames, redesignations) and `checks` (the scenario check notes). |
+| `<label>_report.pdf` | Specification check, the Targets and Followed lines, the scenario check notes and the metric table (continued on the next page when long); time series; paths, histograms and model probabilities. |
 | `<label>_scenario.yaml` | The exact parameters used, so the run can be repeated. |
 
 With `--out <folder>` on the command line the folder is yours; the files inside are still
@@ -307,6 +354,10 @@ an `envelope.md` table. The web app names its downloads the same way.
 
 ## 9. Troubleshooting
 
+- A value changed after you typed it: it was outside the accepted range and was clamped. The
+  scenario check shows it as "Corrected" with the old and new value.
+- The beacon is never acquired: read the scenario check. "Cannot be met" notes name the setting
+  that makes the run impossible.
 - The window does not start on Linux: install `libxcb-cursor0` (Qt 6 requirement).
 - Low frame rate: reduce the screen size, disable Poisson noise, or uncheck Real-time
   pacing to see the true processing speed.

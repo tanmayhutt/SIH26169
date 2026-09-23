@@ -52,9 +52,12 @@ class Summary:
     values: dict = field(default_factory=dict)
     passed: dict = field(default_factory=dict)
     truth_available: bool = True
+    designation: dict = field(default_factory=dict)   # which target was followed, and how it was designated
+    checks: list = field(default_factory=list)        # scenario check notes (engine/checks.py)
 
     def to_dict(self):
         return {"values": self.values, "passed": self.passed, "truth_available": self.truth_available,
+                "designation": self.designation, "checks": self.checks,
                 "definitions": {k: DEFINITIONS[k] for k in self.values if k in DEFINITIONS}}
 
 

@@ -10,7 +10,8 @@ ISRO Space Applications Centre): an AI-based virtual camera tracking system for 
 of mobile Free Space Optical Communication terminals.
 
 Status on 2026-09-23: every mandatory item of the problem statement is implemented, tested and
-released. Remaining work is preparation for the event (section 13).
+released. The 2026-09-23 changes (designation, shapes and sizes, scenario check) still need the
+four-platform build, publish and deploy. Remaining work is preparation for the event (section 13).
 
 ---
 
@@ -63,7 +64,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 22 tests, about 15 s
+.venv/bin/python -m pytest                      # 30 tests, about 15 s
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -115,11 +116,13 @@ fsoc_tracker/
   engine/metrics.py      the PS limits (SPEC), metric definitions, the summary computed at the end
   engine/report.py       the automatic PDF performance report
   engine/naming.py       run labels and output file names
+  engine/checks.py       the scenario check: corrected values, beyond-the-PS and cannot-be-met notes
   world/scene.py         backgrounds (starfield, terrain, gradient, flat)
   world/targets.py       beacon paths: line, circular, figure8, random, spiral, sinusoidal, waypoints, static
   world/camera.py        the gimbal: rate, acceleration and pose limits, one frame of latency
   world/disturbance.py   noise, atmosphere, jitter, platform sway, applied in physical order
   world/renderer.py      draws each frame and its ground truth
+  world/sprites.py       beacon shapes (square, circle, gaussian, cross, ring, diamond, custom mask)
   perception/detect.py   classical detector, sub-pixel centroid, CNN heat-map detector (ONNX)
   perception/estimator.py  IMM filter: constant velocity, acceleration and turn models
   perception/egomotion.py  picture shift by phase correlation (a vibration hint)
@@ -133,8 +136,8 @@ webapp/server.py         FastAPI web app over the same engine; static/index.html
 webapp/deploy.sh         deploy repository, web app, site and Caddy config to the server
 webapp/publish_builds.sh publish a build run's archives on the site
 webapp/fetch_builds.sh   download a build run's archives into dist/ (slow on home connections)
-configs/scenarios/       13 scenarios plus TEMPLATE_evaluator.yaml
-tests/                   test_engine.py, test_ps_compliance.py, package_check.py
+configs/scenarios/       15 scenarios plus TEMPLATE_evaluator.yaml
+tests/                   test_engine.py, test_ps_compliance.py, test_targets.py, package_check.py
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
 web/                     the progress page (index.html) and its data (progress.json)
@@ -190,6 +193,17 @@ tools/                   compare_batches.py, gui_screenshot.py, make_demo_video.
   and shape score candidates by blob area and a fitted width calibrated on a rendered sprite; the
   signature does not blend towards an appearance that looks like two spots merging; an audit every
   15 frames, on a half-size copy of the picture, re-designates after three strikes.
+- Designation (PS row 8 and the functional objective: "a designated moving target"): the
+  tracker follows `targets[designated]` and the report scores that target. `designation` is
+  `appearance` (configured shape, size and brightness), `start` (also told where it starts, as an
+  operator or GPS/ephemeris cue would) or `cue` (a point near it: a click on the preview or on a
+  video's first frame, or typed). With a cue the search takes the strong candidate nearest the
+  cue; after a loss the last estimate becomes the cue. In appearance mode the tracker counts
+  ambiguous frames (another spot scored within 0.15). Tracking every beacon at once was dropped:
+  the PS metrics are for one target and one camera.
+- While searching, candidates are re-measured on the current frame. Before 2026-09-23 they were
+  re-measured on the last tracked frame (after a loss) or on no picture at all (a crash with
+  50 percent salt and pepper). The regression batch is unchanged by the fix.
 - Controller: feed-forward of the estimated velocity and acceleration, led by the command latency
   plus the estimator lag; the lag is defined at 30 Hz and scales with the camera rate (a 60 fps
   video halved it). PID kp 5, kd 0.3, ki 0.8 with anti-windup.
@@ -222,15 +236,19 @@ help and welcome text, decoy generation, the seed rule and the camera display st
 desktop app draws it with Qt; the web server sends it to the page at `/api/ui` and computes tiles,
 telemetry and captions with the same functions. To add or change a setting, change it in
 `engine/config.py` and, if it needs a label or tooltip, in `ui_shared.py`; both front ends pick it
-up. Differences that remain come from the server: views sent at about 15 fps, one run at a time,
+up. Numeric limits live in `engine/config.py` (LIMITS) and every input is clamped there, so no
+front end can pass an impossible value; `engine/checks.py` produces the scenario check notes both
+panels show. Salt and pepper is shown in percent on both panels and stored as a fraction.
+Differences that remain come from the server: views sent at about 15 fps, one run at a time,
 files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (22 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (30 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
-   worse. Last recorded state: 36 of 36 runs unchanged (2026-09-22).
+   worse. Last recorded state: all 42 earlier runs identical, 6 new runs from the two new
+   scenarios (2026-09-23).
 3. For interface changes, take screenshots at 1600 x 1000 and 1366 x 768 with
    `tools/gui_screenshot.py` and look at them; check the web page in a browser too.
 4. `python webapp/smoke.py` for the web app.
@@ -273,6 +291,9 @@ files downloaded instead of opened.
 - A hand-held phone video of a single dot: tracked about 99.6 percent, lock about 33 percent,
   because the hand's motion exceeds the gimbal's limits. It is harder than the PS describes and
   must not be tuned to (section 2).
+- Look-alikes that start at the same point as the designated beacon cannot be told apart at the
+  start. Even with the start cue these runs failed (lock 8 to 25 percent). Look-alikes that start
+  apart pass with the start cue (`decoys_identical`, 5 of 5 seeds).
 
 ## 12. Pitfalls we hit, so you do not
 
@@ -293,14 +314,18 @@ files downloaded instead of opened.
 | Item | Owner | How |
 |---|---|---|
 | Presentation: fill in the Team ID on slide 1. The PDF in `docs/submission/` carries later corrections (slides 2, 4, 5, 6, 8) that the source deck does not; copy them into the source before exporting again | team | compare with `git log -p docs/submission/` |
+| Rebuild the four archives for the 2026-09-23 changes, publish and deploy | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
 | Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |
 | Evaluators' scenarios and videos | at the event | copy `configs/scenarios/TEMPLATE_evaluator.yaml`; open videos directly |
 
-Proposed extras, none required by the PS: Benchmark 2 auto-comparison against the evaluators'
+Proposed extras, none required by the PS: switching the designated target in the middle of a run
+(it would be scored in segments); changing the scenario live during a run; manual camera control;
+Benchmark 2 auto-comparison against the evaluators'
 predefined centroids; a Monte Carlo envelope over thousands of seeds on a large cloud machine;
-blink-coded beacon identification; physically based turbulence; concurrent web runs.
+blink-coded beacon identification; physically based turbulence; concurrent web runs. Tracking
+every beacon at once was dropped as not required.
 
 ## 14. History in one paragraph
 
@@ -310,4 +335,8 @@ faint-beacon track-before-detect, identity fixes, four-platform builds with per-
 checks, waypoint paths (PS row 12 user-defined), demo video and script, output naming scheme.
 2026-09-21 to 22: platform limit re-measured at 10 deg/s, frame-rate-independent lag compensation,
 tracked-rate metric, interface review and fixes. 2026-09-23: desktop and web unified on one
-interface definition. The full commit history is in git.
+interface definition; PS row 8 designation (appearance, start or cue, click to designate) found
+missing by the owner and added, with target names, user-defined shapes and separate width and
+height (rows 9 and 10), a typed start (row 11), the scenario check, salt and pepper in percent
+with clamped inputs (the web app had taken 13 as a fraction), editable target appearance in video
+mode and the search re-measurement fix; two new scenarios. The full commit history is in git.
