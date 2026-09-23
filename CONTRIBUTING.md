@@ -29,7 +29,8 @@ server (only if you will deploy); the login for the project site.
    `COMPLIANCE.md` where a PS item is affected, and the manual, report and PDFs
    (`python docs/build_pdfs.py`) where the user or the report sees the change. These documents are
    the team's shared memory: nobody's chat history travels between machines, so a change is not
-   finished until they say what the code does and why. `CLAUDE.md` gives the full list.
+   finished until they say what the code does and why. `CLAUDE.md` gives the full list, and
+   `python tools/record_check.py` lists any commit that changed code without a record update.
 5. Commit with your own git identity and a short message; push the branch; open a pull request.
    The template lists the checks.
 

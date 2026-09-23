@@ -58,6 +58,10 @@ Record decisions and their reasons, what was tried and rejected, and measured nu
 language. A change is not finished until the record says what the code does. Run
 `python tools/ps_audit.py` after engine changes; it rewrites `docs/PS_AUDIT.md`, which is committed.
 
+At the start of every substantive task, run `python tools/record_check.py`. It lists commits that
+changed the application without touching any record file (a teammate's, or yours). Write those up
+first, from the diff (`git show <sha>`), so the record never lags the code.
+
 ## Repository hygiene
 
 - Commit as your own configured git identity. Never pass a `user.email` or `user.name` override
