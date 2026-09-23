@@ -34,6 +34,8 @@ cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/co
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/submission/LAKSHYA_SIH2026_26169.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/demo/ARGUS-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
+# the same video under its earlier name, which the submitted deck links to
+[ -f "$STAGE/downloads/ARGUS-demo.mp4" ] && cp "$STAGE/downloads/ARGUS-demo.mp4" "$STAGE/downloads/FSOC-Tracker-demo.mp4"
 cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$HERE/docs/HANDOVER.md" "$HERE/docs/KNOWLEDGE_TRANSFER.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
