@@ -8,6 +8,7 @@ Endpoints
     POST /api/run                  start a run: {"scenario": name|null, "overrides": {...}, "video": upload id|null}
     POST /api/stop/{run_id}        stop early (the report is still written)
     POST /api/pause/{run_id}       pause or resume;  POST /api/step/{run_id}  one frame while paused
+    POST /api/disturb/{run_id}     change the disturbances of the running simulation: {"disturbance": {...}}
     GET  /api/ui                   the shared interface definition (panel, tiles, texts), identical to the desktop app
     POST /api/scenario_yaml        the scenario file for the current panel (Save scenario)
     GET  /api/runs                 recent runs on this server with their files (Results)
@@ -38,7 +39,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from fsoc_tracker import __version__
-from fsoc_tracker.engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConfig
+from fsoc_tracker.engine.config import ATMOSPHERE_PRESETS, RunConfig, TargetConfig, clean_disturbance_changes
 from fsoc_tracker.engine.report import write_report
 from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.engine.sources import probe_video
@@ -110,7 +111,12 @@ class Run:
                        "true": [r.true_x, r.true_y], "terr": r.tracking_err_px, "cerr": r.centroid_err_px, "proc_ms": r.proc_ms,
                        "win": list(res.window), "probs": [r.p_cv, r.p_ca, r.p_ct], "unc": r.uncertainty_px,
                        "screen_w": self.cfg.screen.width, "screen_h": self.cfg.screen.height, "total": total, "ifov": ifov,
-                       "capture": self.cfg.tracker.capture_radius_px, "lim": self.cfg.camera.max_pan_rate_deg_s}
+                       "capture": self.cfg.tracker.capture_radius_px, "lim": self.cfg.camera.max_pan_rate_deg_s,
+                       "segment": r.segment, "live": sim.accepts_disturbance_changes}
+                if r.segment:                 # the latest change, so any viewer's page can show it
+                    ch = sim.changes[r.segment - 1]
+                    msg["change"] = {"segment": ch["segment"], "t": ch["t_s"], "what": ch["what"],
+                                     "status": status_text("changed", t=ch["t_s"], what=ch["what"])}
                 live.push(r)
                 now = time.perf_counter()
                 if now - last_frame >= 1 / 15 or self.pause:     # picture and panel at ~15 fps, plot data every frame
@@ -360,6 +366,24 @@ def step_run(run_id: str):
         raise HTTPException(404, "unknown run")
     r.pause = True; r.step_once = True
     return {"paused": True}
+
+
+@app.post("/api/disturb/{run_id}")
+def disturb_run(run_id: str, body: dict):
+    """New disturbance settings for the running simulation; they take effect on its next frame."""
+    r = RUN.get(run_id)
+    if not r:
+        raise HTTPException(404, "unknown run")
+    sim = getattr(r, "sim", None)
+    if r.done.is_set() or sim is None:
+        raise HTTPException(409, "the run is not in progress")
+    if not sim.accepts_disturbance_changes:
+        raise HTTPException(409, "a video run carries its own disturbances")
+    changes = clean_disturbance_changes(body.get("disturbance") or {})
+    if not changes:
+        raise HTTPException(400, "no disturbance settings given")
+    sim.request_disturbance(changes)
+    return {"queued": True, "status": status_text("changing")}
 
 
 @app.post("/api/scenario_yaml")

@@ -6,6 +6,7 @@ the CLI, scenario YAML files and the tests all share one definition. Defaults fo
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any, get_type_hints
@@ -122,6 +123,17 @@ class TrackerConfig:
 
 
 @dataclass
+class ScheduledChange:
+    """A change of the disturbances during a run (PS "shall": introduce disturbances in the
+    virtual camera feed). `disturbance` holds only the fields that change; the change takes
+    effect on the first frame at or after `t_s`. Changes made live in the application are
+    recorded here with the time of the frame they took effect on, so the saved scenario replays
+    the run exactly."""
+    t_s: float = 0.0
+    disturbance: dict = field(default_factory=dict)
+
+
+@dataclass
 class RunConfig:
     name: str = "default"
     seed: int = 0
@@ -142,6 +154,7 @@ class RunConfig:
     video: str | None = None             # set for Benchmark 2 runs: path to an .mp4
     video_truth: str = ""                # optional ground truth for a video: CSV of frame (or t), x, y in video px
     output_dir: str = "results"
+    schedule: list[ScheduledChange] = field(default_factory=list)   # disturbance changes during the run
 
     # ------------------------------------------------------------ targets
     def designated_index(self) -> int:
@@ -197,6 +210,9 @@ def _build(cls, d: dict[str, Any]):
         ftype = hints.get(f.name)
         if f.name == "targets":
             kwargs[f.name] = [_build(TargetConfig, t or {}) for t in (v or [])]
+        elif f.name == "schedule":
+            kwargs[f.name] = sorted((ScheduledChange(float(c.get("t_s", 0.0)), clean_disturbance_changes(c.get("disturbance") or {}))
+                                     for c in (v or [])), key=lambda c: c.t_s)
         elif isinstance(ftype, type) and is_dataclass(ftype):
             kwargs[f.name] = _build(ftype, v or {})
         else:
@@ -251,3 +267,74 @@ def apply_atmosphere_preset(d: DisturbanceConfig) -> DisturbanceConfig:
         d.contrast, d.brightness = p["contrast"], p["brightness"]
         d.blur_sigma, d.turbulence = p["blur_sigma"], p["turbulence"]
     return d
+
+
+PLATFORM_MOTIONS = ("none", "linear", "circular", "random", "spiral", "figure8")
+_PRESET_FIELDS = ("contrast", "brightness", "blur_sigma", "turbulence")
+
+
+def clean_disturbance_changes(changes: dict) -> dict:
+    """Keep only real DisturbanceConfig fields, cast to their types and clamped to LIMITS, so a
+    schedule from a scenario file or a request from the web page cannot inject anything else."""
+    kinds = {f.name: f.type for f in fields(DisturbanceConfig)}
+    out: dict[str, Any] = {}
+    for k, v in (changes or {}).items():
+        kind = kinds.get(k)
+        if kind is None:
+            continue
+        if kind in ("bool", bool):
+            v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
+        elif kind in ("float", float):
+            v = float(v)
+            if not math.isfinite(v):
+                continue
+            lim = LIMITS.get(k)                  # the same accepted range as a value typed before Start
+            if lim is not None:
+                v = min(max(v, float(lim[0])), float(lim[1]))
+        else:
+            v = str(v)
+            if k == "atmosphere" and v not in ATMOSPHERE_PRESETS:
+                continue
+            if k == "platform_motion" and v not in PLATFORM_MOTIONS:
+                continue
+        out[k] = v
+    return out
+
+
+def apply_disturbance_changes(current: DisturbanceConfig, changes: dict) -> DisturbanceConfig:
+    """The disturbance configuration after a change. A new atmosphere preset fills contrast,
+    brightness, blur and turbulence unless the change sets them itself (the same rule as a
+    scenario file), so `{atmosphere: fog}` means fog."""
+    changes = clean_disturbance_changes(changes)
+    new = DisturbanceConfig(**{**asdict(current), **changes})
+    if "atmosphere" in changes and changes["atmosphere"] != current.atmosphere:
+        preset = ATMOSPHERE_PRESETS[changes["atmosphere"]]
+        for k in _PRESET_FIELDS:
+            if k not in changes:
+                setattr(new, k, preset[k])
+    return new
+
+
+def disturbance_diff(before: DisturbanceConfig, after: DisturbanceConfig) -> dict:
+    """The fields that differ, as {name: new value}."""
+    a, b = asdict(before), asdict(after)
+    return {k: b[k] for k in b if b[k] != a[k]}
+
+
+_SHORT = {"salt_pepper_frac": "salt and pepper", "gaussian_sigma": "Gaussian sigma", "poisson": "Poisson",
+          "jitter_px": "jitter", "atmosphere": "atmosphere", "contrast": "contrast", "brightness": "brightness",
+          "turbulence": "turbulence", "blur_sigma": "blur", "platform_motion": "platform",
+          "platform_px_frame": "platform speed", "platform_period_s": "platform period"}
+_UNIT = {"jitter_px": " px/frame", "platform_px_frame": " px/frame", "platform_period_s": " s", "blur_sigma": " px"}
+
+
+def describe_disturbance_change(before: DisturbanceConfig, after: DisturbanceConfig) -> str:
+    """One line for the status bar and the report, e.g. 'atmosphere clear -> fog, jitter 0 -> 10 px/frame'."""
+    def fmt(k, v):
+        if isinstance(v, bool):
+            return "on" if v else "off"
+        if isinstance(v, float):
+            return f"{v:g}{_UNIT.get(k, '')}"
+        return str(v)
+    parts = [f"{_SHORT.get(k, k)} {fmt(k, getattr(before, k))} -> {fmt(k, v)}" for k, v in disturbance_diff(before, after).items()]
+    return ", ".join(parts) or "no change"

@@ -28,7 +28,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
                          new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
-                         TRUTH_TIP, truth_sidecar)  # noqa: F401
+                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS)  # noqa: F401
 from ..engine.config import target_name, parse_xy
 
 
@@ -88,6 +88,22 @@ class DataclassForm(QtWidgets.QWidget):
         else:
             w = QtWidgets.QLineEdit(v); w.textChanged.connect(self.changed)
         return w
+
+    def values(self) -> dict:
+        """The widget values by field name, without writing them into the configuration object
+        (the object may belong to a run in progress)."""
+        out = {}
+        for name, w in self.widgets.items():
+            if isinstance(w, QtWidgets.QCheckBox):
+                out[name] = w.isChecked()
+            elif isinstance(w, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
+                # the stored unit, as read() writes it (salt and pepper shows % and stores a fraction)
+                out[name] = w.value() / self.scales[name] if name in self.scales else w.value()
+            elif isinstance(w, QtWidgets.QComboBox):
+                out[name] = w.currentText()
+            elif isinstance(w, QtWidgets.QLineEdit):
+                out[name] = w.text()
+        return out
 
     def read(self):
         for name, w in self.widgets.items():
@@ -451,7 +467,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cmb_speed.setToolTip("Playback pacing. Max speed shows the true processing rate.")
         tb.addWidget(self.cmb_speed)
         tb.addSeparator()
-        tb.addAction("Open video", self.open_video).setToolTip("Benchmark 2 (Ctrl+O): use a video file as the scene; the simulator is bypassed")
+        self.act_open = tb.addAction("Open video", self.open_video)
+        self.act_open.setToolTip("Benchmark 2 (Ctrl+O): use a video file as the scene; the simulator is bypassed")
         self.act_clear_video = tb.addAction("Simulator", self.clear_video)
         self.act_clear_video.setToolTip("Leave video mode and use the simulated scene again")
         self.act_clear_video.setEnabled(False)
@@ -461,7 +478,8 @@ class MainWindow(QtWidgets.QMainWindow):
         spacer.setStyleSheet("background: transparent;")
         tb.addWidget(spacer)
         tb.addSeparator()
-        tb.addAction("Save scenario", self.save_scenario).setToolTip("Ctrl+S: save the current settings as a scenario file")
+        self.act_save = tb.addAction("Save scenario", self.save_scenario)
+        self.act_save.setToolTip("Ctrl+S: save the current settings as a scenario file")
         tb.addAction("Screenshot", self.screenshot).setToolTip("Ctrl+P: save a PNG of this window into results/")
         tb.addAction("Results", self.open_results).setToolTip("Open the results folder")
         tb.addAction("Manual", self.open_manual).setToolTip("Open the user manual")
@@ -476,6 +494,11 @@ class MainWindow(QtWidgets.QMainWindow):
             "tracker": DataclassForm(self.cfg.tracker),
         }
         self.forms["disturbance"].widgets["atmosphere"].currentTextChanged.connect(self._preset_changed)
+        # disturbances changed while a run is going reach it after a short pause (LIVE_DEBOUNCE_MS)
+        self._live_timer = QtCore.QTimer(self); self._live_timer.setSingleShot(True); self._live_timer.setInterval(LIVE_DEBOUNCE_MS)
+        self._live_timer.timeout.connect(self._push_live_disturbance)
+        for key in LIVE_SECTIONS:
+            self.forms[key].changed.connect(self._live_edited)
         run_w = QtWidgets.QWidget(); rl = QtWidgets.QFormLayout(run_w); rl.setContentsMargins(0, 0, 0, 0); rl.setVerticalSpacing(6); rl.setHorizontalSpacing(10)
         rl.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.ed_name = QtWidgets.QLineEdit(self.cfg.name)
@@ -867,12 +890,45 @@ class MainWindow(QtWidgets.QMainWindow):
     def _set_running(self, r: bool):
         self.act_start.setEnabled(not r); self.act_pause.setEnabled(r); self.act_step.setEnabled(r); self.act_stop.setEnabled(r)
         self.cmb_scn.setEnabled(not r); self.act_pause.setText("Pause")
+        # during a run only the live sections stay editable; everything else is fixed for the run
+        for key, form in self.forms.items():
+            form.setEnabled(not r or key in LIVE_SECTIONS)
+        for w in (self.ed_name, self.sp_seed, self.chk_random, self.sp_dur, self.sp_extra,
+                  self.chk_identical, self.cmb_edit, self.chk_desig, self.target_box):
+            w.setEnabled(not r)
+        for a in (self.act_open, self.act_save):
+            a.setEnabled(not r)
+        if not r and not self.video_path:
+            self._sync_desig_box()              # the designated target's own box stays unclickable
+        if self.video_path:
+            self._set_video_mode(True)          # a video run has no live disturbances (they are in the file)
+        self.act_clear_video.setEnabled(bool(self.video_path) and not r)
+        self.act_truth.setEnabled(bool(self.video_path) and not r)
+
+    # ------------------------------------------------------------- live disturbances
+    def _live_edited(self):
+        if self.worker is not None and self.sim is not None and self.sim.accepts_disturbance_changes:
+            self._live_timer.start()
+
+    def _push_live_disturbance(self):
+        if self.worker is None or self.sim is None:
+            return
+        if self.sim.request_disturbance(self.forms["disturbance"].values()):
+            self.lbl_status.setText(status_text("changing"))
+
+    def _mark_change(self, t: float):
+        for pw in (self.p_err, self.p_cmd):
+            self._change_lines.append((pw, pw.addLine(x=t, pen=pg.mkPen(C["signal"], width=1, style=Qt.PenStyle.DotLine))))
 
     # ------------------------------------------------------------- data flow
     def _buf_reset(self):
         self.b_t, self.b_terr, self.b_cerr, self.b_pan, self.b_tilt, self.b_proc, self.b_mode, self.b_lock = ([] for _ in range(8))
         self._acq_t = None
         self.live = LiveTiles()
+        self._segment = 0
+        for pw, ln in getattr(self, "_change_lines", []):
+            pw.removeItem(ln)
+        self._change_lines = []
 
     @QtCore.pyqtSlot(object)
     def on_step(self, res: StepResult):
@@ -882,6 +938,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.b_mode.append(MODES.index(r.mode)); self.b_lock.append(r.locked)
         self._last_res = res
         self.live.push(r)
+        if r.segment != self._segment:          # a disturbance change took effect on this frame
+            self._segment = r.segment
+            ch = self.sim.changes[r.segment - 1] if len(self.sim.changes) >= r.segment else None
+            self.lbl_status.setText(status_text("changed", t=r.t_sim, what=ch["what"] if ch else ""))
+            self._mark_change(r.t_sim)
         now = time.perf_counter()
         if now - self._last_draw < 1 / 30:
             return
@@ -952,11 +1013,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------- files
     def save_scenario(self):
+        if self.thread is not None:        # reading the panel writes into the running configuration
+            return
         p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save scenario", str(SCENARIO_DIR / "custom.yaml"), "YAML (*.yaml)")
         if p:
             self.read_cfg().save(p); self.lbl_status.setText(f"Saved {p}"); self._fill_scenarios()
 
     def open_video(self):
+        if self.thread is not None:
+            return
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open video for Benchmark 2", "", "Video (*.mp4 *.avi *.mov *.mkv)")
         if p:
             self.video_path = p; self.ed_name.setText(Path(p).stem); self.video_truth = ""; self.designation_cue = ""

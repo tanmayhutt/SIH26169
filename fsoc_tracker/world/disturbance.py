@@ -56,13 +56,60 @@ class DisturbanceModel:
         self._gauss_bank = None
         self._sp_bank = None
         if cfg.gaussian_sigma > 0 or cfg.poisson:
-            self._gauss_bank = rng.standard_normal((4, self.h, self.w)).astype(np.float32)
+            self._gauss_bank = self._gauss_planes()
         if cfg.salt_pepper_frac > 0:
-            u = rng.random((4, self.h, self.w), dtype=np.float32)
-            self._sp_bank = np.zeros((4, self.h, self.w), np.int8)
-            half = cfg.salt_pepper_frac / 2
-            self._sp_bank[u < half] = -1
-            self._sp_bank[u > 1 - half] = 1
+            self._sp_bank = self._sp_planes(cfg.salt_pepper_frac)
+        # platform offset of the last frame, and a settling offset after a change mid-run
+        self._last_platform = (0.0, 0.0)
+        self._settle: tuple[float, float, float, float] | None = None   # (dx, dy, t0, duration)
+
+    def _gauss_planes(self) -> np.ndarray:
+        return self.rng.standard_normal((4, self.h, self.w)).astype(np.float32)
+
+    def _sp_planes(self, frac: float) -> np.ndarray:
+        u = self.rng.random((4, self.h, self.w), dtype=np.float32)
+        bank = np.zeros((4, self.h, self.w), np.int8)
+        half = frac / 2
+        bank[u < half] = -1
+        bank[u > 1 - half] = 1
+        return bank
+
+    # ------------------------------------------------------------- changes mid-run
+    def update(self, new: DisturbanceConfig) -> None:
+        """Switch to new disturbance settings between two frames (a change during the run).
+
+        Noise, atmosphere, turbulence and jitter take effect on the next frame. The platform
+        cannot teleport: the picture stays where the old pattern left it and the difference to
+        the new pattern is blended out with a cosine. The blend moves at most a quarter of the
+        larger of the old and new peak speeds (at least 2 px per frame, so switching the sway off
+        returns the picture to rest over a few seconds), so while it settles the picture moves at
+        most 1.25 times the larger peak speed (2 px per frame above it when both are slow), and
+        never jumps."""
+        old = self.cfg
+        self.cfg = new
+        if (new.gaussian_sigma > 0 or new.poisson) and self._gauss_bank is None:
+            self._gauss_bank = self._gauss_planes()
+        if new.salt_pepper_frac != old.salt_pepper_frac:
+            self._sp_bank = self._sp_planes(new.salt_pepper_frac) if new.salt_pepper_frac > 0 else None
+        motion = lambda c: (c.platform_motion, c.platform_px_frame, c.platform_period_s)
+        if motion(new) == motion(old):
+            return
+        ox, oy = self._last_platform
+        active = new.platform_motion != "none" and new.platform_px_frame > 0
+        if active and new.platform_motion == "random":
+            # the walk continues from where the picture is (inside its own bound)
+            self._rand_walk = np.clip(np.array([ox, oy]), -0.15 * self.w, 0.15 * self.w)
+            nx, ny = float(self._rand_walk[0]), float(self._rand_walk[1])
+        else:
+            nx, ny = self._pattern(new, self.t) if active else (0.0, 0.0)
+        bx, by = ox - nx, oy - ny
+        dist = math.hypot(bx, by)
+        if dist < 1e-6:
+            self._settle = None
+            return
+        speed = lambda c: c.platform_px_frame if (c.platform_motion != "none" and c.platform_px_frame > 0) else 0.0
+        v_px_s = max(0.25 * max(speed(old), speed(new)), 2.0) / self.dt
+        self._settle = (bx, by, self.t, max(1.0, dist * math.pi / (2 * v_px_s)))
 
     # ------------------------------------------------------------- per frame
     def step(self) -> FrameDisturbance:
@@ -84,6 +131,16 @@ class DisturbanceModel:
         # 4. platform motion
         if c.platform_motion != "none" and c.platform_px_frame > 0:
             d.platform_dx, d.platform_dy = self._platform()
+        if self._settle is not None:
+            bx, by, t0, span = self._settle
+            s = (self.t - t0) / span
+            if s >= 1.0:
+                self._settle = None
+            else:
+                k = 0.5 * (1.0 + math.cos(math.pi * s))
+                d.platform_dx += bx * k
+                d.platform_dy += by * k
+        self._last_platform = (d.platform_dx, d.platform_dy)
         # 5. jitter
         if c.jitter_px > 0:
             d.jitter_dx = float(self.rng.uniform(-c.jitter_px, c.jitter_px))
@@ -92,10 +149,22 @@ class DisturbanceModel:
 
     def _platform(self) -> tuple[float, float]:
         c = self.cfg
+        p = self._pattern(c, self.t)
+        if p is not None:
+            return p
+        v = c.platform_px_frame
+        # random: bounded smooth walk
+        self._rand_vel = 0.9 * self._rand_vel + 0.1 * v * self.rng.standard_normal(2)
+        sp = np.linalg.norm(self._rand_vel)
+        if sp > v:
+            self._rand_vel *= v / sp
+        self._rand_walk = np.clip(self._rand_walk + self._rand_vel, -0.15 * self.w, 0.15 * self.w)
+        return float(self._rand_walk[0]), float(self._rand_walk[1])
+
+    def _pattern(self, c: DisturbanceConfig, t: float) -> tuple[float, float] | None:
+        """Offset of a patterned sway at time t; None for the random walk (it has state)."""
         v = c.platform_px_frame              # peak px per frame
-        f = 1.0 / self.dt                    # frames per second
         w = 2 * math.pi / c.platform_period_s
-        t = self.t
         # A sustained shift of v px/frame would leave the screen in seconds, so every
         # pattern is a bounded sway: amplitude limited to 20% of the screen, and the
         # angular frequency raised if needed so that the PEAK speed is exactly v px/frame.
@@ -118,13 +187,7 @@ class DisturbanceModel:
         if c.platform_motion == "spiral":
             r = amp * (0.2 + 0.8 * ((t / (3 * c.platform_period_s)) % 1.0))
             return r * math.cos(w * t), r * math.sin(w * t)
-        # random: bounded smooth walk
-        self._rand_vel = 0.9 * self._rand_vel + 0.1 * v * self.rng.standard_normal(2)
-        sp = np.linalg.norm(self._rand_vel)
-        if sp > v:
-            self._rand_vel *= v / sp
-        self._rand_walk = np.clip(self._rand_walk + self._rand_vel, -0.15 * self.w, 0.15 * self.w)
-        return float(self._rand_walk[0]), float(self._rand_walk[1])
+        return None
 
     # ------------------------------------------------------------- imaging
     def apply_image(self, img: np.ndarray, beacon_boxes: list[tuple[int, int, int, int]], d: FrameDisturbance) -> np.ndarray:

@@ -2,8 +2,10 @@
 CLI and the tests all execute exactly the same code path."""
 from __future__ import annotations
 
+import copy
 import json
 import math
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +19,7 @@ from ..control.tracker import Mode, Tracker, TrackOutput
 from ..perception.egomotion import EgoMotion
 from ..world.camera import Gimbal, RateCommand
 from .checks import check_config
-from .config import RunConfig, parse_xy
+from .config import RunConfig, ScheduledChange, apply_disturbance_changes, describe_disturbance_change, disturbance_diff, parse_xy
 from .metrics import Summary, summarise
 from .sources import Frame, SyntheticSource, VideoSource, make_source
 from .naming import label_from_dir, output_paths
@@ -72,6 +74,56 @@ class Simulation:
         self.t_start = None
         self.summary: Summary | None = None
         self.last_cmd = RateCommand()
+        # disturbance changes during the run: the scenario's schedule plus requests made live
+        self._scheduled = [(math.ceil(c.t_s / self.dt - 1e-6), c) for c in cfg.schedule]
+        self._live: list[dict] = []
+        self._live_lock = threading.Lock()
+        self._live_log: list[ScheduledChange] = []
+        self.changes: list[dict] = []        # every change applied: frame, time, what changed, before/after
+        self.segment = 0                     # frames after the n-th change belong to segment n
+        if isinstance(self.source, SyntheticSource):
+            self.source.before_frame = self._apply_due
+
+    # ------------------------------------------------------ changes during the run
+    @property
+    def accepts_disturbance_changes(self) -> bool:
+        """Disturbances can change live on the simulator only; a video already contains its own."""
+        return isinstance(self.source, SyntheticSource)
+
+    def request_disturbance(self, changes: dict) -> bool:
+        """Ask for new disturbance settings from another thread (the GUI, the web server). They
+        take effect before the next frame is drawn and are recorded in the saved scenario."""
+        if not self.accepts_disturbance_changes:
+            return False
+        with self._live_lock:
+            self._live.append(dict(changes))
+        return True
+
+    def _apply_due(self, i: int, t: float) -> None:
+        due = [c.disturbance for k, c in self._scheduled if k == i]
+        with self._live_lock:
+            live, self._live = self._live, []
+        for changes, is_live in [(c, False) for c in due] + [(c, True) for c in live]:
+            model = self.source.world.disturbance
+            before = model.cfg
+            after = apply_disturbance_changes(before, changes)
+            diff = disturbance_diff(before, after)
+            if not diff:
+                continue
+            model.update(after)
+            self.segment += 1
+            self.changes.append({"segment": self.segment, "frame": i, "t_s": t, "live": is_live, "changes": diff,
+                                 "what": describe_disturbance_change(before, after),
+                                 "before": copy.deepcopy(before), "after": copy.deepcopy(after)})
+            if is_live:
+                self._live_log.append(ScheduledChange(t, diff))
+
+    def effective_config(self) -> RunConfig:
+        """The configuration that replays this run exactly: the starting settings with the live
+        changes added to the schedule at the frames they took effect on."""
+        cfg = copy.deepcopy(self.cfg)
+        cfg.schedule = sorted(cfg.schedule + copy.deepcopy(self._live_log), key=lambda c: c.t_s)
+        return cfg
 
     # ------------------------------------------------------------------ run
     def steps(self) -> Iterator[StepResult]:
@@ -108,13 +160,14 @@ class Simulation:
     def finish(self) -> Summary:
         wall = time.perf_counter() - (self.t_start or time.perf_counter())
         self.telemetry.close()
-        self.summary = summarise(self.telemetry.records, self.cfg.camera.ifov_deg, wall)
+        self.summary = summarise(self.telemetry.records, self.cfg.camera.ifov_deg, wall, self.changes)
         self.summary.designation = self.designation_info()
         self.summary.checks = self.checks
         if self.out_dir is not None:
+            cfg = self.effective_config()
             with open(self.files["summary"], "w", encoding="utf-8") as f:
-                json.dump({"config": self.cfg.to_dict(), **self.summary.to_dict()}, f, indent=2)
-            self.cfg.save(self.files["scenario"])
+                json.dump({"config": cfg.to_dict(), **self.summary.to_dict()}, f, indent=2)
+            cfg.save(self.files["scenario"])
         return self.summary
 
     def designation_info(self) -> dict:
@@ -171,5 +224,5 @@ class Simulation:
             vel_x=out.velocity[0], vel_y=out.velocity[1], uncertainty_px=out.uncertainty_px,
             p_cv=out.model_probs[0], p_ca=out.model_probs[1], p_ct=out.model_probs[2], ego_dx=ego_dx, ego_dy=ego_dy,
             true_x=tx, true_y=ty, true_visible=vis, in_window=inwin, tracking_err_px=terr, tracking_err_deg=terr_deg, tracking_err_stab_px=terr_stab,
-            centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy,
+            centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy, segment=self.segment,
         )

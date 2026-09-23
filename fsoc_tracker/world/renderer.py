@@ -1,6 +1,7 @@
 """Draws the scene picture the tracker observes and records the ground truth for it."""
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 
 import cv2
@@ -37,7 +38,9 @@ class World:
         self.h, self.w = self.background.shape
         self.targets = [Target(tc, self.w, self.h, self.rng, i) for i, tc in enumerate(cfg.targets)]
         self.gimbal = Gimbal(cfg.camera, self.w, self.h)
-        self.disturbance = DisturbanceModel(cfg.disturbance, (self.h, self.w), self.rng, self.dt)
+        # the model works on its own copy: changes during the run (Simulation.request_disturbance)
+        # must not alter the run's configuration, which is saved as the scenario it started from
+        self.disturbance = DisturbanceModel(copy.deepcopy(cfg.disturbance), (self.h, self.w), self.rng, self.dt)
         self._sprites: dict[tuple, np.ndarray] = {}
 
     # ---------------------------------------------------------------- sprite
