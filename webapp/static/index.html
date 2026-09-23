@@ -6,8 +6,8 @@
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-<title>FSOC Tracker</title>
-<meta name="description" content="FSOC Tracker for SIH26169: the same program as the desktop application, running on the server.">
+<title>ARGUS</title>
+<meta name="description" content="ARGUS for SIH26169: the same program as the desktop application, running on the server.">
 <style>
   /* Same palette, sizes and layout as the desktop application (fsoc_tracker/gui/theme.py). */
   :root { --ground:#0B1116; --surface:#111A21; --raised:#18242D; --sunken:#070C10; --ink:#E3ECF1; --ink2:#BCCCD5; --muted:#8DA1AD; --faint:#61737E;
@@ -139,7 +139,7 @@
 <dialog id="dlg"><div class="dlg">
   <h2 id="dlg-title">Desktop application</h2>
   <p id="dlg-intro" style="display:none">This project is delivered as a standalone desktop application, as the problem statement asks. Download it for your computer below, or continue in the browser: this page is the same program running on the server, with nothing to install.</p>
-  <p>The standalone executable: every parameter, real-time pacing on your own machine, keyboard control and the user manual built in. No installation and no Python. Extract the archive to a folder you can write to and run <code>FSOC-Tracker</code>.</p>
+  <p>The standalone executable: every parameter, real-time pacing on your own machine, keyboard control and the user manual built in. No installation and no Python. Extract the archive to a folder you can write to and run <code>ARGUS</code>.</p>
   <div class="rec" id="rec"></div>
   <ul id="dl-all"></ul>
   <div class="steps" id="dl-steps"></div>
@@ -420,10 +420,10 @@ async function resultsDialog() {
 
 // ------------------------------------------------------------------ desktop download offer (web only)
 const BUILDS = [
-  { key: "windows", name: "Windows 10 or 11, 64-bit", file: "FSOC-Tracker-windows-x64.zip", run: "extract, run FSOC-Tracker.exe (FSOC-Tracker-cli.exe for the terminal)" },
-  { key: "linux", name: "Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora", file: "FSOC-Tracker-linux-x64.tar.gz", run: "tar xzf, then ./FSOC-Tracker/FSOC-Tracker" },
-  { key: "mac-arm", name: "macOS 13 or newer, Apple silicon (M1 and later)", file: "FSOC-Tracker-macos-arm64.zip", run: "extract, run FSOC-Tracker" },
-  { key: "mac-intel", name: "macOS 13 or newer, Intel", file: "FSOC-Tracker-macos-intel.zip", run: "extract, run FSOC-Tracker" },
+  { key: "windows", name: "Windows 10 or 11, 64-bit", file: "ARGUS-windows-x64.zip", run: "extract, run ARGUS.exe (ARGUS-cli.exe for the terminal)" },
+  { key: "linux", name: "Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora", file: "ARGUS-linux-x64.tar.gz", run: "tar xzf, then ./ARGUS/ARGUS" },
+  { key: "mac-arm", name: "macOS 13 or newer, Apple silicon (M1 and later)", file: "ARGUS-macos-arm64.zip", run: "extract, run ARGUS" },
+  { key: "mac-intel", name: "macOS 13 or newer, Intel", file: "ARGUS-macos-intel.zip", run: "extract, run ARGUS" },
 ];
 function detectPlatform() {
   const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
@@ -454,7 +454,7 @@ function openDownloads(welcome) {
 async function init() {
   U = await (await fetch("api/ui")).json();
   META = await (await fetch("api/scenarios")).json();
-  document.title = "FSOC Tracker  v" + U.version + "  SIH26169";
+  document.title = "ARGUS  v" + U.version + "  SIH26169";
   buildPanel(); buildTiles(); showTiles(blankTiles()); fillForm(META.defaults); lockForVideo(false);
   $("scn").innerHTML = `<option value="">Custom (edit the panel)</option>` + META.scenarios.map(x => `<option value="${x.name}">${x.label}</option>`).join("");
   $("scn").addEventListener("change", () => { const x = META.scenarios.find(y => y.name === $("scn").value); if (x) { fillForm(x.config); setStatus("Loaded configs/scenarios/" + x.name + ".yaml. Press Start."); } });
@@ -464,7 +464,7 @@ async function init() {
   $("open").onclick = () => $("file").click(); $("file").onchange = () => { if ($("file").files[0]) upload($("file").files[0]); $("file").value = ""; };
   $("sim").onclick = clearVideo; $("save").onclick = saveScenario; $("shot").onclick = screenshot; $("results").onclick = resultsDialog;
   $("manual").onclick = () => window.open("/downloads/USER_MANUAL.pdf", "_blank");
-  $("about").onclick = () => message("About FSOC Tracker", U.about);
+  $("about").onclick = () => message("About ARGUS", U.about);
   $("dl").onclick = () => openDownloads(false);
   $("dlg-close").onclick = () => { $("dlg").close(); if ($("dlg-skip").checked) { try { localStorage.setItem("fsoc.skipWelcome", "1"); } catch (e) {} } };
   $("dlg").addEventListener("click", e => { if (e.target === $("dlg")) $("dlg").close(); });

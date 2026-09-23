@@ -1,7 +1,9 @@
-# FSOC Tracker (LAKSHYA)
+# ARGUS
 
-Team Blank Point. The submission name of the project is **LAKSHYA**; the software and its builds are
-called FSOC Tracker.
+Team Blank Point. **ARGUS** (Acquire, Recognise, Guide, Update, Stabilise) is the name of the
+project, the desktop application, the web app and the builds. The project was earlier called
+LAKSHYA and the software FSOC Tracker; the Python package and the `fsoc-tracker` command keep
+their original names.
 
 AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
 Communication (FSOC) terminals. Smart India Hackathon problem statement **SIH26169**,
@@ -41,8 +43,8 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/python -m pytest
 ```
 
-Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/FSOC-Tracker/`.
-Run `FSOC-Tracker` inside it (no Python needed). With arguments it acts as the command line tool.
+Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/ARGUS/`.
+Run `ARGUS` inside it (no Python needed). With arguments it acts as the command line tool.
 `.github/workflows/build.yml` builds it for Windows x64, Linux x64, macOS Intel and macOS Apple
 silicon, running the tests and a packaged smoke test on each; `bash webapp/fetch_builds.sh` pulls
 the archives into `dist/` for deployment.

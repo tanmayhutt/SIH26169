@@ -51,7 +51,7 @@ RUNS = ROOT / "results" / "web"
 UPLOADS = ROOT / "results" / "uploads"
 RUNS.mkdir(parents=True, exist_ok=True); UPLOADS.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="FSOC Tracker web", version=__version__)
+app = FastAPI(title="ARGUS web", version=__version__)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
