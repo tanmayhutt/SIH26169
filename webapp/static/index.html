@@ -152,6 +152,7 @@ const COL = { accent: "#52C4DE", signal: "#E08D4C", good: "#5CBE93", muted: "#8D
 const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
 const UI = getComputedStyle(document.documentElement).getPropertyValue("--ui");
 let U = null, META = null, RUN_ID = null, WS = null, VIDEO = null, WATCHING = false, PAUSED = false, LAST = null, LIM = 5, TOTAL = 1;
+let SEGMENT = 0, CHANGES = [], LIVE_TIMER = null;   // disturbance changes during the run: segment seen, change times
 const B = { t: [], terr: [], cerr: [], pan: [], tilt: [], proc: [], mode: [] };
 const TRAIL = { truth: [], win: [], cam: [] };
 const sceneImg = new Image(), camImg = new Image();
@@ -180,6 +181,9 @@ function buildPanel() {
   }
   $("side").innerHTML = h;
   $("disturbance.atmosphere").addEventListener("change", e => { const p = U.presets[e.target.value]; if (p) for (const k in p) { const el = $("disturbance." + k); if (el) el.value = fmtNum(el, p[k]); } });
+  for (const key of U.live_sections) for (const f of U.sections.find(x => x.key === key).fields) {
+    const el = $(key + "." + f.name); el.addEventListener("change", liveEdited); if (f.kind !== "choice" && f.kind !== "bool") el.addEventListener("input", liveEdited);
+  }
 }
 const fmtNum = (el, v) => el.dataset.dec !== undefined ? Number(v).toFixed(Number(el.dataset.dec)) : v;
 function fillForm(cfg) {
@@ -197,6 +201,30 @@ function readForm() {
       ov[s.key][f.name] = f.kind === "bool" ? el.checked : (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value; } }
   return ov;
 }
+function readSection(key) {
+  const s = U.sections.find(x => x.key === key), out = {};
+  for (const f of s.fields) { const el = $(key + "." + f.name); out[f.name] = f.kind === "bool" ? el.checked : (f.kind === "int" || f.kind === "float") ? Number(el.value) : el.value; }
+  return out;
+}
+// while a run is going only the live sections stay editable (the same rule as the desktop app)
+function lockForRun(on) {
+  const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
+  for (const s of U.sections) if (!U.live_sections.includes(s.key)) for (const f of s.fields) set(s.key + "." + f.name, on);
+  for (const id of ["name", "seed", "rnd", "duration", "extra"]) set(id, on);
+  for (const id of ["open", "sim", "save"]) { const el = $(id); if (el) el.disabled = on || (id === "sim" && !VIDEO); }
+  if (!on) lockForVideo(!!VIDEO);
+}
+function liveEdited() {
+  if (!RUN_ID || WATCHING || VIDEO) return;           // only the page that started a simulator run changes it
+  clearTimeout(LIVE_TIMER);
+  LIVE_TIMER = setTimeout(async () => {
+    if (!RUN_ID) return;
+    try {
+      const r = await fetch("api/disturb/" + RUN_ID, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disturbance: readSection("disturbance") }) });
+      const j = await r.json(); setStatus(r.ok ? j.status : (j.detail || "Could not change the disturbances."));
+    } catch (e) { setStatus("Server not reachable."); }
+  }, U.live_debounce_ms);
+}
 function lockForVideo(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const [key, names] of Object.entries(U.video_locked)) {
@@ -212,7 +240,7 @@ function buildTiles() { $("tiles").innerHTML = U.tiles.map(([k, t, u]) => `<div 
 function showTiles(T) { for (const k in T) { const d = T[k]; $("t-" + k).textContent = d.text; $("t-" + k).className = "v " + (d.state || ""); $("u-" + k).textContent = d.unit ?? ""; } }
 function blankTiles() { const T = {}; for (const [k, , u] of U.tiles) T[k] = { text: "–", state: null, unit: u }; return T; }
 const setStatus = t => $("status").textContent = t;
-function setRunning(r) { $("start").disabled = r; $("pause").disabled = !r; $("step").disabled = !r; $("stop").disabled = !r; $("scn").disabled = r; $("pause").textContent = "Pause"; PAUSED = false; }
+function setRunning(r) { $("start").disabled = r; $("pause").disabled = !r; $("step").disabled = !r; $("stop").disabled = !r; $("scn").disabled = r; $("pause").textContent = "Pause"; PAUSED = false; lockForRun(r); }
 
 // ------------------------------------------------------------------ drawing helpers
 function fit(c) { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
@@ -286,7 +314,7 @@ function showVideoPreview(info) {
 }
 
 // plots, as the desktop pyqtgraph panels: title with colour keys, grid, dashed limits
-function plot(id, title, keys, series, dashed, yr, modeAxis) {
+function plot(id, title, keys, series, dashed, yr, modeAxis, marks) {
   const [x, W, H] = fit($(id)); x.fillStyle = COL.surface; x.fillRect(0, 0, W, H);
   const L = modeAxis ? 72 : 40, R = 8, T = 26, Bm = 30, pw = W - L - R, ph = H - T - Bm;
   let tx = text(x, 22, 17, title, COL.ink2, `12px ${UI}`, W) + 14;
@@ -302,6 +330,7 @@ function plot(id, title, keys, series, dashed, yr, modeAxis) {
   x.fillStyle = COL.faint; x.fillText("time (s)", L + pw / 2, H - 4); x.textAlign = "left";
   x.save(); x.beginPath(); x.rect(L, T, pw, ph); x.clip();
   for (const d of dashed) { x.strokeStyle = d[1]; x.setLineDash([6, 5]); x.beginPath(); x.moveTo(L, Y(d[0])); x.lineTo(L + pw, Y(d[0])); x.stroke(); x.setLineDash([]); }
+  for (const tc of (marks || [])) if (tc >= t0 && tc <= t1) { x.strokeStyle = COL.signal; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(X(tc), T); x.lineTo(X(tc), T + ph); x.stroke(); x.setLineDash([]); }
   for (const [ys, c] of series) { x.strokeStyle = c; x.lineWidth = modeAxis ? 1.4 : 1.2; x.beginPath(); let on = false; const v = ys.slice(-600);
     for (let i = 0; i < v.length; i++) { if (v[i] === null || !isFinite(v[i])) { on = false; continue; } const px = X(ts[i]), py = Y(v[i]);
       if (!on) { x.moveTo(px, py); on = true; } else if (modeAxis) { x.lineTo(px, Y(v[i - 1])); x.lineTo(px, py); } else x.lineTo(px, py); } x.stroke(); }
@@ -309,15 +338,15 @@ function plot(id, title, keys, series, dashed, yr, modeAxis) {
 }
 function drawPlots() {
   const running = B.t.length > 0;
-  plot("p-err", "Error (px)", [[COL.accent, "tracking"], [COL.signal, "centroiding"]], [[B.terr, COL.accent], [B.cerr, COL.signal]], [[10, COL.faint]], running ? [null, 40] : [0, 40]);
-  plot("p-cmd", "Gimbal rate (deg/s)", [[COL.accent, "pan"], [COL.signal, "tilt"]], [[B.pan, COL.accent], [B.tilt, COL.signal]], [[LIM, COL.faint], [-LIM, COL.faint]], running ? [-1.5 * LIM, 1.5 * LIM] : [-8, 8]);
+  plot("p-err", "Error (px)", [[COL.accent, "tracking"], [COL.signal, "centroiding"]], [[B.terr, COL.accent], [B.cerr, COL.signal]], [[10, COL.faint]], running ? [null, 40] : [0, 40], false, CHANGES);
+  plot("p-cmd", "Gimbal rate (deg/s)", [[COL.accent, "pan"], [COL.signal, "tilt"]], [[B.pan, COL.accent], [B.tilt, COL.signal]], [[LIM, COL.faint], [-LIM, COL.faint]], running ? [-1.5 * LIM, 1.5 * LIM] : [-8, 8], false, CHANGES);
   plot("p-proc", "Processing time per frame (ms)", [[COL.signal, "50 ms = 20 FPS budget"]], [[B.proc, COL.ink]], [[50, COL.signal]], running ? [null, 60] : [0, 60]);
   plot("p-mode", "Tracker state", [], [[B.mode, COL.accent]], [], [-0.3, 4.3], true);
 }
 
 // ------------------------------------------------------------------ run control
 function resetRun() {
-  for (const k in B) B[k] = []; TRAIL.truth = []; TRAIL.win = []; TRAIL.cam = []; LAST = null;
+  for (const k in B) B[k] = []; TRAIL.truth = []; TRAIL.win = []; TRAIL.cam = []; LAST = null; SEGMENT = 0; CHANGES = []; clearTimeout(LIVE_TIMER);
   $("v-scene").classList.remove("live"); $("v-cam").classList.remove("live"); $("cam-idle").textContent = "The camera window appears here.";
   $("scene").getContext("2d").clearRect(0, 0, 1e4, 1e4); $("cam").getContext("2d").clearRect(0, 0, 1e4, 1e4);
   $("bar").style.width = "0"; drawPlots();
@@ -349,6 +378,7 @@ function onMsg(m) {
   if (m.true && m.true[0] !== null) TRAIL.truth.push([m.true[0], m.true[1]]);
   TRAIL.win.push([m.win[0] + m.win[2] / 2, m.win[1] + m.win[3] / 2]);
   LIM = m.lim || LIM; TOTAL = m.total || TOTAL;
+  if (m.segment && m.segment !== SEGMENT && m.change) { SEGMENT = m.segment; CHANGES.push(m.change.t); setStatus(m.change.status); }
   $("bar").style.width = Math.min(100, 100 * m.frame / TOTAL) + "%";
   if (m.scene) {
     LAST = m; $("v-scene").classList.add("live"); $("v-cam").classList.add("live");
@@ -471,7 +501,7 @@ async function init() {
   document.addEventListener("keydown", e => {
     if (document.querySelector("dialog[open]")) return;
     const typing = ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName), k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
-    if (mod && k === "s") { e.preventDefault(); saveScenario(); } else if (mod && k === "p") { e.preventDefault(); screenshot(); } else if (mod && k === "o") { e.preventDefault(); $("file").click(); }
+    if (mod && k === "s") { e.preventDefault(); saveScenario(); } else if (mod && k === "p") { e.preventDefault(); screenshot(); } else if (mod && k === "o") { e.preventDefault(); if (!RUN_ID) $("file").click(); }
     else if (typing) return; else if (e.code === "Space") { e.preventDefault(); RUN_ID ? pause() : start(); } else if (k === "n") step(); else if (e.key === "Escape") stop();
   });
   window.addEventListener("resize", () => { if (LAST) { drawScene(); drawCam(); } else if (VIDEO) showVideoPreview(VIDEO); drawPlots(); });

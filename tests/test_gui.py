@@ -86,3 +86,42 @@ def test_loaded_scenario_runs_with_its_own_seed_and_heading(window):
     window.chk_random.setChecked(True)               # the user can still ask for a fresh run
     fresh = window.read_cfg()
     assert (fresh.seed, fresh.targets[0].heading_deg) != (1, 25.0)
+
+
+def test_disturbances_change_live_during_a_desktop_run(window, tmp_path):
+    """PS 'shall': introduce disturbances in the virtual camera feed. During a run only the
+    Disturbances section is editable; a change reaches the running simulation, is marked, and is
+    saved in the run's scenario so it replays."""
+    import time
+    from fsoc_tracker.engine.config import RunConfig
+    window.headless = True
+    window.chk_random.setChecked(False)
+    window.sp_dur.setValue(6)
+    window.cmb_speed.setCurrentIndex(len(window.cmb_speed) - 1)          # Max speed
+    window.cfg.output_dir = str(tmp_path)
+    window.start()
+    app = QtWidgets.QApplication.instance()
+
+    def wait(cond, seconds):
+        t0 = time.time()
+        while not cond() and time.time() - t0 < seconds:
+            app.processEvents(); time.sleep(0.01)
+        return cond()
+
+    assert wait(lambda: window.sim is not None and window.sim.telemetry.records, 30)
+    assert window.forms["disturbance"].isEnabled()
+    assert not window.forms["camera"].isEnabled() and not window.forms["target"].isEnabled()
+    assert not window.sp_dur.isEnabled() and not window.act_save.isEnabled()
+    window.forms["disturbance"].widgets["atmosphere"].setCurrentText("fog")
+    window.forms["disturbance"].widgets["jitter_px"].setValue(6)
+    assert wait(lambda: window.sim.changes, 10), "the change did not reach the run"
+    sim = window.sim
+    assert wait(lambda: window.thread is None, 60), "run did not finish"
+    ch = sim.changes[0]["changes"]
+    assert ch["atmosphere"] == "fog" and ch["jitter_px"] == 6 and ch["contrast"] == pytest.approx(0.40)
+    assert window.lbl_status.text().startswith("Finished")
+    assert sim.summary.segments and sim.summary.segments[-1]["segment"] >= 1
+    saved = RunConfig.load(sim.files["scenario"])
+    assert saved.disturbance.atmosphere == "clear" and saved.schedule and saved.schedule[0].disturbance["atmosphere"] == "fog"
+    assert window.forms["camera"].isEnabled() and window.sp_dur.isEnabled()      # unlocked after the run
+    assert not window.act_clear_video.isEnabled()                                   # still no video loaded
