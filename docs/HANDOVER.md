@@ -408,5 +408,8 @@ frames over processing time, the turn-limited lead, the coasting guard, a vector
 Benchmark 2 ground truth, independent noise planes, the Near the limit note and fast_circular.
 That evening the new PS audit (`tools/ps_audit.py`) found the derivative limit cycle on a still
 beacon and the figure-8 sway above 20 px per frame; both were fixed, the faint path got its refit
-and width guards (seed 7), and the deck was renamed ARGUS.
+and width guards (seed 7), and the deck was renamed ARGUS. That night the target controls were
+redone as one picker and one Designated tick box with an automatic designation mode, and, with
+the free Actions minutes gone (macOS minutes cost 10x), the workflow was cut to Windows and Linux
+by hand while `tools/build_macos.sh` builds both macOS archives locally (Intel through Rosetta).
 The full commit history is in git.
