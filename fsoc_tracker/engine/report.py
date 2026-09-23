@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import platform
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import numpy as np
 
 from .. import __version__
 from .config import RunConfig
-from .metrics import DEFINITIONS, SPEC, Summary
+from .metrics import DEFINITIONS, SEGMENT_DEFINITION, SPEC, Summary
 from .telemetry import Record
 
 INK, MUTED, ACCENT, SIGNAL, GOOD, LINE = "#101B23", "#61747F", "#0B6E87", "#A8460F", "#2B6B50", "#D3DCE1"
@@ -44,6 +45,8 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             f"motion {cfg.targets[0].motion if cfg.targets else '-'}, atmosphere {cfg.disturbance.atmosphere}, "
             f"platform {cfg.disturbance.platform_motion} {cfg.disturbance.platform_px_frame:g} px/f, jitter {cfg.disturbance.jitter_px:g} px, "
             f"S&P {cfg.disturbance.salt_pepper_frac:g}, gauss {cfg.disturbance.gaussian_sigma:g}"))
+        if summary.segments:
+            src += f"   Disturbances changed {len(summary.segments) - 1} times during the run (page 2)."
         fig.text(0.07, 0.905, src, fontsize=7.5, color=MUTED, wrap=True)
         fig.text(0.07, 0.878, f"Camera {cfg.camera.width}x{cfg.camera.height}, FOV {cfg.camera.fov_w_deg:g}x{cfg.camera.fov_h_deg:g} deg, "
                  f"IFOV {cfg.camera.ifov_deg*3600:.1f} arcsec/px, max rate {cfg.camera.max_pan_rate_deg_s:g}/{cfg.camera.max_tilt_rate_deg_s:g} deg/s, "
@@ -69,8 +72,11 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             notes.append(f"Gimbal at its rate limit in {sat:.0f}% of frames: the target moved faster than the camera can turn at {cfg.camera.max_pan_rate_deg_s:g} deg/s "
                          f"({cfg.camera.max_pan_rate_deg_s / cfg.camera.ifov_deg / cfg.camera.update_rate_hz:.0f} px per frame). Raise the rate limit (PS allows 5 to 10 deg/s) or widen the FOV.")
         stab = summary.values.get("tracking_err_stab_mean_px")
-        if cfg.disturbance.jitter_px > 0 and stab is not None and summary.truth_available:
-            notes.append(f"Camera vibration of +/- {cfg.disturbance.jitter_px:g} px per frame shifts the whole picture at random every frame. No controller can "
+        # the strongest vibration of the run: disturbances may have changed while it ran
+        jit = [abs(v) for r in records for v in (r.jitter_dx, r.jitter_dy) if math.isfinite(v)]
+        jmax = max(jit) if jit else 0.0
+        if jmax > 0 and stab is not None and summary.truth_available:
+            notes.append(f"Camera vibration of up to +/- {jmax:.0f} px per frame shifts the whole picture at random every frame. No controller can "
                          f"anticipate a random jump before the frame arrives, so the raw tracking error carries it; with the vibration removed the pointing error is "
                          f"{stab:.1f} px, which is the part the gimbal can physically follow.")
         cnn = summary.values.get("cnn_frames_pct", 0.0)
@@ -89,6 +95,11 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             if y < 0.06:
                 break
         pdf.savefig(fig); plt.close(fig)
+
+        # ------------------------------------------ disturbance changes (only if there were any)
+        if summary.segments:
+            _segments_page(pdf, summary)
+        changes_at = [g["t_start_s"] for g in summary.segments[1:]]
 
         # ---------------------------------------------------------- page 2
         if records:
@@ -125,6 +136,10 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             ax.set_ylabel("ms / frame"); ax.set_xlabel("time (s)"); ax.set_title("Processing time (dashed: 20 FPS)", fontsize=10, loc="left")
             for ax in axes:
                 ax.grid(alpha=0.25); ax.spines[["top", "right"]].set_visible(False)
+                for tc in changes_at:                  # dotted: a change of the disturbances
+                    ax.axvline(tc, color=SIGNAL, ls=":", lw=1.0)
+            if changes_at:
+                axes[0].text(0.0, 1.13, "dotted lines: disturbances changed", transform=axes[0].transAxes, fontsize=7, color=SIGNAL)
             pdf.savefig(fig); plt.close(fig)
 
             # ------------------------------------------------------ page 3
@@ -155,3 +170,31 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
                 ax.grid(alpha=0.25); ax.spines[["top", "right"]].set_visible(False)
             pdf.savefig(fig); plt.close(fig)
     return path
+
+
+def _segments_page(pdf, summary: Summary) -> None:
+    """One row per disturbance setting of the run: when, what changed, and how the tracker did."""
+    fig = plt.figure(figsize=(8.27, 11.69))
+    fig.patch.set_facecolor("white")
+    fig.text(0.07, 0.955, "Disturbance changes during the run", fontsize=15, weight="bold", color=INK)
+    fig.text(0.07, 0.93, "\n".join(textwrap.wrap(SEGMENT_DEFINITION, 125)), fontsize=7.2, color=MUTED, va="top")
+    cols = [(0.07, "segment"), (0.18, "time (s)"), (0.33, "tracking err"), (0.47, "vib. removed"), (0.61, "centroid"), (0.74, "lock"), (0.86, "FPS")]
+    y = 0.875
+    for x, h in cols:
+        fig.text(x, y, h, fontsize=8, weight="bold", color=INK)
+    y -= 0.022
+    f = lambda v, fmt: "n/a" if v is None else fmt.format(v)
+    for g in summary.segments:
+        row = [str(g["segment"]), f"{g['t_start_s']:.1f} - {g['t_end_s']:.1f}", f(g["tracking_err_mean_px"], "{:.1f} px"),
+               f(g["tracking_err_stab_mean_px"], "{:.1f} px"), f(g["centroid_err_mean_px"], "{:.3f} px"),
+               f(g["lock_retention_pct"], "{:.1f} %"), f(g["fps_mean"], "{:.0f}")]
+        for (x, _), text in zip(cols, row):
+            fig.text(x, y, text, fontsize=8.5, color=INK)
+        lines = textwrap.wrap(g["change"], 118) or [""]
+        for j, ln in enumerate(lines):
+            fig.text(0.18, y - 0.016 - 0.0125 * j, ln, fontsize=7, color=MUTED if g["segment"] == 0 else SIGNAL)
+        y -= 0.016 + 0.0125 * len(lines) + 0.014
+        if y < 0.06:
+            fig.text(0.07, y, "(more segments in the summary JSON)", fontsize=7, color=MUTED)
+            break
+    pdf.savefig(fig); plt.close(fig)
