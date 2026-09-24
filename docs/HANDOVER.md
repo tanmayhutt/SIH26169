@@ -376,7 +376,27 @@ files downloaded instead of opened.
 - PyInstaller symlinks: the launcher creates relative links (or copies on Windows) to the bundled
   data folders on first start; stale links from another machine are repaired.
 
-## 13. What is left, and who
+## 13. Taking over
+
+From 2026-09-24 the project is run by a teammate; the original owner's machine holds nothing the
+repository does not, except the server key and the site login. To take over:
+
+1. Access from the previous owner: collaborator rights on `tanmayhutt/SIH26169` (given), your SSH
+   public key on the server (`ubuntu@15.206.247.203`), the site login, and `gh auth login` on
+   your machine for the publish script.
+2. Clone, set up (section 3), run `python -m pytest`, `python tools/ps_audit.py` and
+   `python tools/record_check.py`. All three must be clean before you change anything.
+3. Builds. GitHub Actions on the main repository is stopped until an Actions budget is set or the
+   free minutes reset (macOS minutes cost 10x and used them up on 2026-09-23). Two ways round it:
+   run the "Build desktop application" workflow on your own fork (a fork has its own free minutes;
+   enable workflows on the fork first) and publish with
+   `REPO_SLUG=<your-user>/SIH26169 bash webapp/publish_builds.sh`; or set a small budget on the
+   main repository (a Windows plus Linux run is about 100 minutes). The macOS archives need an
+   Apple silicon Mac: `bash tools/build_macos.sh`.
+4. Every change: the rules in `CLAUDE.md` (the record, the regression batch, one interface
+   definition, commit identity). Start a Claude session inside the repository and it reads them.
+
+## 13a. What is left, and who
 
 | Item | Owner | How |
 |---|---|---|
