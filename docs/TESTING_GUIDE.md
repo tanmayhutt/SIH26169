@@ -241,15 +241,16 @@ Differences that come from the server:
 
 - Views update about 15 times a second; plots, log and report cover every frame.
 - One run at a time per server; a second visitor sees the run in progress and can watch it.
-- The address carries `#run=<id>` while a run is active; anyone with the link can watch.
+- The address carries `#run=<id>` while a run is active; anyone with the link can watch, but only the page that started the run can pause, step, stop or change it.
 - Results lists the runs on the server with their files; nothing opens on your disk.
 - Desktop app, top right: the archive for the visitor's platform, with install notes.
 
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 57 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances)
+python -m pytest                       # 111 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances, robustness review, verify, handoff, baseline)
 python tools/ps_audit.py               # every PS item measured by running the code; writes docs/PS_AUDIT.md; 39 of 39 pass, exit 1 on a failure
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
+fsoc-tracker verify results/<run folder>   # a run's summary rebuilt from its frames.csv; exit 1 on any difference
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

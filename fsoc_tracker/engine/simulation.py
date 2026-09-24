@@ -52,18 +52,23 @@ class Simulation:
             self.gimbal = self.source.world.gimbal
         else:
             self.gimbal = Gimbal(cfg.camera, self.w, self.h)
-        self.tracker = Tracker(cfg, self.dt, (self.h, self.w))
+        baseline = cfg.tracker.algorithm == "baseline"       # the comparison tracker (control/baseline.py)
+        if baseline:
+            from ..control.baseline import BaselineController, BaselineTracker
+        self.tracker = (BaselineTracker if baseline else Tracker)(cfg, self.dt, (self.h, self.w))
         # designation cue: where the designated beacon starts (simulator), or a point the user
         # gave (a click on the scene or on a video's first frame)
         mode = cfg.resolved_designation()
         if mode == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
-            t = self.source.world.targets[self.di]
-            self.tracker.set_cue(t.x0, t.y0)
+            # where the beacon really is at t = 0: for circular, figure-8 and spiral paths x0, y0 is
+            # the path's centre, for waypoints the first waypoint; state(0) draws no random number
+            s0 = self.source.world.targets[self.di].state(0.0)
+            self.tracker.set_cue(s0.x, s0.y)
         elif mode == "cue":
             xy = parse_xy(cfg.designation_cue)
             if xy is not None:
                 self.tracker.set_cue(*xy)
-        self.controller = Controller(cfg.tracker, self.gimbal, self.dt)
+        self.controller = (BaselineController if baseline else Controller)(cfg.tracker, self.gimbal, self.dt)
         self.ego = EgoMotion()
         self.out_dir = out_dir
         self.label = label_from_dir(out_dir, cfg) if out_dir is not None else None
@@ -81,6 +86,7 @@ class Simulation:
         self._live_log: list[ScheduledChange] = []
         self.changes: list[dict] = []        # every change applied: frame, time, what changed, before/after
         self.segment = 0                     # frames after the n-th change belong to segment n
+        self._handoff_frames = 0             # consecutive frames locked and within the handoff radius
         if isinstance(self.source, SyntheticSource):
             self.source.before_frame = self._apply_due
 
@@ -103,20 +109,26 @@ class Simulation:
         due = [c.disturbance for k, c in self._scheduled if k == i]
         with self._live_lock:
             live, self._live = self._live, []
+        model = self.source.world.disturbance
+        first = copy.deepcopy(model.cfg)
+        any_live = False
         for changes, is_live in [(c, False) for c in due] + [(c, True) for c in live]:
-            model = self.source.world.disturbance
             before = model.cfg
             after = apply_disturbance_changes(before, changes)
             diff = disturbance_diff(before, after)
             if not diff:
                 continue
             model.update(after)
-            self.segment += 1
-            self.changes.append({"segment": self.segment, "frame": i, "t_s": t, "live": is_live, "changes": diff,
-                                 "what": describe_disturbance_change(before, after),
-                                 "before": copy.deepcopy(before), "after": copy.deepcopy(after)})
+            any_live = any_live or is_live
             if is_live:
-                self._live_log.append(ScheduledChange(t, diff))
+                self._live_log.append(ScheduledChange(t, diff))   # each request on its own: replays in order
+        # every change landing on this frame starts one segment, described by their combined effect
+        total = disturbance_diff(first, model.cfg)
+        if total:
+            self.segment += 1
+            self.changes.append({"segment": self.segment, "frame": i, "t_s": t, "live": any_live, "changes": total,
+                                 "what": describe_disturbance_change(first, model.cfg),
+                                 "before": first, "after": copy.deepcopy(model.cfg)})
 
     def effective_config(self) -> RunConfig:
         """The configuration that replays this run exactly: the starting settings with the live
@@ -193,7 +205,13 @@ class Simulation:
         inwin = 0
         terr = terr_deg = terr_stab = cerr = nan
         pdx = pdy = jdx = jdy = nan
-        if frame.truth is not None and frame.truth.beacons:
+        if frame.truth is not None and frame.truth.interpolated:
+            # a video truth frame filled in between two listed rows: it tells whether the beacon
+            # was in the window (for lock), but no error is scored against it
+            ix, iy = frame.truth.beacons[0]
+            vis = 1
+            inwin = int(x0 <= ix < x0 + w and y0 <= iy < y0 + h)
+        elif frame.truth is not None and frame.truth.beacons:
             tx, ty = frame.truth.beacons[self.di]
             vis = int(frame.truth.visible[self.di])
             inwin = int(x0 <= tx < x0 + w and y0 <= ty < y0 + h)
@@ -214,6 +232,11 @@ class Simulation:
         # lock: tracking, and the tracker's own estimate is held near the boresight
         captured = out.estimate is not None and math.hypot(est[0] - wcx, est[1] - wcy) <= self.cfg.tracker.capture_radius_px
         locked = int(out.locked and captured and (inwin or frame.truth is None))
+        # handoff to fine pointing: judged from the tracker's own estimate, so a video has it too
+        tc = self.cfg.tracker
+        near = out.estimate is not None and math.hypot(est[0] - wcx, est[1] - wcy) <= tc.handoff_radius_px
+        self._handoff_frames = self._handoff_frames + 1 if (locked and near) else 0
+        handoff = int(self._handoff_frames * self.dt >= tc.handoff_hold_s - 1e-9 and self._handoff_frames > 0)
         return Record(
             frame=frame.idx, t_sim=frame.t, t_wall=time.perf_counter() - self.t_start, proc_ms=proc_ms,
             fps_inst=1000.0 / max(proc_ms, 1e-3), mode=out.mode.value, locked=locked,
@@ -224,5 +247,5 @@ class Simulation:
             vel_x=out.velocity[0], vel_y=out.velocity[1], uncertainty_px=out.uncertainty_px,
             p_cv=out.model_probs[0], p_ca=out.model_probs[1], p_ct=out.model_probs[2], ego_dx=ego_dx, ego_dy=ego_dy,
             true_x=tx, true_y=ty, true_visible=vis, in_window=inwin, tracking_err_px=terr, tracking_err_deg=terr_deg, tracking_err_stab_px=terr_stab,
-            centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy, segment=self.segment,
+            centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy, segment=self.segment, handoff=handoff,
         )

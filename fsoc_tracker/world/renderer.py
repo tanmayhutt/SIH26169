@@ -22,6 +22,7 @@ class Truth:
     visible: list[bool] = field(default_factory=list)
     disturbance: FrameDisturbance = field(default_factory=FrameDisturbance)
     window: tuple[int, int, int, int] = (0, 0, 0, 0)                   # x0, y0, w, h
+    interpolated: bool = False    # video truth filled between two listed frames: visibility only, not scored
 
 
 class World:

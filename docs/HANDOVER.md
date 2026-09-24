@@ -32,6 +32,8 @@ work is preparation for the event (section 13).
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
 12. `docs/submission/ARGUS_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
+13. `docs/DEMO_NARRATION.md`: the spoken script for the optional 3 to 5 minute demo video, with the source of every number.
+14. `docs/submission/WHOLE_SCENE_SLIDE.md`: a slide and a 30-second answer on why the tracker watches the whole scene.
 13. `docs/history/CHAT_LOG.md`: every teammate's Claude Code conversation in one file, one block
     per person and session, from the first day on. `python tools/chat_history.py sync` appends
     your own sessions (from `~/.claude/projects/<project>/` on your machine) and lists what others
@@ -71,7 +73,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 57 tests
+.venv/bin/python -m pytest                      # 111 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -101,7 +103,10 @@ fsoc-tracker-gui                                                                
 uvicorn webapp.server:app --host 127.0.0.1 --port 8095                              # web app locally
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
+fsoc-tracker verify results/<run folder> [...]        # recompute a run's metrics from its frames.csv, check its summary.json
+python tools/compare_trackers.py               # ARGUS against the simple baseline on the pack -> docs/BASELINE_COMPARISON.md
 python tools/record_check.py                   # commits that changed code without updating the record
+# (a commit written up in a later commit is listed, with that commit, in RECORDED_LATER in the tool)
 python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
 python tools/gui_screenshot.py results/shot full_stress   # desktop screenshots without a display
 python tools/make_demo_video.py                # regenerate the demo video (docs/demo/, not in git)
@@ -137,6 +142,7 @@ fsoc_tracker/
   perception/estimator.py  IMM filter: constant velocity, acceleration and turn models
   perception/egomotion.py  picture shift by phase correlation (a vibration hint)
   control/tracker.py     state machine SEARCH/VERIFY/TRACK/COAST/REACQUIRE, identity, faint path
+  control/baseline.py    a deliberately simple comparison tracker (tracker.algorithm: baseline), never the default
   control/controller.py  feed-forward plus PID pointing, spiral search in hard mode
   ui_shared.py           the interface definition both front ends draw from
   gui/app.py, theme.py   the PyQt6 desktop application
@@ -151,7 +157,7 @@ tests/                   test_engine.py, test_ps_compliance.py, test_targets.py,
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
 web/                     the progress page (index.html) and its data (progress.json)
-tools/                   compare_batches.py, ps_audit.py, gui_screenshot.py, make_demo_video.py
+tools/                   compare_batches.py, compare_trackers.py, ps_audit.py, gui_screenshot.py, make_demo_video.py
 .github/workflows/build.yml  four-platform build, tests and package check on each platform
 ```
 
@@ -262,7 +268,7 @@ Benchmark 2 ground truth: `video_truth` (`--truth`, the Truth CSV button on both
 `<video>_truth.csv` or `<video>.csv` beside the video, picked up by the command line and the
 desktop app) is a CSV of frame (or t in seconds), x, y in video pixels. Header names are matched
 loosely (frame/idx, t/time, x/true_x/cx, y/true_y/cy); without a header the columns are frame, x,
-y; frames not listed count as "beacon not visible". With it, tracking error, centroiding error,
+y; a row with a blank or NaN position says the beacon is not in the frame; a frame not listed is filled in when it lies in a gap of at most a third of a second between two visible rows (a file sampled every few frames; used only to judge lock, no error is scored on it), otherwise it counts as "beacon not visible". With it, tracking error, centroiding error,
 RMSE and a true lock retention are computed; without it, lock comes from the tracker's own
 estimate and can overstate. The report's source line names the file or says "no ground-truth
 file".
@@ -295,7 +301,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (57 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (111 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch
@@ -411,7 +417,7 @@ repository does not, except the server key and the site login. To take over:
 | Rebuild the Windows and Linux archives for the 2026-09-23 changes (the macOS ones are current): needs an Actions budget or the monthly reset, then the workflow and `publish_builds.sh` | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
-| Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |
+| Narrated screen recording, 3 to 5 min (optional) | team | record it while reading `docs/DEMO_NARRATION.md` |
 | Evaluators' scenarios and videos | at the event | copy `configs/scenarios/TEMPLATE_evaluator.yaml`; open videos directly |
 
 Proposed extras, none required by the PS: switching the designated target in the middle of a run
@@ -443,5 +449,11 @@ redone as one picker and one Designated tick box with an automatic designation m
 the free Actions minutes gone (macOS minutes cost 10x), the workflow was cut to Windows and Linux
 by hand while `tools/build_macos.sh` builds both macOS archives locally (Intel through Rosetta).
 Then disturbances were made changeable during a run (live in both apps, or a `schedule` in a
-scenario), replayed exactly from the saved scenario, with per-setting figures in the report.
+scenario), replayed exactly from the saved scenario, with per-setting figures in the report. On
+2026-09-24 a full review fixed: the start cue (it pointed at a circle's centre, not the beacon),
+the desktop click on a video's first frame (mapped with the simulator's geometry), video truth
+sampled every few frames (scored as lost lock), sprites drawn up to 0.8 px off their truth,
+non-finite and malformed values that crashed a run, the packaged launcher taking `2.5` for a
+path, `record_check` (it never flagged anything), front-end state after video mode, and web
+input that returned 500s; web runs are now controlled only by the page that started them.
 The full commit history is in git.

@@ -235,6 +235,9 @@ off: the picture moves on from where it was and settles into the new pattern wit
 the larger peak speed. Video runs (Benchmark 2) have no live disturbances; the video holds its own.
 
 ### Tracker
+- Tracker algorithm: argus (this project's tracker, the default) or baseline, a deliberately simple
+  brightest-spot tracker with proportional control kept only to compare against
+  (`docs/BASELINE_COMPARISON.md`). The scenario check says so when baseline is chosen.
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
 - Controller gains, deadband, capture radius, estimator lag, minimum confidence to acquire.
@@ -289,8 +292,11 @@ From the command line: `fsoc-tracker video path/to/file.mp4`
 
 If the evaluators give the true beacon positions, put them in a CSV: frame (or `t` in
 seconds), x, y in video pixels. Header names are matched loosely (`frame`/`idx`, `t`/`time`,
-`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. Frames not
-listed count as "beacon not visible". With it, tracking error, centroiding error, RMSE and a
+`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. A row with a
+blank or NaN position means the beacon is not in the frame. A frame not listed is filled in when it
+lies in a gap of at most a third of a second between two visible rows (a file sampled every few
+frames; it is used to judge lock, and no error is scored on it); otherwise it counts as "beacon not
+visible". With it, tracking error, centroiding error, RMSE and a
 true lock retention are computed against their positions.
 
 | How | Where |
@@ -332,6 +338,7 @@ Commands:
 fsoc-tracker run --scenario configs/scenarios/fog_circular.yaml [--seed 3] [--duration 20]
 fsoc-tracker video path/to/file.mp4 [--truth truth.csv]
 fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-49
+fsoc-tracker verify results/<run folder>   # recompute the metrics from frames.csv and check summary.json
 fsoc-tracker gui
 ```
 
@@ -390,6 +397,16 @@ With `--out <folder>` on the command line the folder is yours; the files inside 
 labelled. Batch runs write `results/batch/<time>/<scenario>_seed<N>/` with labelled files and
 an `envelope.md` table. The web app names its downloads the same way.
 
+Every figure in `<label>_summary.json` can be checked against the log: `fsoc-tracker verify <run folder>`
+rebuilds the metrics from `<label>_frames.csv` alone, with the same code that made them, and lists any
+value that differs (exit code 1). The end-of-run summary names the command.
+
+**Handoff to fine pointing.** The problem statement's coarse stage works "before fine pointing
+mechanism can take over". The state tile and the camera view say *handoff ready* once the tracker
+is locked and its estimate has stayed within the handoff radius (default 10 px, the PS row 17 limit)
+of the window centre for the hold time (default 1 s); both are in the Tracker section. The report
+gives the time it was first ready and the share of the run it held; the CSV has a `handoff` column.
+
 ## 8. Metric definitions
 
 | Metric | Definition |
@@ -403,6 +420,7 @@ an `envelope.md` table. The web app names its downloads the same way.
 | Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
 | FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
 | `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
+| Handoff ready | Locked, with the estimate within the handoff radius (10 px) of the window centre for the hold time (1 s): coarse alignment stable enough for fine pointing to take over. Reported as the first time and the share held after it. |
 | Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting

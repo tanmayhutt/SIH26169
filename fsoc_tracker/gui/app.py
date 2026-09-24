@@ -666,6 +666,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------- config
     def apply_cfg(self, cfg: RunConfig):
+        if self.video_path and not cfg.video:
+            self.clear_video()          # before the scenario's own designation cue is read below
         self.cfg = cfg
         self.edit_idx = 0
         self.forms["screen"].write(cfg.screen); self.forms["camera"].write(cfg.camera)
@@ -684,7 +686,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.forms["target"].read()
         seed = self.sp_seed.value()
         t0 = self.cfg.targets[0]
-        self.cfg.targets = extra_targets(t0, self.cfg.targets, self.sp_extra.value(), seed, self.chk_identical.isChecked())
+        self.cfg.targets = extra_targets(t0, self.cfg.targets, self.sp_extra.value(), seed, self.chk_identical.isChecked(),
+                                         getattr(self, "designated_idx", 0))
 
     def read_cfg(self, for_run: bool = True) -> RunConfig:
         cfg = self.cfg
@@ -700,7 +703,8 @@ class MainWindow(QtWidgets.QMainWindow):
             cfg.seed = self.sp_seed.value()
         cfg.designated = min(self.designated_idx, len(cfg.targets) - 1)
         cfg.designation = "cue" if (self.video_path and self.designation_cue) else self.designation_mode
-        cfg.designation_cue = self.designation_cue if self.video_path else ""
+        # a click on a video's first frame, or a scenario that designates by a cue point
+        cfg.designation_cue = self.designation_cue if (self.video_path or self.designation_mode == "cue") else ""
         cfg.video = self.video_path
         cfg.video_truth = self.video_truth if self.video_path else ""
         if cfg.video and for_run:
@@ -1002,6 +1006,7 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(str)
     def on_failed(self, tb: str):
         self._teardown()
+        self.lbl_status.setText("Run failed: " + (tb.strip().splitlines() or ["unknown error"])[-1][:160])
         QtWidgets.QMessageBox.critical(self, "Run failed", tb)
 
     def _teardown(self):
@@ -1017,7 +1022,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save scenario", str(SCENARIO_DIR / "custom.yaml"), "YAML (*.yaml)")
         if p:
-            self.read_cfg().save(p); self.lbl_status.setText(f"Saved {p}"); self._fill_scenarios()
+            self.read_cfg(for_run=False).save(p); self.lbl_status.setText(f"Saved {p}"); self._fill_scenarios()
 
     def open_video(self):
         if self.thread is not None:
@@ -1046,7 +1051,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.video_info = {"w": w, "h": h, "fps": fps, "frames": n, "seconds": info["seconds"], "rotation": info["rotation_deg"],
                            "variable": info["variable_rate"], "fps_ts": info["fps_timestamps"]}
         # calibrate the panel: the scene is the video, the clock is its frame rate
-        sc = self.forms["screen"].read(); sc.width, sc.height = w, h; self.forms["screen"].write(sc)
+        sc = self.forms["screen"].read()
+        if getattr(self, "_pre_video", None) is None:      # what the video replaces, restored by clear_video
+            self._pre_video = (sc.width, sc.height, self.forms["camera"].read().update_rate_hz)
+        sc.width, sc.height = w, h; self.forms["screen"].write(sc)
         cam = self.forms["camera"].read(); cam.update_rate_hz = float(fps); cam.width = min(cam.width, w); cam.height = min(cam.height, h); self.forms["camera"].write(cam)
         self._set_video_mode(True)
         gray = bgr if (sc.colour and bgr.ndim == 3) else (cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr)
@@ -1064,6 +1072,10 @@ class MainWindow(QtWidgets.QMainWindow):
         pnt.setPen(_pen(C["accent"], 2)); pnt.drawRect(int((w - cw) / 2 * s), int((h - ch) / 2 * s), int(cw * s), int(ch * s))
         pnt.end()
         self.scene_view.setPixmap(pm)
+        # a click on this picture is a point on the video (the cue), so map it with the video's
+        # own scale and size, not those of the last simulator preview
+        self.scene_view.remember_geometry(s, pm.width(), pm.height(), w, h)
+        self._preview_pos = None
         self.cam_view.setPixmap(QtGui.QPixmap())
         self.cam_view.setText("Press Start to run the tracker on this video")
         for t in self.tiles.values():
@@ -1087,6 +1099,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def clear_video(self):
         self.video_path = None; self.video_info = None; self.video_truth = ""
+        pre = getattr(self, "_pre_video", None)
+        if pre is not None:               # the screen size and rate the video's calibration replaced
+            sc = self.forms["screen"].read(); sc.width, sc.height = pre[0], pre[1]; self.forms["screen"].write(sc)
+            cam = self.forms["camera"].read(); cam.update_rate_hz = pre[2]; self.forms["camera"].write(cam)
+            self._pre_video = None
         self._set_video_mode(False)
         self._placeholders()
         for t in self.tiles.values():
@@ -1102,7 +1119,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 for w in (self.sp_extra, self.sp_dur, self.chk_identical, self.cmb_edit, self.chk_desig):
                     w.setEnabled(not on)
                 if on:
-                    self.cmb_edit.setCurrentIndex(0)
+                    # a video run looks for the designated target's appearance: edit that one
+                    self.cmb_edit.setCurrentIndex(min(self.designated_idx, self.cmb_edit.count() - 1))
                 else:
                     self.designation_cue = ""
                     self._sync_desig_box()

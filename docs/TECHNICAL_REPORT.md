@@ -42,7 +42,7 @@ that steers the camera, live statistics, and an automatically generated performa
 - Benchmark 2 replaces the simulated scene with the evaluators' .mp4. The tracker and
   camera control run unchanged on the video frames; the output is the per-frame centroid and
   the timing and lock metrics. Given the evaluators' positions as a truth CSV (frame or t, x,
-  y), tracking error, centroiding error, RMSE and a true lock retention are computed against
+  y; short gaps in a file sampled every few frames are filled in for lock only), tracking error, centroiding error, RMSE and a true lock retention are computed against
   them; without it lock is judged from the tracker's own estimate, which can overstate it.
 - Two error terms appear in the specification and are both logged: tracking error (true
   beacon to window centre) and centroiding error (measured centroid to true centroid).
@@ -340,6 +340,9 @@ jump: it settles into the new pattern within 1.25 times the larger peak speed.
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
   identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
   evaluator template.
+- Handoff to fine pointing: measured on 15 s runs, clear line 2.20 s (lock at 1.07 s), full PS noise 1.70 s, fog 2.43 s, all held 100%; faint beacon 3.37 s, held 37.8%; platform sway plus shake, the PS maximum and full stress never reach it (the estimate does not stay within 10 px).
+- Reproducible figures: `fsoc-tracker verify <run folder>` rebuilds every metric of a run from its
+  per-frame CSV alone and checks its summary JSON, so a reader can confirm the reported numbers.
 - Batch envelope: `fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-N`
   runs every scenario over N seeds and writes `envelope.md` with mean and worst values.
 - Every metric has a printed definition (section 8 of the user manual) so the numbers can be
@@ -431,6 +434,12 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
   gap-filling fallback; it supplied about half the measurements on a real 60 fps phone video
   and 0% in the standard scenarios, where the classical detector never loses the beacon.
 
+**Against a simple baseline.** To show what each part of the design adds, a deliberately simple
+tracker was run through the same simulator, gimbal and metrics (`tools/compare_trackers.py`, every
+scenario, seeds 0 to 2, 15 s; `docs/BASELINE_COMPARISON.md`): it takes the brightest spot and
+steers toward it with proportional control. Measured: ARGUS meets every PS limit in 33 of 48 runs, the baseline in 0 of 48; the baseline's tracking error is 27 to 40 px on clear skies against 2 to 6 px, it holds 1.6% lock among identical decoys and never acquires the faint beacon; it acquires faster on some clear skies (0.37 s against 1.03 s on the circle) because it has no confirmation step. The matched filter, the confirmation,
+the IMM lead, the gating and the identity signature each remove a failure the baseline shows.
+
 ## 9. Future improvements
 
 - Switching the designated target in the middle of a run (scored in segments), changing the
@@ -489,6 +498,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
 | Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
+| Handoff ready | Locked with the estimate within 10 px (row 17) of the window centre, held 1 s: the point where fine pointing could take over; first time and share held. |
 | Segment | When the disturbances change during a run, each setting is a segment; tracking, vibration-removed and centroiding error, lock, tracked rate and FPS are also given per segment. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 
@@ -498,6 +508,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 fsoc-tracker run   --scenario configs/scenarios/<name>.yaml [--seed N | -1] [--duration S] [--out DIR]
 fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--truth truth.csv] [--out DIR]
 fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--duration S] [--out DIR]
+fsoc-tracker verify results/<run folder>
 fsoc-tracker gui
 ```
 
