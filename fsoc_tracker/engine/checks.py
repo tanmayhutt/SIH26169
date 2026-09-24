@@ -87,6 +87,12 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
             nv = 30.0 if d_s != d_s else (hi if d_s == math.inf else lo if d_s == -math.inf else min(max(d_s, lo), hi))
             notes.append(_note("clamped", "duration_s", f"Duration {cfg.duration_s:g} s is outside {lo:g} to {hi:g} s; set to {nv:g}."))
             cfg.duration_s = nv
+        if cfg.tracker.algorithm not in ("argus", "baseline"):
+            notes.append(_note("clamped", "tracker.algorithm", f"Unknown tracker algorithm '{cfg.tracker.algorithm}', using argus."))
+            cfg.tracker.algorithm = "argus"
+        elif cfg.tracker.algorithm == "baseline":
+            notes.append(_note("beyond_ps", "tracker.algorithm", "Tracker algorithm baseline: a deliberately simple comparison tracker "
+                                                                 "(brightest spot, proportional control), not this project's tracker."))
         if cfg.designation not in DESIGNATIONS:
             notes.append(_note("clamped", "designation", f"Unknown designation '{cfg.designation}', using auto."))
             cfg.designation = "auto"

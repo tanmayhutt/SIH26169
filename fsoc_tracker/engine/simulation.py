@@ -52,7 +52,10 @@ class Simulation:
             self.gimbal = self.source.world.gimbal
         else:
             self.gimbal = Gimbal(cfg.camera, self.w, self.h)
-        self.tracker = Tracker(cfg, self.dt, (self.h, self.w))
+        baseline = cfg.tracker.algorithm == "baseline"       # the comparison tracker (control/baseline.py)
+        if baseline:
+            from ..control.baseline import BaselineController, BaselineTracker
+        self.tracker = (BaselineTracker if baseline else Tracker)(cfg, self.dt, (self.h, self.w))
         # designation cue: where the designated beacon starts (simulator), or a point the user
         # gave (a click on the scene or on a video's first frame)
         mode = cfg.resolved_designation()
@@ -65,7 +68,7 @@ class Simulation:
             xy = parse_xy(cfg.designation_cue)
             if xy is not None:
                 self.tracker.set_cue(*xy)
-        self.controller = Controller(cfg.tracker, self.gimbal, self.dt)
+        self.controller = (BaselineController if baseline else Controller)(cfg.tracker, self.gimbal, self.dt)
         self.ego = EgoMotion()
         self.out_dir = out_dir
         self.label = label_from_dir(out_dir, cfg) if out_dir is not None else None

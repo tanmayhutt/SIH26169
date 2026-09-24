@@ -98,6 +98,7 @@ class DisturbanceConfig:
 @dataclass
 class TrackerConfig:
     """Perception and control settings. Our design, not PS rows."""
+    algorithm: str = "argus"             # argus | baseline (a deliberately simple tracker, for comparison only)
     detector: str = "hybrid"             # classical | cnn | hybrid
     threshold_k: float = 4.0             # adaptive threshold = mean + k*std
     min_area_px: int = 6

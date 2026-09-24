@@ -434,6 +434,12 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
   gap-filling fallback; it supplied about half the measurements on a real 60 fps phone video
   and 0% in the standard scenarios, where the classical detector never loses the beacon.
 
+**Against a simple baseline.** To show what each part of the design adds, a deliberately simple
+tracker was run through the same simulator, gimbal and metrics (`tools/compare_trackers.py`, every
+scenario, seeds 0 to 2, 15 s; `docs/BASELINE_COMPARISON.md`): it takes the brightest spot and
+steers toward it with proportional control. Measured: ARGUS meets every PS limit in 33 of 48 runs, the baseline in 0 of 48; the baseline's tracking error is 27 to 40 px on clear skies against 2 to 6 px, it holds 1.6% lock among identical decoys and never acquires the faint beacon; it acquires faster on some clear skies (0.37 s against 1.03 s on the circle) because it has no confirmation step. The matched filter, the confirmation,
+the IMM lead, the gating and the identity signature each remove a failure the baseline shows.
+
 ## 9. Future improvements
 
 - Switching the designated target in the middle of a run (scored in segments), changing the

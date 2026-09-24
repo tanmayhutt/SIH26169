@@ -235,6 +235,9 @@ off: the picture moves on from where it was and settles into the new pattern wit
 the larger peak speed. Video runs (Benchmark 2) have no live disturbances; the video holds its own.
 
 ### Tracker
+- Tracker algorithm: argus (this project's tracker, the default) or baseline, a deliberately simple
+  brightest-spot tracker with proportional control kept only to compare against
+  (`docs/BASELINE_COMPARISON.md`). The scenario check says so when baseline is chosen.
 - Detector: hybrid (classical first, AI fills gaps), classical, cnn.
 - Use picture-shift estimate: phase correlation as a vibration hint.
 - Controller gains, deadband, capture radius, estimator lag, minimum confidence to acquire.

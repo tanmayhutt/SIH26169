@@ -71,7 +71,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 108 tests
+.venv/bin/python -m pytest                      # 111 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -102,6 +102,7 @@ uvicorn webapp.server:app --host 127.0.0.1 --port 8095                          
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
 fsoc-tracker verify results/<run folder> [...]        # recompute a run's metrics from its frames.csv, check its summary.json
+python tools/compare_trackers.py               # ARGUS against the simple baseline on the pack -> docs/BASELINE_COMPARISON.md
 python tools/record_check.py                   # commits that changed code without updating the record
 # (a commit written up in a later commit is listed, with that commit, in RECORDED_LATER in the tool)
 python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
@@ -139,6 +140,7 @@ fsoc_tracker/
   perception/estimator.py  IMM filter: constant velocity, acceleration and turn models
   perception/egomotion.py  picture shift by phase correlation (a vibration hint)
   control/tracker.py     state machine SEARCH/VERIFY/TRACK/COAST/REACQUIRE, identity, faint path
+  control/baseline.py    a deliberately simple comparison tracker (tracker.algorithm: baseline), never the default
   control/controller.py  feed-forward plus PID pointing, spiral search in hard mode
   ui_shared.py           the interface definition both front ends draw from
   gui/app.py, theme.py   the PyQt6 desktop application
@@ -153,7 +155,7 @@ tests/                   test_engine.py, test_ps_compliance.py, test_targets.py,
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
 web/                     the progress page (index.html) and its data (progress.json)
-tools/                   compare_batches.py, ps_audit.py, gui_screenshot.py, make_demo_video.py
+tools/                   compare_batches.py, compare_trackers.py, ps_audit.py, gui_screenshot.py, make_demo_video.py
 .github/workflows/build.yml  four-platform build, tests and package check on each platform
 ```
 
@@ -297,7 +299,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (108 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (111 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch

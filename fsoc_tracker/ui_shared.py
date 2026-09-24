@@ -29,6 +29,7 @@ CHOICES = {
     "atmosphere": list(ATMOSPHERE_PRESETS.keys()),
     "platform_motion": ["none", "linear", "circular", "random", "spiral", "figure8"],
     "detector": ["hybrid", "classical", "cnn"],
+    "algorithm": ["argus", "baseline"],
 }
 LABELS = {
     "width": "Width (px)", "height": "Height (px)", "fov_w_deg": "FOV width (deg)", "fov_h_deg": "FOV height (deg)",
@@ -42,7 +43,7 @@ LABELS = {
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
     "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
     "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
-    "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
+    "colour": "Colour camera", "detector": "Detector", "algorithm": "Tracker algorithm", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
     "capture_radius_px": "Capture radius (px)", "handoff_radius_px": "Handoff radius (px)", "handoff_hold_s": "Handoff hold (s)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
     "faint_snr_min": "Faint: min chain SNR", "faint_threshold_k": "Faint: threshold (sigma)",
@@ -79,6 +80,7 @@ TIPS = {
     "platform_motion": "PS row 25. Linear is mandatory. All patterns are bounded sways whose peak speed is the value below.",
     "platform_px_frame": "PS row 25. Peak speed of the platform sway, up to 20 px per frame.", "platform_period_s": "Period of circular, figure of 8 and spiral sways.",
     "background": "Scene background.", "background_level": "Mean sky brightness.", "star_density": "Stars per pixel in the starfield.",
+    "algorithm": "argus: this project's tracker. baseline: a deliberately simple brightest-spot tracker with proportional control, only to compare against (tools/compare_trackers.py).",
     "detector": "hybrid: classical first, CNN fills gaps. classical: never use the CNN. cnn: CNN whenever it is confident.",
     "ego_motion": "Use the frame-to-frame picture shift (phase correlation) as a hint for vibration level.",
     "threshold_k": "Detection threshold in sigmas above the local background.", "kp": "Proportional gain, deg/s per deg of error.",

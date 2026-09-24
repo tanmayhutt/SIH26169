@@ -104,6 +104,7 @@ cross-platform smoke test the build workflow runs.
 - `docs/TESTING_GUIDE.md`: how to exercise every input and configuration by hand, with expected outcomes.
 - `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 - `ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
+- `docs/BASELINE_COMPARISON.md`: ARGUS against a deliberately simple brightest-spot tracker on every scenario (`tools/compare_trackers.py`).
 
 ## Licence
 
