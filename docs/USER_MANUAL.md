@@ -213,6 +213,15 @@ clamped to its accepted range in the engine, for both applications, and the scen
 - Speed, Radius, Period, Heading: path parameters. Start: random, centre, or a typed `x,y` in
   screen pixels (for example `400,1500`).
 - Blink: optional intensity modulation in Hz. 0 is steady.
+- Beacon code and Code rate (beyond the PS): a pattern of 0 and 1 (3 to 32 bits, for example
+  `10110`) that the beacon blinks at the code rate (default 10 bits/s, at most half the update
+  rate); a 0 bit dims it to 70%. When the designated target has a code, the tracker accepts a spot
+  only after it has blinked the code for two cycles (1 s for 5 bits at 10 bits/s), turns down spots
+  that do not, and keeps checking while it tracks, so look-alikes are told apart with no start
+  position or click. The end-of-run summary and the report say how many spots it turned down.
+  Codes that differ only in where the cycle starts are the same code; the scenario check warns
+  when a look-alike blinks it. Leave it empty for a faint beacon: the dim bits make a beacon at
+  the detection limit harder to find. Empty is a steady beacon (the PS default).
 
 ### Disturbances (rows 21 to 25)
 - Salt and pepper in percent of pixels (10 = 10 percent; accepted 0 to 50; scenario files store
@@ -222,6 +231,10 @@ clamped to its accepted range in the engine, for both applications, and the scen
   brightness, blur and turbulence; each can then be edited.
 - Platform motion: none, linear, circular, random, spiral, figure8; speed in pixels per
   frame (up to 20) and period.
+- Camera effects beyond the PS table (the PS lists disturbances "... noise, etc."), both off by
+  default: **Exposure gain** (1 = normal; below 1 under-exposed, above 1 over-exposed with the
+  bright beacon clipped at white) and **Frame loss** (percent of frames the camera link loses; a
+  lost frame reaches the tracker with no picture, so it coasts). The scenario check notes both.
 
 **Changing disturbances during a run.** While a run is going, the Disturbances section stays
 editable and every other section is locked (the other settings are fixed for the run). Change
@@ -389,7 +402,7 @@ seed and time it belongs to:
 | File | Contents |
 |---|---|
 | `<label>_frames.csv` | One row per frame: time, state, detection, estimate, camera pose, commands, truth, errors, processing time, and `segment` (0 until the first disturbance change, then 1, 2, ...). |
-| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `designation` (followed target, index, mode, cue, all target names, ambiguous frames, redesignations) and `checks` (the scenario check notes).; `segments` (the figures of each disturbance setting, when they changed during the run). |
+| `<label>_summary.json` | All metrics with their definitions and pass/fail against the specification; `designation` (followed target, index, mode, cue, all target names, ambiguous frames, redesignations, beacon code and the spots it turned down) and `checks` (the scenario check notes).; `segments` (the figures of each disturbance setting, when they changed during the run). |
 | `<label>_report.pdf` | Specification check, the Targets and Followed lines, the scenario check notes and the metric table (continued on the next page when long); time series; paths, histograms and model probabilities. A run whose disturbances changed has one more page, a row per setting. |
 | `<label>_scenario.yaml` | The exact parameters used, including any disturbance changes as `schedule`, so the run can be repeated. |
 
@@ -421,6 +434,7 @@ gives the time it was first ready and the share of the run it held; the CSV has 
 | FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
 | `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
 | Handoff ready | Locked, with the estimate within the handoff radius (10 px) of the window centre for the hold time (1 s): coarse alignment stable enough for fine pointing to take over. Reported as the first time and the share held after it. |
+| Frames lost | Share of frames the camera link lost (frame loss setting). A lost frame breaks lock by definition, so the report adds **lock retention on the frames received** beside the usual lock figure. |
 | Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting

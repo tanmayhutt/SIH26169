@@ -66,6 +66,7 @@ Pick these from the Scenario box. Duration 15 s is enough for each.
 | hardmode_line | tracker sees only the window; must sweep | acquisition 2.83 to 11.97 s (spiral sweep), then error 2.6 to 3.7 px, 100% lock |
 | decoys_identical | Remote terminal plus three identical look-alikes starting apart, paths crossing; designation start (row 8) | error 3.3 to 3.5 px, 100% lock |
 | beacon_shapes | designated 8 x 18 px rectangle among a cross, ring, diamond and custom pattern; designation appearance (rows 9, 10) | error 2.6 to 3.1 px, 100% lock |
+| coded_beacon | the decoys_identical look-alikes with no cue; the beacon blinks the code 10110 (beyond the PS) | acquisition 0.97 to 1.87 s, error 1.9 to 2.3 px, on the beacon 100% of the locked time |
 | TEMPLATE_evaluator | every field labelled by PS row, PS defaults | behaves like clear line; copy it to enter evaluator values |
 
 Picking a scenario runs it exactly as written: its seed and paths are kept and "New seed each
@@ -106,6 +107,12 @@ Change one thing at a time from clear line, press Start, watch the tiles.
 - Click to designate: before Start, click a target on the preview; it becomes the designated one.
 - Video: click the beacon on the first frame; the status bar confirms the point and the tracker
   takes the spot nearest it.
+- Beacon code (beyond the PS): load coded_beacon. The designated beacon blinks 10110; watch it
+  flicker on the scene view. The tracker stays in VERIFY about a second while it reads the code;
+  a look-alike it tries first goes back to SEARCH within a third of a second. The end-of-run
+  dialog says how many spots the code turned down. Clear the code field and run again: by
+  appearance alone the camera ends on a look-alike on most seeds. Click a look-alike before
+  Start with the code set: the code rejects it and the beacon is found.
 
 ### Target (rows 7 to 12)
 - Name: appears on the scene view, the telemetry first line ("following <name>") and the report.
@@ -128,6 +135,10 @@ Change one thing at a time from clear line, press Start, watch the tiles.
   first target stays designated; the identity check re-designates if a decoy is followed.
 
 ### Disturbances (rows 21 to 25)
+- Exposure gain and Frame loss (%): camera effects beyond the PS table, off by default. Frame loss
+  10: the CSV's `frame_lost` column is set on about one frame in ten, those pictures are black, lock
+  drops to about 88% while the summary's lock on received frames stays near 100%. Exposure 4: the
+  beacon clips at white and the centroiding error rises a little.
 - Salt and pepper (%, 0 to 50): 10 is the PS "around 10%" (files store 0.10). At 30 the
   picture is mostly specks and the median filter still holds lock.
 - Gaussian sigma (grey levels): 20 is the PS maximum; 40 is beyond it and still tracks.
@@ -248,7 +259,7 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 111 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances, robustness review, verify, handoff, baseline)
+python -m pytest                       # 123 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances, robustness review, verify, handoff, baseline, camera effects, coded beacon)
 python tools/ps_audit.py               # every PS item measured by running the code; writes docs/PS_AUDIT.md; 39 of 39 pass, exit 1 on a failure
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
 fsoc-tracker verify results/<run folder>   # a run's summary rebuilt from its frames.csv; exit 1 on any difference

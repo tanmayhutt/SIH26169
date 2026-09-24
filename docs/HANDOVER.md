@@ -73,7 +73,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 111 tests
+.venv/bin/python -m pytest                      # 123 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -152,7 +152,7 @@ webapp/server.py         FastAPI web app over the same engine; static/index.html
 webapp/deploy.sh         deploy repository, web app, site and Caddy config to the server
 webapp/publish_builds.sh publish a build run's archives on the site
 webapp/fetch_builds.sh   download a build run's archives into dist/ (slow on home connections)
-configs/scenarios/       16 scenarios plus TEMPLATE_evaluator.yaml
+configs/scenarios/       17 scenarios plus TEMPLATE_evaluator.yaml
 tests/                   test_engine.py, test_ps_compliance.py, test_targets.py, test_review_fixes.py, package_check.py
 training/                train_heatmap.py, finetune_from_video.py (the neural detector)
 models/beacon_heatmap.onnx   the shipped detector, 0.3 MB
@@ -229,6 +229,23 @@ tools/                   compare_batches.py, compare_trackers.py, ps_audit.py, g
   cue; after a loss the last estimate becomes the cue. In appearance mode the tracker counts
   ambiguous frames (another spot scored within 0.15). Tracking every beacon at once was dropped:
   the PS metrics are for one target and one camera.
+- Coded beacon (beyond the PS, off by default): a target's `code` (for example `10110`) and
+  `code_rate_hz` (default 10 bits/s) make it blink that pattern, a 0 bit dimming it to 70 percent
+  (`CODE_LOW`). When the designated target has a code, VERIFY lasts until the spot has shown two
+  code cycles (1 s for 5 bits at 10 bits/s) and accepts it only when the spot's brightness (core
+  mean above the ring median, sampled at the estimate when a dim bit is missed) correlates with the
+  code at 0.6 or better at the best phase, the 0 bits at least 12 percent dimmer; a spot plainly
+  steady after the shortest stretch that must hold a 0 and a 1 (9 frames for 10110) is turned
+  down at once. A rejected spot is followed through the search for 3 s and not picked again. In
+  TRACK the check keeps running; two failures half a window apart hand the spot back to SEARCH.
+  The appearance audit and the ambiguous-frame count are off for a coded beacon (the code is the
+  identity). Codes equal up to where the cycle starts are the same code (the beacon's clock is not
+  known); the scenario check says so. Not applied on the faint path (see section 11).
+  A 0 bit at 45 percent was tried first: in low light the dim bits fell below the detection
+  threshold, the track flickered between TRACK and COAST and slipped onto noise (lowlight_figure8
+  40 percent lock), and dropping brightness from the appearance signature to allow it let noise
+  clumps in at the screen edge (noisy_line 76 percent). At 70 percent with the full signature
+  both hold 100 percent.
 - While searching, candidates are re-measured on the current frame. Before 2026-09-23 they were
   re-measured on the last tracked frame (after a loss) or on no picture at all (a crash with
   50 percent salt and pepper). The regression batch is unchanged by the fix.
@@ -257,7 +274,8 @@ tools/                   compare_batches.py, compare_trackers.py, ps_audit.py, g
 
 ### 6.4 Disturbances
 
-Applied in physical order (extinction, blur, picture shift, detector noise). Platform motion is a
+Applied in physical order (extinction, blur, picture shift, exposure gain, detector noise, frame loss; the last two camera
+effects are beyond the PS table and off by default, and a lost frame reaches the tracker as a black picture). Platform motion is a
 bounded sway (amplitude at most 20 percent of the screen) with the configured peak speed; a
 sustained 20 px per frame shift would leave the screen in seconds. The figure-8 sway is scaled so
 its peak equals the setting: it is fastest at its crossing, sqrt(2) times the circle speed, and
@@ -301,7 +319,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (111 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (123 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch
@@ -374,6 +392,12 @@ files downloaded instead of opened.
 - Look-alikes that start at the same point as the designated beacon cannot be told apart at the
   start. Even with the start cue these runs failed (lock 8 to 25 percent). Look-alikes that start
   apart pass with the start cue (`decoys_identical`, 5 of 5 seeds).
+- A coded beacon costs acquisition time: it is confirmed after two code cycles, 0.97 s on every
+  clear scenario against 0.60 to 1.17 s steady. On the faint path (3 to 6 sigma) one frame cannot
+  show a bit, so the code is not checked there, and the dim bits break the frame-to-frame chains
+  that find the beacon: lowlight_faint seed 0, 15 s, acquisition 12.2 s and 63.1 percent lock
+  against 1.40 s and 97.8 percent steady. Do not code a beacon at the faint limit. A beacon
+  clipped at white (exposure above about 1.2 at intensity 235) shows no 0 bits and fails the code.
 
 ## 12. Pitfalls we hit, so you do not
 
@@ -424,7 +448,7 @@ Proposed extras, none required by the PS: switching the designated target in the
 (it would be scored in segments); changing the scenario live during a run; manual camera control;
 Benchmark 2 comparison against the evaluators'
 predefined centroids in their own file format (a truth CSV is already read); a Monte Carlo envelope over thousands of seeds on a large cloud machine;
-blink-coded beacon identification; physically based turbulence; concurrent web runs. Tracking
+physically based turbulence; concurrent web runs. Tracking
 every beacon at once was dropped as not required.
 
 ## 14. History in one paragraph
@@ -456,4 +480,7 @@ sampled every few frames (scored as lost lock), sprites drawn up to 0.8 px off t
 non-finite and malformed values that crashed a run, the packaged launcher taking `2.5` for a
 path, `record_check` (it never flagged anything), front-end state after video mode, and web
 input that returned 500s; web runs are now controlled only by the page that started them.
+Then camera exposure and frame loss were added as disturbances, and a coded beacon: the
+designated beacon blinks a bit pattern and look-alikes are told apart by it, with no start
+position or click.
 The full commit history is in git.

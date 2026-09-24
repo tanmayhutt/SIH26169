@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..engine.config import TargetConfig
+from ..engine.config import CODE_LOW, TargetConfig, parse_code
 
 
 @dataclass
@@ -49,6 +49,7 @@ class Target:
         self._t_prev = 0.0
         self._last = TargetState(self.x0, self.y0, 0.0, 0.0, cfg.intensity)
         self._poly = self._parse_waypoints(cfg.waypoints) if cfg.motion == "waypoints" else None
+        self._code = parse_code(cfg.code) if cfg.code else None
 
     def _parse_waypoints(self, text: str) -> list[tuple[float, float]]:
         pts = []
@@ -127,6 +128,8 @@ class Target:
         inten = c.intensity
         if c.blink_hz > 0:
             inten = c.intensity * (0.55 + 0.45 * (0.5 + 0.5 * math.sin(2 * math.pi * c.blink_hz * t)))
+        if self._code and not self._code[int(t * c.code_rate_hz + 1e-9) % len(self._code)]:
+            inten *= CODE_LOW
         vis = 0 <= x < self.w and 0 <= y < self.h
         self._last = TargetState(x, y, vx, vy, inten, vis)
         return self._last

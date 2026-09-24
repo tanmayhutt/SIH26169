@@ -62,6 +62,10 @@ class TargetConfig:
     start: str = "random"            # random | centre | "x,y"
     heading_deg: float = 30.0        # line, sinusoidal
     blink_hz: float = 0.0            # 0 = steady; >0 modulates intensity (optional realism)
+    # a coded beacon: it blinks a known bit pattern (bit 0 dims it to CODE_LOW, it stays visible),
+    # so the tracker can tell it from look-alikes by the code alone. Empty = a steady beacon (the PS default)
+    code: str = ""                   # e.g. "10110"
+    code_rate_hz: float = 10.0       # bits per second; a bit must last at least two camera frames
     waypoints: str = ""              # user-defined path for motion "waypoints": "x,y; x,y; ..." in screen px, looped at speed_px_s
 
     def __post_init__(self):
@@ -93,6 +97,10 @@ class DisturbanceConfig:
     platform_motion: str = "none"        # none | linear | circular | random | spiral | figure8
     platform_px_frame: float = 0.0       # peak pixels per frame, up to 20
     platform_period_s: float = 20.0
+    # camera effects: the PS lists disturbances "due to atmospheric turbulence, platform vibrations,
+    # camera motion, noise, etc." in the camera feed; these two are the camera's own
+    exposure_gain: float = 1.0           # exposure/gain: scales the light before the sensor noise, clips at 255
+    frame_drop_frac: float = 0.0         # share of frames the camera link loses (they arrive with no picture)
 
 
 @dataclass
@@ -234,6 +242,25 @@ def target_name(t: TargetConfig, i: int) -> str:
     return (t.name or "").strip() or f"Target {i + 1}"
 
 
+CODE_LOW = 0.7        # brightness of a coded beacon during a 0 bit, as a share of its peak
+
+
+def parse_code(text: str) -> list[int] | None:
+    """A beacon code as bits: "10110" -> [1, 0, 1, 1, 0]; None unless it is 3 to 32 zeros and ones
+    with at least one of each (a code of all ones is a steady beacon)."""
+    t = "".join(str(text or "").split())
+    if not (3 <= len(t) <= 32) or set(t) - {"0", "1"} or len(set(t)) < 2:
+        return None
+    return [int(ch) for ch in t]
+
+
+def same_code(a: str, b: str) -> bool:
+    """Two codes a tracker cannot tell apart: equal up to where the cycle starts (the beacon's
+    clock is not known, so 10110 and 01101 are the same code)."""
+    x, y = parse_code(a), parse_code(b)
+    return x is not None and y is not None and len(x) == len(y) and "".join(map(str, y)) in "".join(map(str, x)) * 2
+
+
 def parse_xy(text: str) -> tuple[float, float] | None:
     """"x,y" -> (x, y), or None when empty or malformed."""
     try:
@@ -255,8 +282,8 @@ LIMITS = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "height
           "speed_px_s": (0, 2000), "radius_px": (10, 3000), "period_s": (1, 600), "heading_deg": (-360, 360),
           "background_level": (0, 120), "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2),
           "deadband_px": (0, 20), "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10),
-          "blink_hz": (0, 15), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
-          "faint_snr_min": (0, 20), "handoff_radius_px": (1, 200), "handoff_hold_s": (0, 10), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
+          "blink_hz": (0, 15), "code_rate_hz": (1, 30), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
+          "faint_snr_min": (0, 20), "handoff_radius_px": (1, 200), "handoff_hold_s": (0, 10), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600), "exposure_gain": (0.25, 4.0), "frame_drop_frac": (0, 0.5)}
 
 
 ATMOSPHERE_PRESETS: dict[str, dict[str, float]] = {
@@ -338,7 +365,8 @@ def disturbance_diff(before: DisturbanceConfig, after: DisturbanceConfig) -> dic
 _SHORT = {"salt_pepper_frac": "salt and pepper", "gaussian_sigma": "Gaussian sigma", "poisson": "Poisson",
           "jitter_px": "jitter", "atmosphere": "atmosphere", "contrast": "contrast", "brightness": "brightness",
           "turbulence": "turbulence", "blur_sigma": "blur", "platform_motion": "platform",
-          "platform_px_frame": "platform speed", "platform_period_s": "platform period"}
+          "platform_px_frame": "platform speed", "platform_period_s": "platform period",
+          "exposure_gain": "exposure", "frame_drop_frac": "frame loss"}
 _UNIT = {"jitter_px": " px/frame", "platform_px_frame": " px/frame", "platform_period_s": " s", "blur_sigma": " px"}
 
 

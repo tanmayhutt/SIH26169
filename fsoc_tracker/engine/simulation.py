@@ -189,7 +189,9 @@ class Simulation:
         mode = self.cfg.resolved_designation()
         return {"target": names[self.di] if names else "", "index": self.di, "mode": mode + (" (auto)" if self.cfg.designation == "auto" else ""),
                 "cue": self.cfg.designation_cue if self.cfg.designation == "cue" else "",
-                "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations)}
+                "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations),
+                "code": "".join(map(str, tr.code)) if getattr(tr, "code", None) else "",
+                "code_rejections": int(getattr(tr, "code_rejections", 0))}
 
     # --------------------------------------------------------------- record
     def _record(self, frame: Frame, out: TrackOutput, cmd: RateCommand, proc_ms: float,
@@ -248,4 +250,5 @@ class Simulation:
             p_cv=out.model_probs[0], p_ca=out.model_probs[1], p_ct=out.model_probs[2], ego_dx=ego_dx, ego_dy=ego_dy,
             true_x=tx, true_y=ty, true_visible=vis, in_window=inwin, tracking_err_px=terr, tracking_err_deg=terr_deg, tracking_err_stab_px=terr_stab,
             centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy, segment=self.segment, handoff=handoff,
+            frame_lost=int(bool(frame.truth is not None and getattr(frame.truth.disturbance, "frame_lost", False))),
         )
