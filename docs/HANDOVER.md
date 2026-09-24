@@ -292,10 +292,11 @@ files downloaded instead of opened.
 1. `python -m pytest` must pass (57 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
-   worse. Last recorded state (2026-09-23, after the PS audit fixes, against the previous
-   commit): 0 worse, 5 better (platform maximum lock), every other run in its "same" band,
-   although tracking errors dropped by about two thirds (the tool flags error increases, not
-   decreases).
+   worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch
+   after the PS audit fixes): 51 runs compared, all identical, 0 worse. Before that (2026-09-23,
+   the PS audit fixes against the previous commit): 0 worse, 5 better (platform maximum lock),
+   every other run in its "same" band, although tracking errors dropped by about two thirds (the
+   tool flags error increases, not decreases).
 3. `python tools/ps_audit.py` must pass: it measures every PS item by running the code and
    writes `docs/PS_AUDIT.md` (39 of 39 on 2026-09-23). CI runs it on the Linux job.
 4. For interface changes, take screenshots at 1600 x 1000 and 1366 x 768 with
