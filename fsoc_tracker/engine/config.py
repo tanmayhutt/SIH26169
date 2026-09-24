@@ -211,8 +211,13 @@ def _build(cls, d: dict[str, Any]):
         if f.name == "targets":
             kwargs[f.name] = [_build(TargetConfig, t or {}) for t in (v or [])]
         elif f.name == "schedule":
-            kwargs[f.name] = sorted((ScheduledChange(float(c.get("t_s", 0.0)), clean_disturbance_changes(c.get("disturbance") or {}))
-                                     for c in (v or [])), key=lambda c: c.t_s)
+            def t_of(c):
+                try:
+                    return float(c.get("t_s", 0.0))
+                except (TypeError, ValueError):
+                    return float("nan")               # reported and dropped by the scenario check
+            entries = [ScheduledChange(t_of(c), clean_disturbance_changes(c.get("disturbance") or {})) for c in (v or []) if isinstance(c, dict)]
+            kwargs[f.name] = sorted(entries, key=lambda c: (not math.isfinite(c.t_s), c.t_s if math.isfinite(c.t_s) else 0.0))
         elif isinstance(ftype, type) and is_dataclass(ftype):
             kwargs[f.name] = _build(ftype, v or {})
         else:
@@ -228,9 +233,10 @@ def parse_xy(text: str) -> tuple[float, float] | None:
     """"x,y" -> (x, y), or None when empty or malformed."""
     try:
         sx, sy = str(text).split(",")
-        return float(sx), float(sy)
+        x, y = float(sx), float(sy)
     except (ValueError, AttributeError):
         return None
+    return (x, y) if math.isfinite(x) and math.isfinite(y) else None     # "nan,nan" is no point
 
 
 # Accepted input range of every numeric setting, in the units of this file. Values outside are
@@ -285,7 +291,10 @@ def clean_disturbance_changes(changes: dict) -> dict:
         if kind in ("bool", bool):
             v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
         elif kind in ("float", float):
-            v = float(v)
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                continue                          # "five" is not a number: the setting is left out
             if not math.isfinite(v):
                 continue
             lim = LIMITS.get(k)                  # the same accepted range as a value typed before Start

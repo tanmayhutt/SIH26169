@@ -45,13 +45,22 @@ def _chdir_to_bundle():
 def _absolutise(args: list[str]) -> list[str]:
     """Relative file paths on the command line mean 'relative to where I launched from',
     so resolve them before the working directory moves into the bundle."""
-    out = []
+    def is_number(a: str) -> bool:
+        try:
+            float(a)
+            return True
+        except ValueError:
+            return False
+    out, prev = [], ""
     for a in args:
         p = Path(a)
-        if not a.startswith("-") and not p.is_absolute() and (p.exists() or p.parent.exists() and p.suffix):
+        looks_like_path = p.exists() or bool(p.suffix) or "/" in a or "\\" in a or prev in ("--out", "-o")
+        # a number (--duration 2.5, --seed 3) is never a path, even though "2.5" has a suffix
+        if not a.startswith("-") and not p.is_absolute() and not is_number(a) and looks_like_path:
             out.append(str(p.resolve()))
         else:
             out.append(a)
+        prev = a
     return out
 
 

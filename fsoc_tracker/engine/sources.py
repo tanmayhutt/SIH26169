@@ -2,6 +2,8 @@
 an evaluator's video file; both yield the same Frame."""
 from __future__ import annotations
 
+import bisect
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -108,14 +110,27 @@ class VideoSource:
         # the evaluators' reference positions, if given: every error metric is then computed
         # against them, exactly as in the simulator
         self.truth = load_truth(cfg.video_truth, fps) if cfg.video_truth else None
+        self._truth_frames = sorted(self.truth) if self.truth else []
+        # a truth file sampled every few frames: a gap up to a third of a second between two
+        # visible rows is filled in (visibility only); a longer gap means the beacon was away
+        self._truth_gap = max(2, int(round(fps / 3.0)))
 
     def _truth(self, i: int) -> Truth | None:
         if self.truth is None:
             return None
+        nan = float("nan")
+        seen = lambda p: p is not None and math.isfinite(p[0]) and math.isfinite(p[1])
         xy = self.truth.get(i)
-        if xy is None:
-            return Truth(beacons=[(float("nan"), float("nan"))], visible=[False])
-        return Truth(beacons=[xy], visible=[True])
+        if xy is not None:
+            return Truth(beacons=[xy if seen(xy) else (nan, nan)], visible=[seen(xy)])
+        k = bisect.bisect_left(self._truth_frames, i)
+        if 0 < k < len(self._truth_frames):
+            a, b = self._truth_frames[k - 1], self._truth_frames[k]
+            pa, pb = self.truth[a], self.truth[b]
+            if b - a <= self._truth_gap and seen(pa) and seen(pb):
+                f = (i - a) / (b - a)
+                return Truth(beacons=[(pa[0] + f * (pb[0] - pa[0]), pa[1] + f * (pb[1] - pa[1]))], visible=[True], interpolated=True)
+        return Truth(beacons=[(nan, nan)], visible=[False])
 
     def __iter__(self):
         i = 0
@@ -140,7 +155,9 @@ def load_truth(path: str | Path, fps: float) -> dict[int, tuple[float, float]]:
     """Ground truth for a video (Benchmark 2): a CSV with a frame number (or a time in
     seconds) and the beacon centre x, y in video pixels, one row per frame. Header names are
     matched loosely (frame/idx, t/time, x/true_x/cx, y/true_y/cy); without a header the
-    columns are frame, x, y. Frames not listed count as 'beacon not visible'."""
+    columns are frame, x, y. A row whose x or y is blank or NaN says the beacon is not in the
+    frame. A frame not listed is filled in by VideoSource when it lies in a short gap between two
+    visible rows (a file sampled every few frames), otherwise it counts as 'beacon not visible'."""
     import csv
     rows = list(csv.reader(open(path, newline="", encoding="utf-8-sig")))
     rows = [r for r in rows if r and any(c.strip() for c in r)]
@@ -168,7 +185,8 @@ def load_truth(path: str | Path, fps: float) -> dict[int, tuple[float, float]]:
     out: dict[int, tuple[float, float]] = {}
     for r in body:
         try:
-            x, y = float(r[xi]), float(r[yi])
+            cell = lambda j: float(r[j]) if r[j].strip() else float("nan")   # blank: beacon not in the frame
+            x, y = cell(xi), cell(yi)
             k = int(round(float(r[fi]))) if fi is not None else int(round(float(r[ti]) * fps))
         except (ValueError, IndexError):
             continue

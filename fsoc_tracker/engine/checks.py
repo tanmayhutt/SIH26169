@@ -19,6 +19,7 @@ import dataclasses
 import math
 from pathlib import Path
 
+from ..world.sprites import parse_mask
 from .config import LIMITS, RunConfig, parse_xy, target_name
 
 SHAPES = ("square", "circle", "gaussian", "cross", "ring", "diamond", "custom")
@@ -81,15 +82,38 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
                 t.height_px = t.size_px
         lo, hi = LIMITS["duration_s"]
         if not cfg.video and not (lo <= cfg.duration_s <= hi):
-            nv = min(max(cfg.duration_s, lo), hi)
+            d_s = cfg.duration_s
+            # min/max pass NaN through, so non-finite values are placed explicitly
+            nv = 30.0 if d_s != d_s else (hi if d_s == math.inf else lo if d_s == -math.inf else min(max(d_s, lo), hi))
             notes.append(_note("clamped", "duration_s", f"Duration {cfg.duration_s:g} s is outside {lo:g} to {hi:g} s; set to {nv:g}."))
             cfg.duration_s = nv
         if cfg.designation not in DESIGNATIONS:
             notes.append(_note("clamped", "designation", f"Unknown designation '{cfg.designation}', using auto."))
             cfg.designation = "auto"
+        try:
+            cfg.designated = int(cfg.designated)       # a scenario file may hold 1.0 or "1"
+        except (TypeError, ValueError):
+            notes.append(_note("clamped", "designated", f"Designated target '{cfg.designated}' is not a number; using target 1."))
+            cfg.designated = 0
         if cfg.targets and not (0 <= cfg.designated < len(cfg.targets)):
             notes.append(_note("clamped", "designated", f"Designated target {cfg.designated + 1} does not exist; using target 1."))
             cfg.designated = 0
+        # disturbance schedule: every entry must be able to take effect
+        kept = []
+        for c in cfg.schedule:
+            if not math.isfinite(c.t_s):
+                notes.append(_note("clamped", "schedule", f"A disturbance change at t = {c.t_s} s cannot be placed in time; it was dropped."))
+                continue
+            if c.t_s < 0:
+                notes.append(_note("clamped", "schedule", f"A disturbance change at t = {c.t_s:g} s is before the start; it applies at 0 s."))
+                c.t_s = 0.0
+            if not cfg.video and c.t_s >= cfg.duration_s:
+                notes.append(_note("beyond_ps", "schedule", f"A disturbance change at t = {c.t_s:g} s is after the run ends ({cfg.duration_s:g} s) and never applies."))
+            if not c.disturbance:
+                notes.append(_note("clamped", "schedule", f"The disturbance change at t = {c.t_s:g} s has no usable settings; it was dropped."))
+                continue
+            kept.append(c)
+        cfg.schedule = kept
         if cfg.video and len(cfg.targets) > 1:
             # a video brings its own beacons; only the designated target's appearance is used,
             # as the description of what to look for
@@ -115,6 +139,9 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
             ps.append((f"target{i}.size", f"{target_name(t, i)}: size {w} x {h} px is outside the PS range of 5-20 x 5-20 px (row 10)."))
         if t.shape == "custom" and not t.mask.strip():
             ps.append((f"target{i}.mask", f"{target_name(t, i)}: shape custom has no mask; a square is drawn. Enter rows of 0 and 1, for example 010;111;010."))
+        elif t.shape == "custom" and parse_mask(t.mask) is None:
+            ps.append((f"target{i}.mask", f"{target_name(t, i)}: the mask '{t.mask[:40]}' cannot be read (rows of 0 and 1 with at least one 1, "
+                                          f"or an image file); a square is drawn. Example: 010;111;010."))
     # rows 21 to 25
     if d.salt_pepper_frac > 0.10 + 1e-9:
         ps.append(("disturbance.salt_pepper_frac", f"Salt and pepper {100 * d.salt_pepper_frac:.0f}% of pixels is above the PS 'around 10%' (row 21)."))
