@@ -181,7 +181,7 @@ time (1000 / mean ms); the mean of per-frame rates is kept as `fps_inst_mean` fo
 
 ### 2.8 Tests  🟩
 
-111 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+116 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
 accuracy, sub-pixel refinement, IMM prediction, re-acquisition metric, closed loop clear, closed
 loop with vibration, multi-target identity, 3 and 8 decoys, video path, desktop panel (video
 runs the whole file, a loaded scenario keeps its seed), PS rows, and targets (width and height,
@@ -192,7 +192,7 @@ estimate cannot run off the screen, video ground truth gives errors, the CNN mod
 any folder), and the PS audit fixes (a still beacon centred without oscillation, platform sway
 never above the set speed, a faint track not walked off by noise), and live disturbance changes
 (timing, exact replay from the saved scenario, no platform jump, video runs refuse changes, the
-desktop panel and the web API). 111 of 111 pass locally, including the baseline comparison, the handoff-to-fine-pointing indicator, `fsoc-tracker verify` (a run's summary rebuilt from its frames.csv; a
+desktop panel and the web API). 116 of 116 pass locally, including the camera effects (frame loss, exposure), the baseline comparison, the handoff-to-fine-pointing indicator, `fsoc-tracker verify` (a run's summary rebuilt from its frames.csv; a
 tampered summary is caught) and the robustness review of 2026-09-24 (start cue,
 video truth gaps, sprite centres, malformed input, launcher, record check, web input and control).
 Regression batch over the 16-scenario pack against the previous commit: 0 worse, 5 better
@@ -227,7 +227,7 @@ The model path is also looked up from the package folder, so an installed comman
 ### 2.10 Executable builds  🟩
 
 Windows and Linux are built by `.github/workflows/build.yml` (run by hand or on a tag). Each job installs the
-project, runs the 111 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and
+project, runs the 116 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and
 runs the packaged executable on a scenario before uploading the archive; `bash webapp/publish_builds.sh` puts the
 archives on the site. The macOS Intel and Apple silicon archives are built by `bash tools/build_macos.sh` on the
 team's Apple silicon Mac (Intel through Rosetta) with the same checks, and uploaded by it. The 2026-09-23 macOS

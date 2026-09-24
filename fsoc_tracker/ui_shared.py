@@ -42,7 +42,7 @@ LABELS = {
     "poisson": "Poisson shot noise", "jitter_px": "Camera jitter (px/frame)", "atmosphere": "Atmosphere preset",
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
     "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
-    "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
+    "platform_period_s": "Platform period (s)", "exposure_gain": "Exposure gain", "frame_drop_frac": "Frame loss (%)", "background_level": "Sky level (0-255)", "star_density": "Star density",
     "colour": "Colour camera", "detector": "Detector", "algorithm": "Tracker algorithm", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
     "capture_radius_px": "Capture radius (px)", "handoff_radius_px": "Handoff radius (px)", "handoff_hold_s": "Handoff hold (s)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
@@ -78,6 +78,8 @@ TIPS = {
     "contrast": "PS row 24. 1.0 = none. Fog is about 0.4.", "brightness": "PS row 24. Grey levels added; fog lifts the black level, low light lowers it.",
     "turbulence": "Beam wander and flicker strength.", "blur_sigma": "PSF broadening from the atmosphere.",
     "platform_motion": "PS row 25. Linear is mandatory. All patterns are bounded sways whose peak speed is the value below.",
+    "exposure_gain": "Camera exposure (a disturbance beyond the PS table): 1 = normal; below 1 under-exposed, above 1 over-exposed with bright areas clipped to white.",
+    "frame_drop_frac": "Camera frame loss (beyond the PS table): percent of frames the link loses; a lost frame reaches the tracker with no picture, so it must coast.",
     "platform_px_frame": "PS row 25. Peak speed of the platform sway, up to 20 px per frame.", "platform_period_s": "Period of circular, figure of 8 and spiral sways.",
     "background": "Scene background.", "background_level": "Mean sky brightness.", "star_density": "Stars per pixel in the starfield.",
     "algorithm": "argus: this project's tracker. baseline: a deliberately simple brightest-spot tracker with proportional control, only to compare against (tools/compare_trackers.py).",
@@ -98,7 +100,7 @@ HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "ve
 RANGES = LIMITS          # accepted input ranges live in the engine, so every front end clamps alike
 # fields shown in other units than they are stored: salt and pepper is a fraction in the engine
 # (0.10) and a percentage on the panel (10), the way the PS states it
-SCALE = {"salt_pepper_frac": 100.0}
+SCALE = {"salt_pepper_frac": 100.0, "frame_drop_frac": 100.0}
 # choices that also accept typed text: PS row 11 lets the user give the start as "x,y"
 EDITABLE_CHOICES = {"start"}
 MODES = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
@@ -470,6 +472,8 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
            f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
            + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
+           + (f"Frames lost {f('frames_lost_pct', '{:.1f}')} %; lock on the frames received {f('lock_retention_received_pct', '{:.1f}')} %\n"
+              if (_num(v, "frames_lost_pct") or 0) > 0 else "")
            + (f"Handoff to fine pointing: ready at {f('handoff_time_s')} s, held {f('handoff_pct', '{:.1f}')} % after\n"
               if _num(v, "handoff_time_s") is not None else "Handoff to fine pointing: not reached\n")
            + f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")

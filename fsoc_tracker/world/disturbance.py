@@ -33,6 +33,7 @@ class FrameDisturbance:
     platform_dy: float = 0.0
     jitter_dx: float = 0.0        # picture shift from vibration, px
     jitter_dy: float = 0.0
+    frame_lost: bool = False      # the camera link lost this frame: no picture reaches the tracker
 
     @property
     def shift(self) -> tuple[float, float]:
@@ -145,6 +146,9 @@ class DisturbanceModel:
         if c.jitter_px > 0:
             d.jitter_dx = float(self.rng.uniform(-c.jitter_px, c.jitter_px))
             d.jitter_dy = float(self.rng.uniform(-c.jitter_px, c.jitter_px))
+        # 7. frame loss (drawn only when set, so runs without it keep their random numbers)
+        if c.frame_drop_frac > 0:
+            d.frame_lost = bool(self.rng.random() < c.frame_drop_frac)
         return d
 
     def _platform(self) -> tuple[float, float]:
@@ -212,6 +216,9 @@ class DisturbanceModel:
             M = np.array([[1, 0, sx], [0, 1, sy]], np.float32)
             out = cv2.warpAffine(out, M, (self.w, self.h), flags=cv2.INTER_LINEAR,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=int(np.median(out[::16, ::16])))
+        # exposure: the sensor collects more or less of the light, before its own noise; clips at white
+        if c.exposure_gain != 1.0:
+            out = cv2.convertScaleAbs(out, alpha=c.exposure_gain)
         # 6. detector noise
         if self._gauss_bank is not None:
             k = int(self.rng.integers(0, self._gauss_bank.shape[0]))
@@ -239,4 +246,8 @@ class DisturbanceModel:
             out = out.copy()
             out[plane == 1] = 255
             out[plane == -1] = 0
+        # 7. a lost frame carries no picture (the noise draws above still ran, so the random
+        # numbers of the frames after it do not depend on which frames were lost)
+        if d.frame_lost:
+            out = np.zeros_like(out)
         return out

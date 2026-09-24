@@ -103,7 +103,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `world/scene.py` | Backgrounds: starfield, terrain, gradient, flat. |
 | `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, user-defined waypoints, static. |
 | `world/camera.py` | Gimbal: pose in degrees, rate and acceleration limits, command latency, IFOV conversions. |
-| `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, Poisson (a Gaussian approximation), Gaussian and salt-and-pepper noise, in physical order; read and shot noise use independent random planes. |
+| `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, camera exposure gain, frame loss, Poisson (a Gaussian approximation), Gaussian and salt-and-pepper noise, in physical order; read and shot noise use independent random planes. |
 | `world/renderer.py` | Draws the scene with sub-pixel beacon placement; returns ground truth. |
 | `world/sprites.py` | Beacon shapes (square, circle, gaussian, cross, ring, diamond, custom mask) at width x height, shared by the renderer and the detector's width calibration. |
 | `perception/detect.py` | Classical detector (median, background subtraction, matched filter, adaptive threshold, connected components, shape filters), sub-pixel centroid (centre of gravity plus 2D Gaussian fit), CNN heat-map detector (ONNX). |
@@ -340,6 +340,7 @@ jump: it settles into the new pattern within 1.25 times the larger peak speed.
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
   identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
   evaluator template.
+- Camera effects beyond the PS table: clear line, 15 s: 10% frame loss gives 88.0% lock (every lost frame breaks lock) but 100% on the frames received, tracking error 2.59 px (2.35 without) and re-acquisition within 0.10 s; 25% loss: 71.0% lock, 3.04 px, 0.17 s. Exposure x4 clips the beacon at white and raises the centroiding error from 0.006 to 0.093 px; x0.5 changes nothing measurable.
 - Handoff to fine pointing: measured on 15 s runs, clear line 2.20 s (lock at 1.07 s), full PS noise 1.70 s, fog 2.43 s, all held 100%; faint beacon 3.37 s, held 37.8%; platform sway plus shake, the PS maximum and full stress never reach it (the estimate does not stay within 10 px).
 - Reproducible figures: `fsoc-tracker verify <run folder>` rebuilds every metric of a run from its
   per-frame CSV alone and checks its summary JSON, so a reader can confirm the reported numbers.
@@ -499,6 +500,7 @@ the IMM lead, the gating and the identity signature each remove a failure the ba
 | Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
 | Handoff ready | Locked with the estimate within 10 px (row 17) of the window centre, held 1 s: the point where fine pointing could take over; first time and share held. |
+| Frames lost; lock on received frames | With simulated frame loss: the share of frames lost, and lock retention over the frames that arrived, beside the usual figure. |
 | Segment | When the disturbances change during a run, each setting is a segment; tracking, vibration-removed and centroiding error, lock, tracked rate and FPS are also given per segment. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 

@@ -531,7 +531,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 111 automated tests, including one per group of PS rows that pins every default to the PS.
+- 116 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -621,6 +621,8 @@ repository has its own free minutes, so a build can also be run there and publis
   both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
   and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
   monthly reset, or a build on a teammate's fork.
+- **2026-09-24. Camera effects.** Exposure gain and frame loss added as disturbances beyond the PS table (the PS
+  lists them "etc."), off by default. Measured on clear line, 15 s: 10% frame loss gives 88.0% lock (every lost frame breaks lock) but 100% on the frames received, tracking error 2.59 px (2.35 without) and re-acquisition within 0.10 s; 25% loss: 71.0% lock, 3.04 px, 0.17 s. Exposure x4 clips the beacon at white and raises the centroiding error from 0.006 to 0.093 px; x0.5 changes nothing measurable.
 - **2026-09-24. Measured against a simple baseline.** `tools/compare_trackers.py` runs ARGUS and a
   brightest-spot tracker with proportional control over every scenario: ARGUS meets every PS limit in 33 of 48 runs, the baseline in 0 of 48; the baseline's tracking error is 27 to 40 px on clear skies against 2 to 6 px, it holds 1.6% lock among identical decoys and never acquires the faint beacon; it acquires faster on some clear skies (0.37 s against 1.03 s on the circle) because it has no confirmation step.
 - **2026-09-24. Handoff to fine pointing.** The PS places coarse alignment "before fine pointing

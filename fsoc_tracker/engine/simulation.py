@@ -248,4 +248,5 @@ class Simulation:
             p_cv=out.model_probs[0], p_ca=out.model_probs[1], p_ct=out.model_probs[2], ego_dx=ego_dx, ego_dy=ego_dy,
             true_x=tx, true_y=ty, true_visible=vis, in_window=inwin, tracking_err_px=terr, tracking_err_deg=terr_deg, tracking_err_stab_px=terr_stab,
             centroid_err_px=cerr, platform_dx=pdx, platform_dy=pdy, jitter_dx=jdx, jitter_dy=jdy, segment=self.segment, handoff=handoff,
+            frame_lost=int(bool(frame.truth is not None and getattr(frame.truth.disturbance, "frame_lost", False))),
         )

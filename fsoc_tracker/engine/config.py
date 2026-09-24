@@ -93,6 +93,10 @@ class DisturbanceConfig:
     platform_motion: str = "none"        # none | linear | circular | random | spiral | figure8
     platform_px_frame: float = 0.0       # peak pixels per frame, up to 20
     platform_period_s: float = 20.0
+    # camera effects: the PS lists disturbances "due to atmospheric turbulence, platform vibrations,
+    # camera motion, noise, etc." in the camera feed; these two are the camera's own
+    exposure_gain: float = 1.0           # exposure/gain: scales the light before the sensor noise, clips at 255
+    frame_drop_frac: float = 0.0         # share of frames the camera link loses (they arrive with no picture)
 
 
 @dataclass
@@ -256,7 +260,7 @@ LIMITS = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "height
           "background_level": (0, 120), "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2),
           "deadband_px": (0, 20), "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10),
           "blink_hz": (0, 15), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
-          "faint_snr_min": (0, 20), "handoff_radius_px": (1, 200), "handoff_hold_s": (0, 10), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
+          "faint_snr_min": (0, 20), "handoff_radius_px": (1, 200), "handoff_hold_s": (0, 10), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600), "exposure_gain": (0.25, 4.0), "frame_drop_frac": (0, 0.5)}
 
 
 ATMOSPHERE_PRESETS: dict[str, dict[str, float]] = {
@@ -338,7 +342,8 @@ def disturbance_diff(before: DisturbanceConfig, after: DisturbanceConfig) -> dic
 _SHORT = {"salt_pepper_frac": "salt and pepper", "gaussian_sigma": "Gaussian sigma", "poisson": "Poisson",
           "jitter_px": "jitter", "atmosphere": "atmosphere", "contrast": "contrast", "brightness": "brightness",
           "turbulence": "turbulence", "blur_sigma": "blur", "platform_motion": "platform",
-          "platform_px_frame": "platform speed", "platform_period_s": "platform period"}
+          "platform_px_frame": "platform speed", "platform_period_s": "platform period",
+          "exposure_gain": "exposure", "frame_drop_frac": "frame loss"}
 _UNIT = {"jitter_px": " px/frame", "platform_px_frame": " px/frame", "platform_period_s": " s", "blur_sigma": " px"}
 
 

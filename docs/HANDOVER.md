@@ -73,7 +73,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 111 tests
+.venv/bin/python -m pytest                      # 116 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -257,7 +257,8 @@ tools/                   compare_batches.py, compare_trackers.py, ps_audit.py, g
 
 ### 6.4 Disturbances
 
-Applied in physical order (extinction, blur, picture shift, detector noise). Platform motion is a
+Applied in physical order (extinction, blur, picture shift, exposure gain, detector noise, frame loss; the last two camera
+effects are beyond the PS table and off by default, and a lost frame reaches the tracker as a black picture). Platform motion is a
 bounded sway (amplitude at most 20 percent of the screen) with the configured peak speed; a
 sustained 20 px per frame shift would leave the screen in seconds. The figure-8 sway is scaled so
 its peak equals the setting: it is fastest at its crossing, sqrt(2) times the circle speed, and
@@ -301,7 +302,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (111 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (116 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch

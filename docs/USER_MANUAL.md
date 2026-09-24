@@ -222,6 +222,10 @@ clamped to its accepted range in the engine, for both applications, and the scen
   brightness, blur and turbulence; each can then be edited.
 - Platform motion: none, linear, circular, random, spiral, figure8; speed in pixels per
   frame (up to 20) and period.
+- Camera effects beyond the PS table (the PS lists disturbances "... noise, etc."), both off by
+  default: **Exposure gain** (1 = normal; below 1 under-exposed, above 1 over-exposed with the
+  bright beacon clipped at white) and **Frame loss** (percent of frames the camera link loses; a
+  lost frame reaches the tracker with no picture, so it coasts). The scenario check notes both.
 
 **Changing disturbances during a run.** While a run is going, the Disturbances section stays
 editable and every other section is locked (the other settings are fixed for the run). Change
@@ -421,6 +425,7 @@ gives the time it was first ready and the share of the run it held; the CSV has 
 | FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
 | `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
 | Handoff ready | Locked, with the estimate within the handoff radius (10 px) of the window centre for the hold time (1 s): coarse alignment stable enough for fine pointing to take over. Reported as the first time and the share held after it. |
+| Frames lost | Share of frames the camera link lost (frame loss setting). A lost frame breaks lock by definition, so the report adds **lock retention on the frames received** beside the usual lock figure. |
 | Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting

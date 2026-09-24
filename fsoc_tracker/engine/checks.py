@@ -157,6 +157,12 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
         ps.append(("disturbance.jitter_px", f"Camera jitter {d.jitter_px:g} px/frame is above the PS maximum of +/- 20 px/frame (row 23)."))
     if d.platform_px_frame > 20:
         ps.append(("disturbance.platform_px_frame", f"Platform motion {d.platform_px_frame:g} px/frame is above the PS maximum of 20 px/frame (row 25)."))
+    if d.frame_drop_frac > 0:
+        ps.append(("disturbance.frame_drop_frac", f"Frame loss {100 * d.frame_drop_frac:g}% is a camera effect beyond the PS table "
+                                                  "(the PS lists disturbances 'etc.'); lost frames reach the tracker with no picture."))
+    if d.exposure_gain != 1.0:
+        ps.append(("disturbance.exposure_gain", f"Exposure gain {d.exposure_gain:g} is a camera effect beyond the PS table; "
+                                                "bright areas clip at white when it is above 1."))
     if d.turbulence > 0.6:
         ps.append(("disturbance.turbulence", f"Turbulence {d.turbulence:.2f} is above the strongest atmosphere preset (rain, 0.6); the beacon wanders and flickers more than any PS condition describes."))
     if d.contrast < 0.4:
