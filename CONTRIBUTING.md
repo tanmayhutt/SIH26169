@@ -31,6 +31,8 @@ server (only if you will deploy); the login for the project site.
    the team's shared memory: nobody's chat history travels between machines, so a change is not
    finished until they say what the code does and why. `CLAUDE.md` gives the full list, and
    `python tools/record_check.py` lists any commit that changed code without a record update.
+   `python tools/chat_history.py sync` appends your Claude sessions to the shared chat history
+   (`docs/history/CHAT_LOG.md`) and shows what teammates added; commit that file with your work.
 5. Commit with your own git identity and a short message; push the branch; open a pull request.
    The template lists the checks.
 

@@ -27,7 +27,7 @@ CSV log and an automatic PDF performance report.
 | `docs/HANDOVER.md` | Working on the code: setup, commands, code map, verification, release, server |
 | `CONTRIBUTING.md` | How teammates make and submit changes |
 | `CLAUDE.md` | Rules for every contributor and AI agent |
-| `docs/history/CHAT_2026-09-18_to_09-24.md` | The owner's whole Claude Code conversation that built the project, 18 to 24 September, secrets removed (how the work happened; the handover and knowledge-transfer files are authoritative) |
+| `docs/history/CHAT_LOG.md` | Every teammate's Claude Code conversation, one file, in order, secrets removed: how the work happened (the handover and knowledge-transfer files are authoritative) |
 | `docs/PS_AUDIT.md` | Every PS item checked by running the code, with the measured value (`python tools/ps_audit.py`) |
 | `COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
 | `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them) |

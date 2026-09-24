@@ -32,11 +32,12 @@ work is preparation for the event (section 13).
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
 12. `docs/submission/ARGUS_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
-13. `docs/history/CHAT_2026-09-18_to_09-24.md`: the owner's complete Claude Code conversation from the
-    first day to the handover, exported with `tools/export_chat.py` (secrets removed, tool output
-    left out). Read it for the reasoning behind a decision; the files above state the current
-    truth. Anyone can export their own sessions the same way: the log is in
-    `~/.claude/projects/<project>/<session>.jsonl` on the machine the session ran on.
+13. `docs/history/CHAT_LOG.md`: every teammate's Claude Code conversation in one file, one block
+    per person and session, from the first day on. `python tools/chat_history.py sync` appends
+    your own sessions (from `~/.claude/projects/<project>/` on your machine) and lists what others
+    added; Claude runs it at the start and end of every task (see `CLAUDE.md`). Secrets are
+    removed; exact strings to remove go in the ignored local file `.chat_redact`. Read it for the
+    reasoning behind a decision; the files above state the current truth.
 
 `PROGRESS.md` and `web/progress.json` are the running status record; the second drives the
 progress page on the site.

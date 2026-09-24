@@ -18,3 +18,5 @@ docs/demo/
 .DS_Store
 .venv-intel/
 out/
+.chat_redact
+.history_seen
