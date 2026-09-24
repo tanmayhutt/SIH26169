@@ -31,6 +31,11 @@ work is preparation for the event (section 13).
 9. `docs/TESTING_GUIDE.md`: how to exercise every input by hand, with expected results.
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
+13. `docs/history/CHAT_2026-09-18_to_09-24.md`: the owner's complete Claude Code conversation from the
+    first day to the handover, exported with `tools/export_chat.py` (secrets removed, tool output
+    left out). Read it for the reasoning behind a decision; the files above state the current
+    truth. Anyone can export their own sessions the same way: the log is in
+    `~/.claude/projects/<project>/<session>.jsonl` on the machine the session ran on.
 12. `docs/submission/ARGUS_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
 
 `PROGRESS.md` and `web/progress.json` are the running status record; the second drives the
