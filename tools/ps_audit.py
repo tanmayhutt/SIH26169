@@ -375,10 +375,11 @@ def _():
 
 
 # ------------------------------------------------------------------ deliverables
-@check("Deliverable 1", "Standalone executable, all mandatory functions", "PyInstaller spec and the four-platform build workflow")
+@check("Deliverable 1", "Standalone executable, all mandatory functions", "PyInstaller spec; Windows and Linux in the build workflow, both macOS in tools/build_macos.sh")
 def _():
     wf = (ROOT / ".github/workflows/build.yml").read_text()
-    labels = [k for k in ("windows-x64", "linux-x64", "macos-intel", "macos-arm64") if k in wf]
+    mac = (ROOT / "tools/build_macos.sh").read_text()
+    labels = [k for k in ("windows-x64", "linux-x64") if k in wf] + [k for k in ("macos-intel", "macos-arm64") if k in mac]
     return (ROOT / "fsoc_tracker.spec").exists() and len(labels) == 4, f"spec present; build targets {', '.join(labels)}"
 
 
