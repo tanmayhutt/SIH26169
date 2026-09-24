@@ -109,6 +109,10 @@ class TrackerConfig:
     gate_px: float = 60.0                # association gate around prediction
     deadband_px: float = 1.5             # do not command the gimbal inside this radius
     capture_radius_px: float = 30.0      # lock is declared when the estimate is within this of the boresight
+    # handoff to fine pointing (PS: "before fine pointing mechanism can take over"): locked with the
+    # estimate held within the row 17 limit of the boresight for this long, so fine pointing could start
+    handoff_radius_px: float = 10.0
+    handoff_hold_s: float = 1.0
     acquire_conf_min: float = 0.62       # a new track needs at least this detector confidence (stars score ~0.55, a beacon 0.67-0.96)
     faint_snr_min: float = 3.5           # faint path: mean matched-filter SNR a chain of weak detections must show
     faint_threshold_k: float = 3.0       # faint path: detection threshold in noise sigmas (track-before-detect links the rest)
@@ -251,7 +255,7 @@ LIMITS = {"width": (64, 8000), "height": (64, 8000), "size_px": (2, 60), "height
           "background_level": (0, 120), "star_density": (0, 0.01), "kp": (0, 20), "kd": (0, 5), "ki": (0, 5), "feedforward": (0, 2),
           "deadband_px": (0, 20), "threshold_k": (1, 12), "max_accel_deg_s2": (1, 500), "command_latency_frames": (0, 10),
           "blink_hz": (0, 15), "capture_radius_px": (5, 200), "estimator_lag_s": (0, 1), "acquire_conf_min": (0, 1),
-          "faint_snr_min": (0, 20), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
+          "faint_snr_min": (0, 20), "handoff_radius_px": (1, 200), "handoff_hold_s": (0, 10), "faint_threshold_k": (1, 12), "platform_period_s": (1, 600), "duration_s": (1, 3600)}
 
 
 ATMOSPHERE_PRESETS: dict[str, dict[str, float]] = {

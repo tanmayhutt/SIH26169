@@ -398,6 +398,12 @@ Every figure in `<label>_summary.json` can be checked against the log: `fsoc-tra
 rebuilds the metrics from `<label>_frames.csv` alone, with the same code that made them, and lists any
 value that differs (exit code 1). The end-of-run summary names the command.
 
+**Handoff to fine pointing.** The problem statement's coarse stage works "before fine pointing
+mechanism can take over". The state tile and the camera view say *handoff ready* once the tracker
+is locked and its estimate has stayed within the handoff radius (default 10 px, the PS row 17 limit)
+of the window centre for the hold time (default 1 s); both are in the Tracker section. The report
+gives the time it was first ready and the share of the run it held; the CSV has a `handoff` column.
+
 ## 8. Metric definitions
 
 | Metric | Definition |
@@ -411,6 +417,7 @@ value that differs (exit code 1). The end-of-run summary names the command.
 | Re-acquisition time | Time from losing lock to regaining it. A loss not regained by the end of the run counts with its length so far (also reported as lock lost at end). Spec: 1 s or less. |
 | FPS (`fps_mean`) | Frames over processing time: 1000 divided by the mean processing time in ms. Spec: 20 or more. |
 | `fps_inst_mean` | The mean of the per-frame rates 1 / processing time. Higher than `fps_mean` when frame times vary; for comparison only. |
+| Handoff ready | Locked, with the estimate within the handoff radius (10 px) of the window centre for the hold time (1 s): coarse alignment stable enough for fine pointing to take over. Reported as the first time and the share held after it. |
 | Segment | When the disturbances change during a run, each setting is a segment with its own tracking, vibration-removed and centroiding error, lock, tracked rate and FPS. The run's overall figures span all segments. |
 
 ## 9. Troubleshooting

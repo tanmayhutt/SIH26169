@@ -218,7 +218,7 @@ stream"** (the software itself generates the video it tracks).
 |---|---|---|
 | Software Application | "A standalone executable application implementing the complete virtual camera tracking system. The application shall provide all the mandatory functions and features as described above." | Native desktop builds for Windows, Linux, macOS Intel and macOS Apple silicon; runs with no installation and no internet |
 | Source Code | "Complete source code with proper documentation. The code shall be modular and adequately commented." | This repository, modular packages, docstrings, documents |
-| Technical Report | "about 10-15 pages containing problem understanding, system architecture, description of software modules, tracking methods, AI methods (if used), test methodology, performance analysis and future improvements" | `docs/TECHNICAL_REPORT.pdf`, 12 pages, all listed sections |
+| Technical Report | "about 10-15 pages containing problem understanding, system architecture, description of software modules, tracking methods, AI methods (if used), test methodology, performance analysis and future improvements" | `docs/TECHNICAL_REPORT.pdf`, 13 pages, all listed sections |
 | User Manual | "description of installation of software, application operation, parameter configuration, GUI description, etc. A 3-5 minutes video may also be provided as an optional deliverable for demonstration of the application." | `docs/USER_MANUAL.pdf`; a demo video of about 4 minutes |
 | Performance Log | "The software should be capable of automatically generating a performance report containing simulation duration, FPS, acquisition time, average and maximum tracking error, lock retention rate, processing time, etc." | Every run writes a PDF report, a per-frame CSV and a summary file, automatically |
 
@@ -531,7 +531,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 104 automated tests, including one per group of PS rows that pins every default to the PS.
+- 108 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -621,6 +621,9 @@ repository has its own free minutes, so a build can also be run there and publis
   both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
   and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
   monthly reset, or a build on a teammate's fork.
+- **2026-09-24. Handoff to fine pointing.** The PS places coarse alignment "before fine pointing
+  mechanism can take over". A run now says when that could happen: locked, estimate within 10 px
+  (row 17) of the centre, held 1 s. Measured: clear line 2.20 s (lock at 1.07 s), full PS noise 1.70 s, fog 2.43 s, all held 100%; faint beacon 3.37 s, held 37.8%; platform sway plus shake, the PS maximum and full stress never reach it (the estimate does not stay within 10 px). Tracking is unchanged.
 - **2026-09-24. Verifiable figures.** `fsoc-tracker verify <run folder>` rebuilds every metric from a run's
   frames.csv and checks its summary.json (the 51-run regression batch: 51 of 51 reproduce, 32 values each);
   a summary edited by hand is caught. It lets an evaluator confirm our numbers from the log alone.
@@ -775,6 +778,10 @@ web app. Keep the report PDF ready to open.
 - **How do you know every PS item is met?** `tools/ps_audit.py` measures each one by running the
   code (rows 1 to 25, the eight "shall" functions, the deliverables, both benchmarks) and writes
   `docs/PS_AUDIT.md`; 39 of 39 pass, and the build runs it.
+- **When is coarse alignment done, so fine pointing can take over?** When the tracker is locked and
+  its estimate has stayed within 10 px (the row 17 limit) of the window centre for 1 s; the app says
+  "handoff ready". Clear sky: about a second after lock, held 100%. Under the PS maximum shake it is
+  never reached, which is the same physical limit as the raw tracking error there.
 - **Can the disturbances change while it tracks?** Yes: during a run the Disturbances section
   stays live, so noise, fog, jitter or platform sway can be switched on or off without a restart;
   the next frame carries it, the tiles restart from the change and the report scores each setting

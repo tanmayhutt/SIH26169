@@ -21,5 +21,5 @@ Part D; never round a limit away.
 | 6 | A hard mode row: 3 to 12 s, 7 to 12 px, 100 %, "By design" |
 | 6 | Decoys risk: designate by appearance, a start cue or a click; identical look-alikes 100 % lock with the start cue |
 | 6 | Verification boxes: 45 automated tests; regression batch 16 scenarios x 3 seeds |
-| 8 | Reference [18]: the technical report has 12 pages |
+| 8 | Reference [18]: the technical report has 13 pages (the current PDF still says 12) |
 | 8 | Coverage (25 of 25 rows, 8 of 8 "shall", 5 of 5 deliverables), performance log fields, metric definitions (lock, tracking error, centroiding error), known limits |

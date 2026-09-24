@@ -60,6 +60,9 @@ class Record:
     jitter_dy: float
     # disturbance segment: 0 until the first change during the run, then 1, 2, ...
     segment: int = 0
+    # coarse alignment stable enough to hand over to fine pointing (locked, estimate within
+    # handoff_radius_px of the boresight, held for handoff_hold_s)
+    handoff: int = 0
 
 
 COLUMNS = [f.name for f in fields(Record)]

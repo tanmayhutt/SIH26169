@@ -340,6 +340,7 @@ jump: it settles into the new pattern within 1.25 times the larger peak speed.
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
   identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
   evaluator template.
+- Handoff to fine pointing: measured on 15 s runs, clear line 2.20 s (lock at 1.07 s), full PS noise 1.70 s, fog 2.43 s, all held 100%; faint beacon 3.37 s, held 37.8%; platform sway plus shake, the PS maximum and full stress never reach it (the estimate does not stay within 10 px).
 - Reproducible figures: `fsoc-tracker verify <run folder>` rebuilds every metric of a run from its
   per-frame CSV alone and checks its summary JSON, so a reader can confirm the reported numbers.
 - Batch envelope: `fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-N`
@@ -491,6 +492,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 | Lock retention rate | Percentage of frames after acquisition in TRACK with the beacon within the capture radius. Target loss is 100 minus this. Row 18. |
 | Re-acquisition time | Time from losing lock to regaining it; count, mean and maximum. A loss not regained by the end of the run counts in the maximum with its length so far. Row 19. |
 | Slew saturation | Percentage of frames in which the commanded rate exceeded the gimbal limit. |
+| Handoff ready | Locked with the estimate within 10 px (row 17) of the window centre, held 1 s: the point where fine pointing could take over; first time and share held. |
 | Segment | When the disturbances change during a run, each setting is a segment; tracking, vibration-removed and centroiding error, lock, tracked rate and FPS are also given per segment. |
 | AI share | Percentage of frames in which the CNN provided the accepted measurement. |
 

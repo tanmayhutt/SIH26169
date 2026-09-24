@@ -31,6 +31,8 @@ DEFINITIONS = {
     "reacq_count": "Number of times lock was lost and regained.",
     "reacq_time_mean_s": "Mean time from losing lock to regaining it.",
     "reacq_time_max_s": "Maximum time from losing lock to regaining it; a loss not regained by the end of the run counts with its length so far. Spec row 19: <= 1 s.",
+    "handoff_time_s": "Handoff ready: first time the coarse alignment was stable enough for fine pointing to take over (locked, the estimate within the handoff radius, default 10 px as PS row 17, of the window centre for the hold time, default 1 s).",
+    "handoff_pct": "Percentage of frames after the first handoff-ready frame that were still handoff ready.",
     "lock_lost_at_end_s": "Length of a lock loss still open when the run ended (0 if the run ended locked).",
     "tracking_err_mean_px": "Tracking error: mean distance from the true beacon to the window centre over frames after acquisition. Spec row 17: <= 10 px.",
     "tracking_err_max_px": "Maximum tracking error over frames after acquisition.",
@@ -150,6 +152,10 @@ def summarise(records: list[Record], ifov_deg: float, wall_s: float, changes: li
     sat = np.array([(r.sat_pan or r.sat_tilt) for r in records])
     v["slew_saturation_pct"] = float(100 * sat.mean())
     v["cnn_frames_pct"] = float(100 * np.mean([r.tier == "cnn" for r in records]))
+    ho = np.array([getattr(r, "handoff", 0) for r in records], bool)
+    hi = np.flatnonzero(ho)
+    v["handoff_time_s"] = float(t[hi[0]]) if len(hi) else float("nan")
+    v["handoff_pct"] = float(100 * ho[hi[0]:].mean()) if len(hi) else 0.0
     if changes:
         s.segments = segment_summaries(records, good, changes)
     # pass / fail

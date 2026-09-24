@@ -70,7 +70,7 @@ Status: 🟩 implemented and verified, 🟨 implemented with a caveat, ⬜ not y
 | Functional verification | 20 | implementation of all mandatory functions, operational success, GUI | all eight functions demonstrable live; scenario picker; live tiles | 🟩 |
 | Benchmark performance 1 | 30 | execution of given scenarios; log of centroiding error; automatically generated performance logs | scenario YAML loads in one click; `centroid_err_px` per frame in `frames.csv`; report automatic | 🟩 (their file format may need a mapping) |
 | Benchmark performance 2 | 30 | video files (.mp4 @30 fps) covering a complete screen with noise and moving beacon; bypass the PTZ camera; comparison of centroiding error with predefined values; RMSE, acquisition and re-acquisition time, lock retention, FPS | Open video: simulator bypassed, frames used as the scene, `det_x/det_y` per frame, timing and lock metrics in the report. With the evaluators' positions as a truth CSV (`--truth`, Truth CSV button, or `<video>_truth.csv` beside the video), tracking error, centroiding error, RMSE and true lock retention are computed against them | 🟩 |
-| Technical evaluation | 20 | understanding, architecture, algorithms, AI and CV, novelty, documentation, Q and A | `ARCHITECTURE.md`, `docs/TECHNICAL_REPORT.pdf` (12 pages), `docs/USER_MANUAL.pdf`, this file | 🟩 |
+| Technical evaluation | 20 | understanding, architecture, algorithms, AI and CV, novelty, documentation, Q and A | `ARCHITECTURE.md`, `docs/TECHNICAL_REPORT.pdf` (13 pages), `docs/USER_MANUAL.pdf`, this file | 🟩 |
 
 ## Things the PS does not specify, and what we chose
 

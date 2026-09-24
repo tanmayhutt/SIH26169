@@ -44,7 +44,7 @@ LABELS = {
     "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
     "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
-    "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
+    "capture_radius_px": "Capture radius (px)", "handoff_radius_px": "Handoff radius (px)", "handoff_hold_s": "Handoff hold (s)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
     "faint_snr_min": "Faint: min chain SNR", "faint_threshold_k": "Faint: threshold (sigma)",
 }
 TIPS = {
@@ -83,6 +83,8 @@ TIPS = {
     "ego_motion": "Use the frame-to-frame picture shift (phase correlation) as a hint for vibration level.",
     "threshold_k": "Detection threshold in sigmas above the local background.", "kp": "Proportional gain, deg/s per deg of error.",
     "kd": "Derivative gain.", "ki": "Integral gain.", "feedforward": "Weight on the predicted target angular rate.",
+    "handoff_radius_px": "Handoff to fine pointing: the estimate must stay within this of the window centre (default 10 px, the PS row 17 limit).",
+    "handoff_hold_s": "Handoff to fine pointing: how long lock and the handoff radius must hold before coarse alignment counts as ready (default 1 s).",
     "deadband_px": "No command inside this radius, so vibration is not chased.", "capture_radius_px": "Lock is declared when the estimate is within this of the window centre.",
     "estimator_lag_s": "Assumed delay of the velocity estimate at the 30 Hz reference, compensated with acceleration; scales with the update rate.",
     "acquire_conf_min": "A new track needs at least this detector confidence. Stars and noise clumps score about 0.55, a beacon 0.67 (low light) to 0.96 (clear).",
@@ -272,7 +274,8 @@ def camera_top(r, ifov_deg: float) -> tuple[str, str]:
     """(state text, detail text) for the top bar of the camera view."""
     err = r.tracking_err_px
     err_s = f"err {err:.1f} px ({err * ifov_deg * 3600:.0f} arcsec)" if np.isfinite(err) else "err n/a (no truth in a video)"
-    return f"{r.mode}{'  locked' if r.locked else ''}", f"{err_s}   conf {r.confidence:.2f}   {r.tier}"
+    state = f"{r.mode}{'  locked' if r.locked else ''}{'  handoff ready' if getattr(r, 'handoff', 0) else ''}"
+    return state, f"{err_s}   conf {r.confidence:.2f}   {r.tier}"
 
 
 def camera_bottom(r) -> tuple[str, bool]:
@@ -334,7 +337,8 @@ class LiveTiles:
         if r is None:
             return T
         state = "pass" if r.mode == "TRACK" and r.locked else ("warn" if r.mode in ("COAST", "REACQUIRE") else None)
-        T["state"] = {"text": r.mode, "state": state, "unit": "locked" if r.locked else "not locked"}
+        unit = ("locked, handoff ready" if getattr(r, "handoff", 0) else "locked") if r.locked else "not locked"
+        T["state"] = {"text": r.mode, "state": state, "unit": unit}
         since = f"since {self.seg_t:.1f} s" if self.segment else None
         if self.acq_t is not None:
             T["acq"].update(text=f"{self.acq_t:.2f} s", state="pass" if self.acq_t <= SPEC["acquisition_time_s"][1] else "fail")
@@ -464,7 +468,9 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
            f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
            + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
-           f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
+           + (f"Handoff to fine pointing: ready at {f('handoff_time_s')} s, held {f('handoff_pct', '{:.1f}')} % after\n"
+              if _num(v, "handoff_time_s") is not None else "Handoff to fine pointing: not reached\n")
+           + f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
         msg += "\nRecompute and check these figures from the log: fsoc-tracker verify <this run's folder>"
