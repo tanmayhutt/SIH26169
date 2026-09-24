@@ -40,6 +40,23 @@ def parse_mask(mask: str) -> np.ndarray | None:
     return None
 
 
+def _centred(sp: np.ndarray) -> np.ndarray:
+    """Shift a drawn spot, by sub-pixel resampling, so its intensity centroid is the sprite's
+    centre ((n - 1) / 2), where the renderer places the truth. Drawing at whole pixels put a
+    circle, ring, diamond or cross up to 0.8 px off, which the report then counted as
+    centroiding error although the tracker measured the drawn spot correctly."""
+    tot = float(sp.sum())
+    if tot <= 0:
+        return sp
+    nh, nw = sp.shape
+    yy, xx = np.mgrid[0:nh, 0:nw]
+    dx = (nw - 1) / 2.0 - float((sp * xx).sum()) / tot
+    dy = (nh - 1) / 2.0 - float((sp * yy).sum()) / tot
+    if abs(dx) < 1e-4 and abs(dy) < 1e-4:
+        return sp
+    return cv2.warpAffine(sp, np.float32([[1, 0, dx], [0, 1, dy]]), (nw, nh), flags=cv2.INTER_LINEAR)
+
+
 def make_sprite(shape: str, width: int, height: int | None = None, mask: str = "") -> np.ndarray:
     """The beacon's spot, peak 1, shape (height + 6, width + 6)."""
     w = max(int(width), 2)
@@ -80,6 +97,8 @@ def make_sprite(shape: str, width: int, height: int | None = None, mask: str = "
         else:
             sp[PAD:PAD + h, PAD:PAD + w] = cv2.resize(m, (w, h), interpolation=cv2.INTER_AREA)
         sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
+    if shape != "gaussian":
+        sp = _centred(sp)
     peak = float(sp.max())
     return sp / peak if peak > 0 else sp
 
@@ -94,7 +113,7 @@ def _legacy(shape: str, s: int) -> np.ndarray:
         sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
     elif shape == "circle":
         cv2.circle(sp, (n // 2, n // 2), s // 2, 1.0, -1, lineType=cv2.LINE_AA)
-        sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
+        sp = _centred(cv2.GaussianBlur(sp, (0, 0), 0.6))     # drawn at n // 2, half a pixel off (n - 1) / 2
     else:
         yy, xx = np.mgrid[0:n, 0:n]
         sig = s / 3.0

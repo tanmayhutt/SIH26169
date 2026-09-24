@@ -29,6 +29,7 @@ CHOICES = {
     "atmosphere": list(ATMOSPHERE_PRESETS.keys()),
     "platform_motion": ["none", "linear", "circular", "random", "spiral", "figure8"],
     "detector": ["hybrid", "classical", "cnn"],
+    "algorithm": ["argus", "baseline"],
 }
 LABELS = {
     "width": "Width (px)", "height": "Height (px)", "fov_w_deg": "FOV width (deg)", "fov_h_deg": "FOV height (deg)",
@@ -42,9 +43,9 @@ LABELS = {
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
     "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
     "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
-    "colour": "Colour camera", "detector": "Detector", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
+    "colour": "Colour camera", "detector": "Detector", "algorithm": "Tracker algorithm", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
-    "capture_radius_px": "Capture radius (px)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
+    "capture_radius_px": "Capture radius (px)", "handoff_radius_px": "Handoff radius (px)", "handoff_hold_s": "Handoff hold (s)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
     "faint_snr_min": "Faint: min chain SNR", "faint_threshold_k": "Faint: threshold (sigma)",
 }
 TIPS = {
@@ -79,10 +80,13 @@ TIPS = {
     "platform_motion": "PS row 25. Linear is mandatory. All patterns are bounded sways whose peak speed is the value below.",
     "platform_px_frame": "PS row 25. Peak speed of the platform sway, up to 20 px per frame.", "platform_period_s": "Period of circular, figure of 8 and spiral sways.",
     "background": "Scene background.", "background_level": "Mean sky brightness.", "star_density": "Stars per pixel in the starfield.",
+    "algorithm": "argus: this project's tracker. baseline: a deliberately simple brightest-spot tracker with proportional control, only to compare against (tools/compare_trackers.py).",
     "detector": "hybrid: classical first, CNN fills gaps. classical: never use the CNN. cnn: CNN whenever it is confident.",
     "ego_motion": "Use the frame-to-frame picture shift (phase correlation) as a hint for vibration level.",
     "threshold_k": "Detection threshold in sigmas above the local background.", "kp": "Proportional gain, deg/s per deg of error.",
     "kd": "Derivative gain.", "ki": "Integral gain.", "feedforward": "Weight on the predicted target angular rate.",
+    "handoff_radius_px": "Handoff to fine pointing: the estimate must stay within this of the window centre (default 10 px, the PS row 17 limit).",
+    "handoff_hold_s": "Handoff to fine pointing: how long lock and the handoff radius must hold before coarse alignment counts as ready (default 1 s).",
     "deadband_px": "No command inside this radius, so vibration is not chased.", "capture_radius_px": "Lock is declared when the estimate is within this of the window centre.",
     "estimator_lag_s": "Assumed delay of the velocity estimate at the 30 Hz reference, compensated with acceleration; scales with the update rate.",
     "acquire_conf_min": "A new track needs at least this detector confidence. Stars and noise clumps score about 0.55, a beacon 0.67 (low light) to 0.96 (clear).",
@@ -162,9 +166,11 @@ def schema(cfg: RunConfig | None = None) -> list[dict]:
     return out
 
 
-def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int, identical: bool = False) -> list[TargetConfig]:
+def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int, identical: bool = False,
+                  designated: int = 0) -> list[TargetConfig]:
     """Target 1 plus `extra` more: scenario targets first, then generated decoys. With
-    `identical` the generated decoys copy target 1's shape, size and brightness, so only a
+    `identical` every target other than the designated one takes the designated target's shape,
+    size and brightness (copies: the scenario's own objects are not changed), so only a
     designation cue (start position or a click) can tell them apart."""
     rng = np.random.default_rng(seed + 99)
     motions = ["circular", "line", "figure8", "random", "sinusoidal"]
@@ -173,16 +179,18 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
         if i + 1 < len(existing):
             targets.append(existing[i + 1])
         else:
-            t = TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
-                             intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
-                             speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
-                             period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre")
-            if identical:
-                t.shape, t.size_px, t.height_px, t.mask, t.intensity = t0.shape, t0.size_px, t0.height_px, t0.mask, t0.intensity
-                t.start = "random"
-            targets.append(t)
+            targets.append(TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
+                                        intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
+                                        speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
+                                        period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)),
+                                        start="random" if identical else "centre"))
+    if identical and len(targets) > 1:
+        di = min(max(int(designated), 0), len(targets) - 1)
+        look = targets[di]
+        targets = [t if k == di else dataclasses.replace(t, shape=look.shape, size_px=look.size_px, height_px=look.height_px,
+                                                          mask=look.mask, intensity=look.intensity)
+                   for k, t in enumerate(targets)]
     return targets
-
 
 def target_labels(cfg: RunConfig) -> list[str]:
     """Names for the 'Designated' and 'Edit target' pickers."""
@@ -268,7 +276,8 @@ def camera_top(r, ifov_deg: float) -> tuple[str, str]:
     """(state text, detail text) for the top bar of the camera view."""
     err = r.tracking_err_px
     err_s = f"err {err:.1f} px ({err * ifov_deg * 3600:.0f} arcsec)" if np.isfinite(err) else "err n/a (no truth in a video)"
-    return f"{r.mode}{'  locked' if r.locked else ''}", f"{err_s}   conf {r.confidence:.2f}   {r.tier}"
+    state = f"{r.mode}{'  locked' if r.locked else ''}{'  handoff ready' if getattr(r, 'handoff', 0) else ''}"
+    return state, f"{err_s}   conf {r.confidence:.2f}   {r.tier}"
 
 
 def camera_bottom(r) -> tuple[str, bool]:
@@ -330,7 +339,8 @@ class LiveTiles:
         if r is None:
             return T
         state = "pass" if r.mode == "TRACK" and r.locked else ("warn" if r.mode in ("COAST", "REACQUIRE") else None)
-        T["state"] = {"text": r.mode, "state": state, "unit": "locked" if r.locked else "not locked"}
+        unit = ("locked, handoff ready" if getattr(r, "handoff", 0) else "locked") if r.locked else "not locked"
+        T["state"] = {"text": r.mode, "state": state, "unit": unit}
         since = f"since {self.seg_t:.1f} s" if self.segment else None
         if self.acq_t is not None:
             T["acq"].update(text=f"{self.acq_t:.2f} s", state="pass" if self.acq_t <= SPEC["acquisition_time_s"][1] else "fail")
@@ -460,9 +470,12 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
            f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
            + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
-           f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
+           + (f"Handoff to fine pointing: ready at {f('handoff_time_s')} s, held {f('handoff_pct', '{:.1f}')} % after\n"
+              if _num(v, "handoff_time_s") is not None else "Handoff to fine pointing: not reached\n")
+           + f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
+        msg += "\nRecompute and check these figures from the log: fsoc-tracker verify <this run's folder>"
     if d.get("ambiguous_frames"):
         msg += (f"\n\nNote: in {d['ambiguous_frames']} search frames another target looked just like {d.get('target', 'the designated one')}; "
                 f"by appearance alone the tracker may pick the wrong one. Use designation 'start' or click the beacon.")

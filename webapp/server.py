@@ -26,6 +26,7 @@ import copy
 import json
 import math
 import queue
+import re
 import shutil
 import threading
 import time
@@ -76,13 +77,22 @@ class Run:
         self.done = threading.Event()
         self.summary = None
         self.error = None
+        # whoever starts the run gets this token; stop, pause, step and live changes need it, so a
+        # visitor watching the run cannot control it
+        self.token = uuid.uuid4().hex
+        self.pending: list[dict] = []          # live changes asked for before the simulation exists
+        self.pending_lock = threading.Lock()
         self.thread = threading.Thread(target=self._work, daemon=True)
         self.thread.start()
 
     def _work(self):
         try:
             sim = Simulation(self.cfg, self.out)
-            self.sim = sim
+            with self.pending_lock:
+                self.sim = sim
+                for ch in self.pending:           # an edit made right after Start
+                    sim.request_disturbance(ch)
+                self.pending = []
             last_frame = 0.0
             next_t = time.perf_counter()
             live = LiveTiles()
@@ -239,6 +249,21 @@ def _typed(obj, k, v):
         pass
 
 
+def _number(ov: dict, key: str, cast, default, minimum=None):
+    """A number from the browser form; a bad value is a 400 with the field named, not a 500."""
+    if key not in ov:
+        return default
+    try:
+        v = cast(ov[key])
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"{key} must be a number, got {str(ov[key])[:20]!r}")
+    if isinstance(v, float) and not math.isfinite(v):
+        raise HTTPException(400, f"{key} must be a finite number")
+    if minimum is not None and v < minimum:
+        raise HTTPException(400, f"{key} must be at least {minimum}")
+    return v
+
+
 def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
     """Whitelisted, typed overrides from the browser form. The page sends the full target list
     (it keeps one per 'Edit target'); older pages send one 'target' and a decoy count."""
@@ -259,19 +284,17 @@ def _apply_overrides(cfg: RunConfig, ov: dict) -> RunConfig:
         t = ov.get("target") or {}
         for k, v in t.items():
             _typed(cfg.targets[0], k, v)
-    extra = int(ov.get("extra_targets", len(cfg.targets) - 1))
-    seed = int(ov.get("seed", cfg.seed))
-    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed, bool(ov.get("identical", False)))
-    if "designated" in ov:
-        cfg.designated = int(ov["designated"])
+    extra = _number(ov, "extra_targets", int, len(cfg.targets) - 1)
+    seed = _number(ov, "seed", int, cfg.seed, minimum=0)
+    designated = _number(ov, "designated", int, cfg.designated)
+    cfg.targets = extra_targets(cfg.targets[0], cfg.targets, max(0, min(extra, 8)), seed, bool(ov.get("identical", False)), designated)
+    cfg.designated = designated
     if ov.get("designation") in ("auto", "appearance", "start", "cue"):
         cfg.designation = ov["designation"]
     if "designation_cue" in ov:
         cfg.designation_cue = str(ov["designation_cue"])[:40]
-    if "seed" in ov:
-        cfg.seed = int(ov["seed"])
-    if "duration_s" in ov:
-        cfg.duration_s = float(ov["duration_s"])
+    cfg.seed = seed
+    cfg.duration_s = _number(ov, "duration_s", float, cfg.duration_s)
     if "name" in ov and str(ov["name"]).strip():
         cfg.name = "".join(c for c in str(ov["name"]) if c.isalnum() or c in "-_ ")[:40] or "run"
     return cfg
@@ -320,7 +343,7 @@ async def start_run(body: dict):
         cfg.duration_s = min(max(cfg.duration_s, DURATION_RANGE[0]), DURATION_RANGE[1]) if not cfg.video else 0.0
         cfg.output_dir = str(RUNS)
         run_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
-        speed = float(body.get("speed", 1.0))
+        speed = _number(body, "speed", float, 1.0)
         RUN[run_id] = Run(cfg, run_id, speed if speed in [v for _, v in SPEEDS] else 1.0)
         # keep only the last 30 runs and the last 10 uploaded videos on disk
         for old in sorted(RUNS.iterdir())[:-30]:
@@ -330,7 +353,7 @@ async def start_run(body: dict):
             if str(old) != cfg.video:
                 old.unlink(missing_ok=True)
         chk = scenario_check(cfg)
-        return {"run_id": run_id, "seed": cfg.seed, "config": cfg.to_dict(), "label": run_label_of(cfg), "checks": chk,
+        return {"run_id": run_id, "token": RUN[run_id].token, "seed": cfg.seed, "config": cfg.to_dict(), "label": run_label_of(cfg), "checks": chk,
                 "status": status_text("running", name=cfg.name, seed=cfg.seed, out=f"results/{run_label_of(cfg)}")
                           + (f"   |   {chk[0]}" if chk else "")}
 
@@ -338,8 +361,13 @@ async def start_run(body: dict):
 def _config_from(body: dict) -> RunConfig:
     """Scenario plus panel values, with the same seed and decoy rules as the desktop app."""
     name = body.get("scenario")
+    if name and not (isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_\-]{1,80}", name)):
+        raise HTTPException(400, "scenario must be the plain name of a file in configs/scenarios")
+    ov = body.get("overrides") or {}
+    if not isinstance(ov, dict):
+        raise HTTPException(400, "overrides must be an object of panel values")
     cfg = RunConfig.load(SCENARIOS / f"{name}.yaml") if name and (SCENARIOS / f"{name}.yaml").exists() else RunConfig()
-    cfg = _apply_overrides(cfg, body.get("overrides") or {})
+    cfg = _apply_overrides(cfg, ov)
     if body.get("random_seed", True):
         new_random_seed(cfg)
     return cfg
@@ -350,39 +378,48 @@ def run_label_of(cfg: RunConfig) -> str:
     return run_label(cfg)
 
 
-@app.post("/api/pause/{run_id}")
-def pause_run(run_id: str):
+def _controlled(run_id: str, token: str) -> "Run":
+    """The run, if the caller started it (holds its token); a watcher gets 403."""
     r = RUN.get(run_id)
     if not r:
         raise HTTPException(404, "unknown run")
+    if not token or token != r.token:
+        raise HTTPException(403, "only the page that started this run can control it")
+    return r
+
+
+@app.post("/api/pause/{run_id}")
+def pause_run(run_id: str, token: str = ""):
+    r = _controlled(run_id, token)
     r.pause = not r.pause
     return {"paused": r.pause}
 
 
 @app.post("/api/step/{run_id}")
-def step_run(run_id: str):
-    r = RUN.get(run_id)
-    if not r:
-        raise HTTPException(404, "unknown run")
+def step_run(run_id: str, token: str = ""):
+    r = _controlled(run_id, token)
     r.pause = True; r.step_once = True
     return {"paused": True}
 
 
 @app.post("/api/disturb/{run_id}")
-def disturb_run(run_id: str, body: dict):
+def disturb_run(run_id: str, body: dict, token: str = ""):
     """New disturbance settings for the running simulation; they take effect on its next frame."""
-    r = RUN.get(run_id)
-    if not r:
-        raise HTTPException(404, "unknown run")
-    sim = getattr(r, "sim", None)
-    if r.done.is_set() or sim is None:
+    r = _controlled(run_id, token or str(body.get("token", "")))
+    if r.done.is_set():
         raise HTTPException(409, "the run is not in progress")
-    if not sim.accepts_disturbance_changes:
+    if r.cfg.video:
         raise HTTPException(409, "a video run carries its own disturbances")
-    changes = clean_disturbance_changes(body.get("disturbance") or {})
+    d = body.get("disturbance")
+    changes = clean_disturbance_changes(d) if isinstance(d, dict) else {}
     if not changes:
-        raise HTTPException(400, "no disturbance settings given")
-    sim.request_disturbance(changes)
+        raise HTTPException(400, "no usable disturbance settings given")
+    with r.pending_lock:
+        sim = getattr(r, "sim", None)
+        if sim is None:
+            r.pending.append(changes)             # the simulation is still being built
+        else:
+            sim.request_disturbance(changes)
     return {"queued": True, "status": status_text("changing")}
 
 
@@ -408,10 +445,8 @@ def runs():
 
 
 @app.post("/api/stop/{run_id}")
-def stop_run(run_id: str):
-    r = RUN.get(run_id)
-    if not r:
-        raise HTTPException(404, "unknown run")
+def stop_run(run_id: str, token: str = ""):
+    r = _controlled(run_id, token)
     r.stop.set()
     return {"ok": True}
 
@@ -450,7 +485,10 @@ async def upload_video(request: Request, file: UploadFile = File(...)):
     for k, cast in (("cam_w", int), ("cam_h", int), ("fov_w", float), ("fov_h", float)):
         v = query.get(k)
         if v not in (None, ""):
-            setattr(cam, {"cam_w": "width", "cam_h": "height", "fov_w": "fov_w_deg", "fov_h": "fov_h_deg"}[k], cast(v))
+            try:                         # only shapes the description text; a bad value is left out
+                setattr(cam, {"cam_w": "width", "cam_h": "height", "fov_w": "fov_w_deg", "fov_h": "fov_h_deg"}[k], cast(v))
+            except ValueError:
+                pass
     info["loaded_text"] = video_loaded_lines(file.filename or name, info, cam)
     info["preview_header"] = video_preview_header(info)
     info["status"] = status_text("video", path=file.filename or name)

@@ -3,6 +3,7 @@
     fsoc-tracker run   --scenario configs/scenarios/clear_line.yaml [--seed N] [--duration S] [--out DIR]
     fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--out DIR]
     fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--out DIR]
+    fsoc-tracker verify results/<run folder> [...]      # recompute the metrics from frames.csv, check summary.json
     fsoc-tracker gui
 """
 from __future__ import annotations
@@ -68,10 +69,22 @@ def main(argv=None):
     b.add_argument("--duration", type=float, default=None)
     b.add_argument("--out", "-o", default="results/batch")
 
+    vf = sub.add_parser("verify", help="recompute a run's metrics from its frames.csv and check its summary.json")
+    vf.add_argument("folders", nargs="+", help="run folder(s) holding <label>_frames.csv and <label>_summary.json")
+
     sub.add_parser("gui", help="launch the desktop application")
 
     a = ap.parse_args(argv)
     stamp = time.strftime("%Y%m%d_%H%M%S")
+
+    if a.cmd == "verify":
+        from .engine.verify import print_result, verify_run
+        results = [verify_run(f) for f in a.folders]
+        for res in results:
+            print_result(res)
+        bad = sum(not res["ok"] for res in results)
+        print(f"verify: {len(results) - bad} of {len(results)} runs reproduce their summary from their frames")
+        return 1 if bad else 0
 
     if a.cmd == "gui":
         from .gui.app import main as gui_main
