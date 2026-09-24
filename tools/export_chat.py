@@ -70,6 +70,8 @@ def main(src: str, dst: str) -> None:
                 text = re.sub(r"\[SYSTEM NOTIFICATION - NOT USER INPUT\].*?(?=\n\n|$)", "", text, flags=re.S).strip()
                 if not text or text.startswith("<local-command-caveat>") or "[Request interrupted by user" in text and len(text) < 60:
                     continue
+                if "<command-name>" in text or text.startswith("# Claude Code Doctor"):   # a slash command's own instructions, not the person
+                    continue
                 n_user += 1
                 out.append(f"\n**Tanmay** ({ts[11:16]} UTC):\n\n{clean(text)}\n")
             elif j["type"] == "assistant" and t == "text":
