@@ -16,7 +16,7 @@ from enum import Enum
 import cv2
 import numpy as np
 
-from ..engine.config import RunConfig
+from ..engine.config import RunConfig, parse_code
 from ..perception.detect import Candidate, ClassicalDetector, CNNDetector
 from ..perception.estimator import IMM
 
@@ -101,6 +101,27 @@ class Tracker:
         self._cue_mode = False
         self.ambiguous_frames = 0     # search frames in which another spot looked just like the designated one
         self.ambiguous = False
+        # coded beacon: the designated beacon blinks a known bit pattern, so a spot is accepted as
+        # it only when its brightness over the last two code cycles follows that pattern. A spot
+        # that does not is remembered for a few seconds and not picked again (a look-alike)
+        self.code = parse_code(t.code) if t is not None and t.code else None
+        self.code_rejections = 0          # spots turned down because they did not blink the code
+        self.code_score = float("nan")    # best correlation of the followed spot with the code
+        self._code_samples: list[float] = []
+        self._code_strikes = 0
+        self._excluded: list[dict] = []
+        self._frame = 0
+        if self.code:
+            self._code_rate = float(t.code_rate_hz)
+            self._code_cycle = len(self.code) / (self._code_rate * dt)      # frames in one code cycle
+            self._code_window = int(np.ceil(2 * self._code_cycle))
+            # the shortest stretch that always holds both a 1 and a 0 (the longest run of equal
+            # bits, cyclically, plus one): a steady spot is turned down after that many frames
+            runs, cur, ring = 1, 1, self.code * 2
+            for p, q in zip(ring, ring[1:]):
+                cur = cur + 1 if p == q else 1
+                runs = max(runs, cur)
+            self._code_quick = int(np.ceil((min(runs, len(self.code)) + 1) / (self._code_rate * dt)))
 
     JITTER_CAP = 25.0   # px; the PS maximum vibration is 20 px/frame
     AMBIGUOUS_MARGIN = 0.15   # appearance scores closer than this cannot tell two spots apart
@@ -148,6 +169,7 @@ class Tracker:
     # ------------------------------------------------------------------ main
     def step(self, img: np.ndarray, window_only_rect: tuple[int, int, int, int] | None = None) -> TrackOutput:
         self.frames_in_mode += 1
+        self._frame += 1
         tier = "none"
         detection = None
         gate_d = 0.0
@@ -170,14 +192,12 @@ class Tracker:
             else:
                 det_img = img
                 cands = self.classical.detect(img, roi)
-            # candidates past the first few come back unrefined; whoever picks one refines it
-            # on this frame's picture, never on one left over from an earlier frame or state
+            # candidates past the first few come back unrefined; whoever picks one refines it on
+            # this frame's picture, never on one left over from an earlier frame or state
             self._det_img = det_img
             tier = "classical" if cands else "none"
-            # candidates are re-measured on this frame's picture (before, a search after a loss
-            # re-measured them on the last tracked frame, and a first search with several strong
-            # candidates had no picture at all)
-            self._det_img = det_img
+            if self._excluded:
+                self._follow_excluded(cands)
             chosen = self._pick_new(cands)
             # the faint path needs a still picture to build its moving-target residual; in hard
             # mode the window sweeps the screen, so the path is off there
@@ -195,6 +215,7 @@ class Tracker:
                     self.designated_sig = _signature(chosen)
                     self.verify_hits = [True]
                     self._set(Mode.VERIFY)
+                    self._code_samples = []
                 else:
                     self.imm.update(chosen.x, chosen.y, self._meas_sigma())
                     self.verify_hits.append(True)
@@ -204,7 +225,19 @@ class Tracker:
                 # a provisional (faint) candidate needs a longer, stricter confirmation
                 v_n, v_m = (5, 6) if self.provisional else (self.tc.verify_n, self.tc.verify_m)
                 hist = self.verify_hits[-v_m:]
-                if sum(hist) >= v_n:
+                # a coded beacon is confirmed only once the spot has blinked its code; its dim bits
+                # may be missed by the detector, so it is dropped only when it is mostly unseen.
+                # A faint beacon (3 to 6 sigma) is too weak in one frame to show a bit: no check
+                verdict = True
+                if self.code and not self.faint:
+                    self._code_sample(img, detection)
+                    verdict = self._code_verdict()
+                    v_m = self._code_quick
+                    v_n = max(1, int(np.ceil(0.34 * v_m)))
+                    hist = self.verify_hits[-v_m:]
+                if verdict is False:
+                    self._reject_spot()
+                elif sum(hist) >= v_n and verdict:
                     self._set(Mode.TRACK)
                     self.miss_count = 0
                     self.provisional = False
@@ -288,8 +321,18 @@ class Tracker:
                     self._set(Mode.SEARCH)
                     self.imm.initialised = False
                     self.faint = False
+            if self.code and not self.faint and self.mode != Mode.SEARCH:
+                # keep checking while following: after two decoys cross, the one followed may
+                # have changed. Two failed checks half a window apart hand the spot back
+                self._code_sample(img, detection)
+                if self._frame % max(self._code_window // 2, 1) == 0:
+                    verdict = self._code_verdict()
+                    self._code_strikes = self._code_strikes + 1 if verdict is False else 0
+                    if self._code_strikes >= 2:
+                        self._reject_spot()
 
-        if self.mode == Mode.TRACK and self.frames_in_mode % 15 == 0 and len(self.cfg.targets) > 1:
+        # a coded beacon carries its own identity, so the appearance audit is not needed
+        if self.mode == Mode.TRACK and self.frames_in_mode % 15 == 0 and len(self.cfg.targets) > 1 and not self.code:
             self._audit_designation(img)
 
         est = self.imm.position() if self.imm.initialised else None
@@ -394,6 +437,10 @@ class Tracker:
         strong = [c for c in cands if c.confidence >= floor]
         if not strong:
             return None
+        if self._excluded:
+            strong = [c for c in strong if not self._is_excluded(c)]
+            if not strong:
+                return None
         cands = strong
         self.provisional = False
         self.faint = False
@@ -415,11 +462,102 @@ class Tracker:
             cands = [c for c in cands if c.sigma >= self.MIN_SIGMA] or cands   # a hot pixel is not a beacon
             peak_max = max(c.peak for c in cands) or 1.0
             scored = sorted(((self._config_score(c, peak_max), c) for c in cands), key=lambda sc: sc[0])
-            self.ambiguous = len(self.cfg.targets) > 1 and len(scored) > 1 and scored[1][0] - scored[0][0] < self.AMBIGUOUS_MARGIN
+            # a coded beacon is told apart by its code, so look-alikes do not make the choice ambiguous
+            self.ambiguous = not self.code and len(self.cfg.targets) > 1 and len(scored) > 1 and scored[1][0] - scored[0][0] < self.AMBIGUOUS_MARGIN
             if self.ambiguous:
                 self.ambiguous_frames += 1
             return scored[0][1]
         return cands[0]
+
+    # ------------------------------------------------------------ coded beacon
+    CODE_ACCEPT = 0.6     # correlation with the code over two cycles that accepts a spot
+    CODE_REJECT = 0.3     # below this after one cycle a spot is plainly not blinking the code
+    CODE_DEPTH = 0.12     # the 0 bits must be at least this much dimmer than the 1 bits (the beacon: 0.3)
+    EXCLUDE_S = 3.0       # how long a rejected spot is not picked again
+
+    def _spot_brightness(self, img: np.ndarray, x: float, y: float) -> float:
+        """Brightness of a spot: the mean of its core above the median of a ring around it. A
+        mean, not the peak, so that salt noise on a single pixel does not decide a bit."""
+        g = img if img.ndim == 2 else img.mean(axis=2)
+        r = max(2, int(round((self.classical.expected_size_px or 8.0) / 2)))
+        c = max(1, r // 2)
+        xi, yi = int(round(x)), int(round(y))
+        core = g[max(yi - c, 0):yi + c + 1, max(xi - c, 0):xi + c + 1]
+        ring = g[max(yi - r - 4, 0):yi + r + 5, max(xi - r - 4, 0):xi + r + 5]
+        if core.size == 0 or ring.size == 0:
+            return float("nan")
+        edge = np.concatenate([ring[:3].ravel(), ring[-3:].ravel(), ring[:, :3].ravel(), ring[:, -3:].ravel()])
+        return float(core.mean() - np.median(edge))
+
+    def _code_sample(self, img: np.ndarray, detection) -> None:
+        """One brightness sample of the followed spot per frame, at the detection or, when the
+        detector missed it (a dim bit), at the estimate; NaN on a frame with no picture, so
+        the samples stay aligned with the frame clock."""
+        at = detection if detection is not None else (self.imm.position() if self.imm.initialised else None)
+        v = self._spot_brightness(img, *at) if at is not None and img.any() else float("nan")
+        self._code_samples.append(v)
+        del self._code_samples[:-self._code_window]
+
+    def _code_verdict(self) -> bool | None:
+        """Does the followed spot blink the code? The beacon's clock is not known, so every
+        phase is tried and the best correlation counts. None until there are enough samples."""
+        s = np.array(self._code_samples, float)
+        seen = np.isfinite(s)
+        if len(s) < self._code_quick or seen.sum() < 0.6 * len(s):
+            return None
+        bits = np.array(self.code)
+        k = np.arange(len(s))
+        x = s[seen]
+        best = -1.0
+        for off in range(int(round(self._code_cycle))):
+            e = bits[((k + off) * self.dt * self._code_rate + 1e-9).astype(int) % len(bits)][seen]
+            if e.min() == e.max() or x.std() < 1e-6:
+                continue
+            hi, lo = x[e == 1].mean(), x[e == 0].mean()
+            if hi <= 0 or (hi - lo) / hi < self.CODE_DEPTH:
+                continue
+            best = max(best, float(np.corrcoef(x, e)[0, 1]))
+        self.code_score = best
+        if len(s) >= self._code_window:
+            return best >= self.CODE_ACCEPT
+        return False if best < self.CODE_REJECT else None
+
+    def _reject_spot(self) -> None:
+        """The followed spot does not blink the code: remember where it is going and search again."""
+        if self.imm.initialised:
+            (x, y), (vx, vy) = self.imm.position(), self.imm.velocity()
+            self._excluded.append({"x": x, "y": y, "vx": vx, "vy": vy, "frame": self._frame, "seen": self._frame})
+        self.code_rejections += 1
+        self._code_samples, self._code_strikes = [], 0
+        self._set(Mode.SEARCH)
+        self.imm.initialised = False
+        self.provisional = self.faint = False
+
+    def _predicted(self, e: dict) -> tuple[float, float, float]:
+        """Where a rejected spot should be now, and how far off that may be."""
+        age = (self._frame - e["seen"]) * self.dt
+        return e["x"] + e["vx"] * age, e["y"] + e["vy"] * age, 25.0 + 60.0 * age + 2 * self.jitter_sigma
+
+    def _follow_excluded(self, cands: list[Candidate]) -> None:
+        """Keep each rejected spot's position current while searching: it takes the nearest
+        detection near where it should be, so one on a curved path is still recognised."""
+        self._excluded = [e for e in self._excluded if (self._frame - e["frame"]) * self.dt <= self.EXCLUDE_S]
+        for e in self._excluded:
+            px, py, r = self._predicted(e)
+            near = [c for c in cands if np.hypot(c.x - px, c.y - py) < r]
+            if near:
+                c = min(near, key=lambda c: np.hypot(c.x - px, c.y - py))
+                age = max((self._frame - e["seen"]) * self.dt, self.dt)
+                e["vx"] = 0.5 * e["vx"] + 0.5 * (c.x - e["x"]) / age
+                e["vy"] = 0.5 * e["vy"] + 0.5 * (c.y - e["y"]) / age
+                e["x"], e["y"], e["seen"] = c.x, c.y, self._frame
+
+    def _is_excluded(self, c: Candidate) -> bool:
+        for e in self._excluded:
+            px, py, r = self._predicted(e)
+            if np.hypot(c.x - px, c.y - py) < r:
+                return True
+        return False
 
     # ------------------------------------------------------- faint beacon path
     def _faint_params(self) -> tuple[float, float]:
@@ -583,12 +721,16 @@ def _signature(c: Candidate) -> dict:
     return {"area": float(c.area), "peak": float(c.peak), "sigma": float(c.sigma)}
 
 
-def _signature_distance(a: dict | None, b: dict) -> float:
+def _signature_distance(a: dict | None, b: dict, brightness: bool = True) -> float:
+    """How different two spots look. Without `brightness` (a coded beacon, whose brightness
+    changes by design, and whose thresholded area with it) only the fitted width counts."""
     if not a:
         return 0.0
+    ds = abs(a["sigma"] - b["sigma"]) / 3.0
+    if not brightness:
+        return float(ds)
     da = abs(np.log((a["area"] + 1) / (b["area"] + 1)))
     dp = abs(a["peak"] - b["peak"]) / 255.0
-    ds = abs(a["sigma"] - b["sigma"]) / 3.0
     return float(1.5 * da + 2.0 * dp + ds)
 
 

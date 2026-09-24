@@ -38,11 +38,11 @@ LABELS = {
     "window_only": "Hard mode: see window only", "name": "Name", "size_px": "Width (px)", "height_px": "Height (px)",
     "mask": "Custom shape (0/1 rows)", "intensity": "Peak intensity",
     "speed_px_s": "Speed (px/s)", "radius_px": "Radius (px)", "period_s": "Period (s)", "heading_deg": "Heading (deg)",
-    "blink_hz": "Blink (Hz, 0 = steady)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper (%)", "gaussian_sigma": "Gaussian sigma",
+    "blink_hz": "Blink (Hz, 0 = steady)", "code": "Beacon code (0/1, empty = steady)", "code_rate_hz": "Code rate (bits/s)", "waypoints": "Waypoints (x,y; x,y)", "salt_pepper_frac": "Salt and pepper (%)", "gaussian_sigma": "Gaussian sigma",
     "poisson": "Poisson shot noise", "jitter_px": "Camera jitter (px/frame)", "atmosphere": "Atmosphere preset",
     "contrast": "Contrast multiplier", "brightness": "Brightness offset", "turbulence": "Turbulence (0-1)",
     "blur_sigma": "PSF blur sigma (px)", "platform_motion": "Platform motion", "platform_px_frame": "Platform (px/frame)",
-    "platform_period_s": "Platform period (s)", "background_level": "Sky level (0-255)", "star_density": "Star density",
+    "platform_period_s": "Platform period (s)", "exposure_gain": "Exposure gain", "frame_drop_frac": "Frame loss (%)", "background_level": "Sky level (0-255)", "star_density": "Star density",
     "colour": "Colour camera", "detector": "Detector", "algorithm": "Tracker algorithm", "ego_motion": "Use picture-shift estimate", "threshold_k": "Threshold k (sigma)",
     "kp": "Kp", "kd": "Kd", "ki": "Ki", "feedforward": "Feedforward weight", "deadband_px": "Deadband (px)",
     "capture_radius_px": "Capture radius (px)", "handoff_radius_px": "Handoff radius (px)", "handoff_hold_s": "Handoff hold (s)", "estimator_lag_s": "Estimator lag (s)", "acquire_conf_min": "Acquire confidence",
@@ -69,6 +69,8 @@ TIPS = {
     "speed_px_s": "Along-track speed for line, random, sinusoidal and waypoint paths.", "radius_px": "Radius for circular, figure of 8, spiral; half-amplitude for sinusoidal.",
     "period_s": "Time for one loop of the path.", "heading_deg": "Direction of a line or sinusoidal path.", "start": "PS row 11, user-defined, default random: random, centre, or type x,y in screen pixels (for example 400,1500).",
     "blink_hz": "Optional intensity modulation of the beacon.",
+    "code": "Beyond the PS: the beacon blinks this bit pattern (for example 10110; a 0 bit dims it to 70%). The tracker accepts a spot only when it blinks the code, so look-alikes are told apart without a start position or a click. Empty = a steady beacon.",
+    "code_rate_hz": "Bits per second of the beacon code. A bit must last at least two frames: at most half the update rate (15 at 30 Hz).",
     "waypoints": "PS row 12, user-defined path: points in screen pixels for motion 'waypoints', followed at Speed and looped. Example 300,300; 1700,400; 1000,1600.",
     "salt_pepper_frac": "PS row 21: percent of pixels set to black or white. The PS says around 10%; accepted 0 to 50.",
     "gaussian_sigma": "PS row 21 and 22. Read-noise standard deviation in grey levels, up to 20.",
@@ -78,6 +80,8 @@ TIPS = {
     "contrast": "PS row 24. 1.0 = none. Fog is about 0.4.", "brightness": "PS row 24. Grey levels added; fog lifts the black level, low light lowers it.",
     "turbulence": "Beam wander and flicker strength.", "blur_sigma": "PSF broadening from the atmosphere.",
     "platform_motion": "PS row 25. Linear is mandatory. All patterns are bounded sways whose peak speed is the value below.",
+    "exposure_gain": "Camera exposure (a disturbance beyond the PS table): 1 = normal; below 1 under-exposed, above 1 over-exposed with bright areas clipped to white.",
+    "frame_drop_frac": "Camera frame loss (beyond the PS table): percent of frames the link loses; a lost frame reaches the tracker with no picture, so it must coast.",
     "platform_px_frame": "PS row 25. Peak speed of the platform sway, up to 20 px per frame.", "platform_period_s": "Period of circular, figure of 8 and spiral sways.",
     "background": "Scene background.", "background_level": "Mean sky brightness.", "star_density": "Stars per pixel in the starfield.",
     "algorithm": "argus: this project's tracker. baseline: a deliberately simple brightest-spot tracker with proportional control, only to compare against (tools/compare_trackers.py).",
@@ -98,7 +102,7 @@ HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "ve
 RANGES = LIMITS          # accepted input ranges live in the engine, so every front end clamps alike
 # fields shown in other units than they are stored: salt and pepper is a fraction in the engine
 # (0.10) and a percentage on the panel (10), the way the PS states it
-SCALE = {"salt_pepper_frac": 100.0}
+SCALE = {"salt_pepper_frac": 100.0, "frame_drop_frac": 100.0}
 # choices that also accept typed text: PS row 11 lets the user give the start as "x,y"
 EDITABLE_CHOICES = {"start"}
 MODES = ["SEARCH", "VERIFY", "TRACK", "COAST", "REACQUIRE"]
@@ -470,12 +474,18 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Tracked {f('tracked_pct', '{:.1f}')} %   Lock retention {f('lock_retention_pct', '{:.1f}')} %   target loss {f('target_loss_pct', '{:.1f}')} %  ({pf('target_loss_pct')})\n"
            f"Re-acquisitions {v.get('reacq_count', 0)}, max {f('reacq_time_max_s')} s  ({pf('reacq_time_max_s')})"
            + (f"; lock lost for the last {f('lock_lost_at_end_s')} s, not regained" if (_num(v, "lock_lost_at_end_s") or 0) > 0 else "") + "\n"
+           + (f"Frames lost {f('frames_lost_pct', '{:.1f}')} %; lock on the frames received {f('lock_retention_received_pct', '{:.1f}')} %\n"
+              if (_num(v, "frames_lost_pct") or 0) > 0 else "")
            + (f"Handoff to fine pointing: ready at {f('handoff_time_s')} s, held {f('handoff_pct', '{:.1f}')} % after\n"
               if _num(v, "handoff_time_s") is not None else "Handoff to fine pointing: not reached\n")
            + f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
         msg += "\nRecompute and check these figures from the log: fsoc-tracker verify <this run's folder>"
+    if d.get("code"):
+        n = d.get("code_rejections", 0)
+        msg += (f"\n\nBeacon code {d['code']}: {n} spot{'' if n == 1 else 's'} turned down because {'it' if n == 1 else 'they'} did not blink it."
+                if n else f"\n\nBeacon code {d['code']}: no other spot was taken for it.")
     if d.get("ambiguous_frames"):
         msg += (f"\n\nNote: in {d['ambiguous_frames']} search frames another target looked just like {d.get('target', 'the designated one')}; "
                 f"by appearance alone the tracker may pick the wrong one. Use designation 'start' or click the beacon.")

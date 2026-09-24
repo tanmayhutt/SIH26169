@@ -63,6 +63,7 @@ class Record:
     # coarse alignment stable enough to hand over to fine pointing (locked, estimate within
     # handoff_radius_px of the boresight, held for handoff_hold_s)
     handoff: int = 0
+    frame_lost: int = 0          # the camera link lost this frame (simulated frame loss)
 
 
 COLUMNS = [f.name for f in fields(Record)]
