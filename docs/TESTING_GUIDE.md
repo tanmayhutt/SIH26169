@@ -248,8 +248,9 @@ Differences that come from the server:
 ## 9. Automated checks, for completeness
 
 ```
-python -m pytest                       # 99 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances, robustness review)
+python -m pytest                       # 104 tests: geometry, gimbal, paths, centroid, IMM, metrics, closed loop, identity, decoys, video, desktop panel, PS rows, targets and designation, review fixes (FPS, fast target, coasting guard, video truth, CNN path, still beacon, platform sway speed, faint track, live disturbances, robustness review, verify)
 python tools/ps_audit.py               # every PS item measured by running the code; writes docs/PS_AUDIT.md; 39 of 39 pass, exit 1 on a failure
 python webapp/smoke.py                 # web app: start, run a scenario, fetch the report
+fsoc-tracker verify results/<run folder>   # a run's summary rebuilt from its frames.csv; exit 1 on any difference
 python tests/package_check.py dist/ARGUS-<platform>.zip   # a built archive, as a user would run it
 ```

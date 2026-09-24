@@ -340,6 +340,8 @@ jump: it settles into the new pattern within 1.25 times the larger peak speed.
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
   identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
   evaluator template.
+- Reproducible figures: `fsoc-tracker verify <run folder>` rebuilds every metric of a run from its
+  per-frame CSV alone and checks its summary JSON, so a reader can confirm the reported numbers.
 - Batch envelope: `fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-N`
   runs every scenario over N seeds and writes `envelope.md` with mean and worst values.
 - Every metric has a printed definition (section 8 of the user manual) so the numbers can be
@@ -498,6 +500,7 @@ Figure 5 summarises the envelope: mean and worst-seed tracking error per scenari
 fsoc-tracker run   --scenario configs/scenarios/<name>.yaml [--seed N | -1] [--duration S] [--out DIR]
 fsoc-tracker video path/to/file.mp4 [--scenario cfg.yaml] [--truth truth.csv] [--out DIR]
 fsoc-tracker batch --scenario a.yaml [b.yaml ...] --seeds 0-49 [--duration S] [--out DIR]
+fsoc-tracker verify results/<run folder>
 fsoc-tracker gui
 ```
 

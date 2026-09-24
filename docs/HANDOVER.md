@@ -71,7 +71,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 99 tests
+.venv/bin/python -m pytest                      # 104 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -101,6 +101,7 @@ fsoc-tracker-gui                                                                
 uvicorn webapp.server:app --host 127.0.0.1 --port 8095                              # web app locally
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
+fsoc-tracker verify results/<run folder> [...]        # recompute a run's metrics from its frames.csv, check its summary.json
 python tools/record_check.py                   # commits that changed code without updating the record
 # (a commit written up in a later commit is listed, with that commit, in RECORDED_LATER in the tool)
 python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
@@ -296,7 +297,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (99 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (104 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch

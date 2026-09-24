@@ -335,6 +335,7 @@ Commands:
 fsoc-tracker run --scenario configs/scenarios/fog_circular.yaml [--seed 3] [--duration 20]
 fsoc-tracker video path/to/file.mp4 [--truth truth.csv]
 fsoc-tracker batch --scenario configs/scenarios/*.yaml --seeds 0-49
+fsoc-tracker verify results/<run folder>   # recompute the metrics from frames.csv and check summary.json
 fsoc-tracker gui
 ```
 
@@ -392,6 +393,10 @@ seed and time it belongs to:
 With `--out <folder>` on the command line the folder is yours; the files inside are still
 labelled. Batch runs write `results/batch/<time>/<scenario>_seed<N>/` with labelled files and
 an `envelope.md` table. The web app names its downloads the same way.
+
+Every figure in `<label>_summary.json` can be checked against the log: `fsoc-tracker verify <run folder>`
+rebuilds the metrics from `<label>_frames.csv` alone, with the same code that made them, and lists any
+value that differs (exit code 1). The end-of-run summary names the command.
 
 ## 8. Metric definitions
 

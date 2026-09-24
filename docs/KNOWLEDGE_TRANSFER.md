@@ -531,7 +531,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 99 automated tests, including one per group of PS rows that pins every default to the PS.
+- 104 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -621,6 +621,9 @@ repository has its own free minutes, so a build can also be run there and publis
   both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
   and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
   monthly reset, or a build on a teammate's fork.
+- **2026-09-24. Verifiable figures.** `fsoc-tracker verify <run folder>` rebuilds every metric from a run's
+  frames.csv and checks its summary.json (the 51-run regression batch: 51 of 51 reproduce, 32 values each);
+  a summary edited by hand is caught. It lets an evaluator confirm our numbers from the log alone.
 - **2026-09-24. A full robustness review.** Every PS scenario over ten seeds (170 runs, no crash),
   19 evaluator-style videos (sizes 5 to 20 px, 1080p and 4K, 25 and 60 fps, noise, fog, low light,
   shake, a still beacon, two beacons, a beacon that leaves) and broken files, plus two code
