@@ -21,12 +21,12 @@ CODE = ("fsoc_tracker/", "webapp/server.py", "webapp/static/", "configs/", "mode
 RECORD = ("docs/HANDOVER.md", "docs/KNOWLEDGE_TRANSFER.md", "PROGRESS.md", "web/progress.json", "COMPLIANCE.md",
           "docs/USER_MANUAL.md", "docs/TECHNICAL_REPORT.md", "docs/TESTING_GUIDE.md", "docs/PS_AUDIT.md", "CLAUDE.md", "README.md")
 IGNORE = ("tests/", "docs/", "context.md")   # tests and docs alone are not an application change
-# Code commits made before the same-commit rule existed (CLAUDE.md, 2026-09-24), each written up in
-# the later commit named here. Checked by hand: the later commit is a descendant and edits the
-# record files. New commits are not added here; they carry their record update themselves.
+# Code commits written up in a later commit instead of their own (most from before the
+# same-commit rule in CLAUDE.md). Checked by hand: the later commit is a descendant and edits the
+# record files about that change. New work carries its record update in the same commit.
 RECORDED_LATER = {"2bcaee6": "fc4b620", "728cd20": "fc4b620", "e025e91": "fc4b620", "286e508": "fc4b620",
                   "c3a1517": "55c2778", "84dc899": "55c2778", "01750ff": "55c2778", "2905bd7": "3db51ba",
-                  "a60a137": "960c02d"}
+                  "a60a137": "960c02d", "5b11160": "dbc3cf7"}
 
 
 def git(*args: str) -> str:

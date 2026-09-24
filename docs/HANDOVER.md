@@ -102,6 +102,7 @@ uvicorn webapp.server:app --host 127.0.0.1 --port 8095                          
 python webapp/smoke.py                         # web app end to end: start, run, fetch report
 python tools/compare_batches.py results/a results/b   # before/after, exit 1 if any run is worse
 python tools/record_check.py                   # commits that changed code without updating the record
+# (a commit written up in a later commit is listed, with that commit, in RECORDED_LATER in the tool)
 python tools/ps_audit.py                       # measure every PS item, write docs/PS_AUDIT.md, exit 1 on a failure
 python tools/gui_screenshot.py results/shot full_stress   # desktop screenshots without a display
 python tools/make_demo_video.py                # regenerate the demo video (docs/demo/, not in git)
