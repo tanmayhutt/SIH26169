@@ -154,7 +154,7 @@ const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono
 const UI = getComputedStyle(document.documentElement).getPropertyValue("--ui");
 let U = null, META = null, RUN_ID = null, WS = null, VIDEO = null, WATCHING = false, PAUSED = false, LAST = null, LIM = 5, TOTAL = 1;
 let TARGETS = [], EDIT = 0, DESIG = 0, DMODE = "auto", CUE = "", PREVIEW = null, GEOM = null, CHECK_T = null;   // targets as stored (engine units); which one the form edits
-let SEGMENT = 0, CHANGES = [], LIVE_TIMER = null;   // disturbance changes during the run: segment seen, change times
+let SEGMENT = 0, CHANGES = [], LIVE_TIMER = null, TOKEN = null;   // TOKEN: this page started the run and may control it   // disturbance changes during the run: segment seen, change times
 const B = { t: [], terr: [], cerr: [], pan: [], tilt: [], proc: [], mode: [] };
 const TRAIL = { truth: [], win: [], cam: [] };
 const sceneImg = new Image(), camImg = new Image();
@@ -269,9 +269,9 @@ function readSection(key) {
 function lockForRun(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const s of U.sections) if (!U.live_sections.includes(s.key)) for (const f of s.fields) set(s.key + "." + f.name, on);
-  for (const id of ["name", "seed", "rnd", "duration", "extra"]) set(id, on);
-  for (const id of ["open", "sim", "save"]) { const el = $(id); if (el) el.disabled = on || (id === "sim" && !VIDEO); }
-  if (!on) lockForVideo(!!VIDEO);
+  for (const id of ["name", "seed", "rnd", "duration", "extra", "identical", "edit", "desig", "speed"]) set(id, on);
+  for (const id of ["open", "sim", "save", "truth"]) { const el = $(id); if (el) el.disabled = on || ((id === "sim" || id === "truth") && !VIDEO); }
+  if (!on) { lockForVideo(!!VIDEO); syncDesigBox(); }
 }
 function liveEdited() {
   if (!RUN_ID || WATCHING || VIDEO) return;           // only the page that started a simulator run changes it
@@ -279,7 +279,7 @@ function liveEdited() {
   LIVE_TIMER = setTimeout(async () => {
     if (!RUN_ID) return;
     try {
-      const r = await fetch("api/disturb/" + RUN_ID, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disturbance: readSection("disturbance") }) });
+      const r = await fetch("api/disturb/" + RUN_ID, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ disturbance: readSection("disturbance"), token: TOKEN }) });
       const j = await r.json(); setStatus(r.ok ? j.status : (j.detail || "Could not change the disturbances."));
     } catch (e) { setStatus("Server not reachable."); }
   }, U.live_debounce_ms);
@@ -299,7 +299,7 @@ function buildTiles() { $("tiles").innerHTML = U.tiles.map(([k, t, u]) => `<div 
 function showTiles(T) { for (const k in T) { const d = T[k]; $("t-" + k).textContent = d.text; $("t-" + k).className = "v " + (d.state || ""); $("u-" + k).textContent = d.unit ?? ""; } }
 function blankTiles() { const T = {}; for (const [k, , u] of U.tiles) T[k] = { text: "–", state: null, unit: u }; return T; }
 const setStatus = t => $("status").textContent = t;
-function setRunning(r) { $("start").disabled = r; $("pause").disabled = !r; $("step").disabled = !r; $("stop").disabled = !r; $("scn").disabled = r; $("pause").textContent = "Pause"; PAUSED = false; lockForRun(r); }
+function setRunning(r) { $("start").disabled = r; const ctl = !r || WATCHING; $("pause").disabled = ctl; $("step").disabled = ctl; $("stop").disabled = ctl; $("scn").disabled = r; $("pause").textContent = "Pause"; PAUSED = false; lockForRun(r); }
 
 // ------------------------------------------------------------------ drawing helpers
 function fit(c) { const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
@@ -425,11 +425,13 @@ async function start() {
   const body = { scenario: $("scn").value || null, overrides: readForm(), random_seed: $("rnd").checked, video: VIDEO ? VIDEO.upload : null, truth: VIDEO && VIDEO.truth ? VIDEO.truth : null, speed: U.speeds[$("speed").selectedIndex][1] };
   let r; try { r = await fetch("api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch (e) { setStatus("Server not reachable."); return; }
   if (!r.ok) { let d = "Could not start."; try { d = (await r.json()).detail || d; } catch (e) {} setStatus(d); return; }
-  const j = await r.json(); RUN_ID = j.run_id; $("seed").value = j.seed; LIM = j.config.camera.max_pan_rate_deg_s;
-  if (j.config.targets && j.config.targets.length) { TARGETS = j.config.targets; loadTargetForm(Math.min(EDIT, TARGETS.length - 1)); }
+  const j = await r.json(); RUN_ID = j.run_id; TOKEN = j.token || null; $("seed").value = j.seed; LIM = j.config.camera.max_pan_rate_deg_s;
+  // a simulator run returns the targets it used (generated decoys, a new heading); a video run returns only
+  // the designated target's look, so the panel keeps its own list for the next run
+  if (!VIDEO && j.config.targets && j.config.targets.length) { TARGETS = j.config.targets; loadTargetForm(Math.min(EDIT, TARGETS.length - 1)); }
   history.replaceState(null, "", "#run=" + RUN_ID); setRunning(true); setStatus(j.status); connect(RUN_ID);
 }
-const post = p => RUN_ID && fetch(p + RUN_ID, { method: "POST" }).then(r => r.json()).catch(() => ({}));
+const post = p => RUN_ID && TOKEN && fetch(p + RUN_ID + "?token=" + encodeURIComponent(TOKEN), { method: "POST" }).then(r => r.json()).catch(() => ({}));
 async function pause() { const j = await post("api/pause/"); if (j) { PAUSED = !!j.paused; $("pause").textContent = PAUSED ? "Resume" : "Pause"; } }
 async function step() { await post("api/step/"); PAUSED = true; $("pause").textContent = "Resume"; }
 async function stop() { await post("api/stop/"); }
@@ -453,7 +455,7 @@ async function finish() {
   const id = RUN_ID; let st = null;
   for (let i = 0; i < 40; i++) { try { st = await (await fetch("api/run/" + id)).json(); } catch (e) {} if (st && st.done) break; await new Promise(r => setTimeout(r, 250)); }
   if (st && !st.done && !st.error) { connect(id); return; }                   // socket dropped, run alive: reconnect
-  RUN_ID = null; setRunning(false); history.replaceState(null, "", location.pathname); $("bar").style.width = "100%"; drawPlots();
+  RUN_ID = null; TOKEN = null; WATCHING = false; setRunning(false); history.replaceState(null, "", location.pathname); $("bar").style.width = "100%"; drawPlots();
   if (!st || !st.summary) { setStatus("Run ended" + (st && st.error ? ": " + st.error.split("\n").filter(Boolean).slice(-1)[0] : " without a summary.")); return; }
   showTiles(st.tiles); setStatus(st.status); WATCHING = false;
   const f = st.files || {};
