@@ -32,6 +32,8 @@ work is preparation for the event (section 13).
 10. `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 11. `docs/plan.html`: a plain-English briefing for mentors and non-specialists.
 12. `docs/submission/ARGUS_SIH2026_26169.pdf`: the SIH idea-submission presentation (8 slides).
+13. `docs/DEMO_NARRATION.md`: the spoken script for the optional 3 to 5 minute demo video, with the source of every number.
+14. `docs/submission/WHOLE_SCENE_SLIDE.md`: a slide and a 30-second answer on why the tracker watches the whole scene.
 13. `docs/history/CHAT_LOG.md`: every teammate's Claude Code conversation in one file, one block
     per person and session, from the first day on. `python tools/chat_history.py sync` appends
     your own sessions (from `~/.claude/projects/<project>/` on your machine) and lists what others
@@ -415,7 +417,7 @@ repository does not, except the server key and the site login. To take over:
 | Rebuild the Windows and Linux archives for the 2026-09-23 changes (the macOS ones are current): needs an Actions budget or the monthly reset, then the workflow and `publish_builds.sh` | team | section 9 |
 | Hand-driven GUI session on a Windows and a Linux machine | team | `docs/TESTING_GUIDE.md` sections 2 and 3; note the Processing tile value |
 | Rehearse the live demonstration | presenter | `docs/DEMO_SCRIPT.md`, once end to end |
-| Narrated screen recording, 3 to 5 min (optional) | team | record the rehearsal |
+| Narrated screen recording, 3 to 5 min (optional) | team | record it while reading `docs/DEMO_NARRATION.md` |
 | Evaluators' scenarios and videos | at the event | copy `configs/scenarios/TEMPLATE_evaluator.yaml`; open videos directly |
 
 Proposed extras, none required by the PS: switching the designated target in the middle of a run

@@ -270,7 +270,7 @@ The web app is the architecture-neutral path.
 | Technical report 10 to 15 pages, exported | 🟩 13-page PDF |
 | User manual, exported | 🟩 PDF, per-platform installation |
 | Web app for review without installation | 🟩 project site, login protected |
-| Demo video (optional) | ⬜ |
+| Demo video (optional) | ⬜ narration script ready (`docs/DEMO_NARRATION.md`); recording left to the team |
 | Rehearsed 10 to 15 minute live demo script | ⬜ |
 
 ---
