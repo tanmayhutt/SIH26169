@@ -452,8 +452,7 @@ target loss, re-acquisition count and times, processing time, gimbal saturation.
    error read "n/a" and lock is judged from the tracker's own estimate, which can overstate it; the
    log still records our measured centre in every frame (`det_x`, `det_y`) for the evaluators'
    comparison, and acquisition, re-acquisition and FPS are measured as usual.
-5. With a truth file (a CSV of frame or time, x, y in video pixels; frames not listed count as
-   "beacon not visible"), tracking error, centroiding error, RMSE and a true lock retention are
+5. With a truth file (a CSV of frame or time, x, y in video pixels; a row with a blank or NaN position says the beacon is not in the frame; a frame not listed is filled in when it lies in a gap of at most a third of a second between two visible rows (a file sampled every few frames; used only to judge lock, no error is scored on it), otherwise it counts as "beacon not visible"), tracking error, centroiding error, RMSE and a true lock retention are
    computed against the evaluators' positions. Give it with `--truth truth.csv`, the "Truth CSV"
    toolbar button (desktop and web), or name it `<video>_truth.csv` next to the video. On a
    noisy_line clip rendered to .mp4 with its truth: tracking error 4.85 px, centroiding error
@@ -532,7 +531,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 57 automated tests, including one per group of PS rows that pins every default to the PS.
+- 99 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -622,6 +621,17 @@ repository has its own free minutes, so a build can also be run there and publis
   both macOS apps are built on the team's Mac by `tools/build_macos.sh` (Intel through Rosetta)
   and were uploaded that night. The Windows and Linux downloads wait for an Actions budget, the
   monthly reset, or a build on a teammate's fork.
+- **2026-09-24. A full robustness review.** Every PS scenario over ten seeds (170 runs, no crash),
+  19 evaluator-style videos (sizes 5 to 20 px, 1080p and 4K, 25 and 60 fps, noise, fog, low light,
+  shake, a still beacon, two beacons, a beacon that leaves) and broken files, plus two code
+  reviews. Fixed: the start cue pointed at a circular path's centre, so an identical decoy won
+  (18% lock, now 100%); a click on a video's first frame (desktop) was mapped with the
+  simulator's geometry; a truth file sampled every fifth frame scored 80% of frames as lost lock
+  (now 97%); circle, ring, diamond and cross beacons were drawn up to 0.8 px off their truth, so
+  their centroiding error was overstated; NaN or infinite values and text in a schedule crashed a
+  run (now noted and handled); the packaged app read `--duration 2.5` as a file; `record_check`
+  never flagged a commit; the web app answered bad input with 500s and let anyone watching stop
+  or change someone else's run.
 - **2026-09-23 night. Disturbances during a run.** The PS asks the software to introduce
   disturbances into the camera feed; they were fixed for a whole run. Now the Disturbances
   section stays live while a run is going (the other sections are locked), a change reaches the

@@ -42,7 +42,7 @@ that steers the camera, live statistics, and an automatically generated performa
 - Benchmark 2 replaces the simulated scene with the evaluators' .mp4. The tracker and
   camera control run unchanged on the video frames; the output is the per-frame centroid and
   the timing and lock metrics. Given the evaluators' positions as a truth CSV (frame or t, x,
-  y), tracking error, centroiding error, RMSE and a true lock retention are computed against
+  y; short gaps in a file sampled every few frames are filled in for lock only), tracking error, centroiding error, RMSE and a true lock retention are computed against
   them; without it lock is judged from the tracker's own estimate, which can overstate it.
 - Two error terms appear in the specification and are both logged: tracking error (true
   beacon to window centre) and centroiding error (measured centroid to true centroid).

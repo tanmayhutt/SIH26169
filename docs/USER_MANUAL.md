@@ -289,8 +289,11 @@ From the command line: `fsoc-tracker video path/to/file.mp4`
 
 If the evaluators give the true beacon positions, put them in a CSV: frame (or `t` in
 seconds), x, y in video pixels. Header names are matched loosely (`frame`/`idx`, `t`/`time`,
-`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. Frames not
-listed count as "beacon not visible". With it, tracking error, centroiding error, RMSE and a
+`x`/`true_x`/`cx`, `y`/`true_y`/`cy`); without a header the columns are frame, x, y. A row with a
+blank or NaN position means the beacon is not in the frame. A frame not listed is filled in when it
+lies in a gap of at most a third of a second between two visible rows (a file sampled every few
+frames; it is used to judge lock, and no error is scored on it); otherwise it counts as "beacon not
+visible". With it, tracking error, centroiding error, RMSE and a
 true lock retention are computed against their positions.
 
 | How | Where |

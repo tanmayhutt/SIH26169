@@ -71,7 +71,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 57 tests
+.venv/bin/python -m pytest                      # 99 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -262,7 +262,7 @@ Benchmark 2 ground truth: `video_truth` (`--truth`, the Truth CSV button on both
 `<video>_truth.csv` or `<video>.csv` beside the video, picked up by the command line and the
 desktop app) is a CSV of frame (or t in seconds), x, y in video pixels. Header names are matched
 loosely (frame/idx, t/time, x/true_x/cx, y/true_y/cy); without a header the columns are frame, x,
-y; frames not listed count as "beacon not visible". With it, tracking error, centroiding error,
+y; a row with a blank or NaN position says the beacon is not in the frame; a frame not listed is filled in when it lies in a gap of at most a third of a second between two visible rows (a file sampled every few frames; used only to judge lock, no error is scored on it), otherwise it counts as "beacon not visible". With it, tracking error, centroiding error,
 RMSE and a true lock retention are computed; without it, lock comes from the tracker's own
 estimate and can overstate. The report's source line names the file or says "no ground-truth
 file".
@@ -295,7 +295,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (57 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (99 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch
@@ -443,5 +443,11 @@ redone as one picker and one Designated tick box with an automatic designation m
 the free Actions minutes gone (macOS minutes cost 10x), the workflow was cut to Windows and Linux
 by hand while `tools/build_macos.sh` builds both macOS archives locally (Intel through Rosetta).
 Then disturbances were made changeable during a run (live in both apps, or a `schedule` in a
-scenario), replayed exactly from the saved scenario, with per-setting figures in the report.
+scenario), replayed exactly from the saved scenario, with per-setting figures in the report. On
+2026-09-24 a full review fixed: the start cue (it pointed at a circle's centre, not the beacon),
+the desktop click on a video's first frame (mapped with the simulator's geometry), video truth
+sampled every few frames (scored as lost lock), sprites drawn up to 0.8 px off their truth,
+non-finite and malformed values that crashed a run, the packaged launcher taking `2.5` for a
+path, `record_check` (it never flagged anything), front-end state after video mode, and web
+input that returned 500s; web runs are now controlled only by the page that started them.
 The full commit history is in git.

@@ -57,8 +57,10 @@ class Simulation:
         # gave (a click on the scene or on a video's first frame)
         mode = cfg.resolved_designation()
         if mode == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
-            t = self.source.world.targets[self.di]
-            self.tracker.set_cue(t.x0, t.y0)
+            # where the beacon really is at t = 0: for circular, figure-8 and spiral paths x0, y0 is
+            # the path's centre, for waypoints the first waypoint; state(0) draws no random number
+            s0 = self.source.world.targets[self.di].state(0.0)
+            self.tracker.set_cue(s0.x, s0.y)
         elif mode == "cue":
             xy = parse_xy(cfg.designation_cue)
             if xy is not None:
@@ -103,20 +105,26 @@ class Simulation:
         due = [c.disturbance for k, c in self._scheduled if k == i]
         with self._live_lock:
             live, self._live = self._live, []
+        model = self.source.world.disturbance
+        first = copy.deepcopy(model.cfg)
+        any_live = False
         for changes, is_live in [(c, False) for c in due] + [(c, True) for c in live]:
-            model = self.source.world.disturbance
             before = model.cfg
             after = apply_disturbance_changes(before, changes)
             diff = disturbance_diff(before, after)
             if not diff:
                 continue
             model.update(after)
-            self.segment += 1
-            self.changes.append({"segment": self.segment, "frame": i, "t_s": t, "live": is_live, "changes": diff,
-                                 "what": describe_disturbance_change(before, after),
-                                 "before": copy.deepcopy(before), "after": copy.deepcopy(after)})
+            any_live = any_live or is_live
             if is_live:
-                self._live_log.append(ScheduledChange(t, diff))
+                self._live_log.append(ScheduledChange(t, diff))   # each request on its own: replays in order
+        # every change landing on this frame starts one segment, described by their combined effect
+        total = disturbance_diff(first, model.cfg)
+        if total:
+            self.segment += 1
+            self.changes.append({"segment": self.segment, "frame": i, "t_s": t, "live": any_live, "changes": total,
+                                 "what": describe_disturbance_change(first, model.cfg),
+                                 "before": first, "after": copy.deepcopy(model.cfg)})
 
     def effective_config(self) -> RunConfig:
         """The configuration that replays this run exactly: the starting settings with the live
@@ -193,7 +201,13 @@ class Simulation:
         inwin = 0
         terr = terr_deg = terr_stab = cerr = nan
         pdx = pdy = jdx = jdy = nan
-        if frame.truth is not None and frame.truth.beacons:
+        if frame.truth is not None and frame.truth.interpolated:
+            # a video truth frame filled in between two listed rows: it tells whether the beacon
+            # was in the window (for lock), but no error is scored against it
+            ix, iy = frame.truth.beacons[0]
+            vis = 1
+            inwin = int(x0 <= ix < x0 + w and y0 <= iy < y0 + h)
+        elif frame.truth is not None and frame.truth.beacons:
             tx, ty = frame.truth.beacons[self.di]
             vis = int(frame.truth.visible[self.di])
             inwin = int(x0 <= tx < x0 + w and y0 <= ty < y0 + h)
