@@ -62,6 +62,23 @@ At the start of every substantive task, run `python tools/record_check.py`. It l
 changed the application without touching any record file (a teammate's, or yours). Write those up
 first, from the diff (`git show <sha>`), so the record never lags the code.
 
+## The shared chat history
+
+`docs/history/CHAT_LOG.md` is every teammate's conversation with Claude, in one file, in order,
+one block per person and session. It is how the team shares the reasoning behind the work, not
+only the result.
+
+- On the first substantive task after cloning, read `docs/history/CHAT_LOG.md` end to end (with
+  `docs/HANDOVER.md` and `docs/KNOWLEDGE_TRANSFER.md`) before changing anything.
+- At the start of every task, run `python tools/chat_history.py sync`. It appends this machine's
+  sessions to the file and lists the blocks other people added since the last look. Read those
+  blocks and tell the user, in a few lines, what each teammate did and decided.
+- Before the final commit of a task, run it again, so the conversation that produced the change
+  travels with the change. Commit `docs/history/CHAT_LOG.md` with the work.
+- Never edit the file by hand and never put clock times in it. Exact strings that must not appear
+  (a site password, a handle) go in the local file `.chat_redact`, one per line; it is ignored by
+  git. Where the log disagrees with the handover or the knowledge transfer, those two are right.
+
 ## Repository hygiene
 
 - Commit as your own configured git identity. Never pass a `user.email` or `user.name` override
