@@ -101,7 +101,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 |---|---|
 | `engine/config.py` | Typed configuration; one field per problem statement parameter row; YAML load and save. |
 | `world/scene.py` | Backgrounds: starfield, terrain, gradient, flat. |
-| `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, user-defined waypoints, static. |
+| `world/targets.py` | Beacon kinematics: line, circular, figure of 8, random (Ornstein-Uhlenbeck), spiral, sinusoidal, user-defined waypoints, static; optional blink and beacon code. |
 | `world/camera.py` | Gimbal: pose in degrees, rate and acceleration limits, command latency, IFOV conversions. |
 | `world/disturbance.py` | Extinction, turbulence (wander, scintillation), PSF blur, platform sway, vibration, camera exposure gain, frame loss, Poisson (a Gaussian approximation), Gaussian and salt-and-pepper noise, in physical order; read and shot noise use independent random planes. |
 | `world/renderer.py` | Draws the scene with sub-pixel beacon placement; returns ground truth. |
@@ -109,7 +109,7 @@ controller emits a rate command clipped by the gimbal model; a telemetry record 
 | `perception/detect.py` | Classical detector (median, background subtraction, matched filter, adaptive threshold, connected components, shape filters), sub-pixel centroid (centre of gravity plus 2D Gaussian fit), CNN heat-map detector (ONNX). |
 | `perception/estimator.py` | IMM over constant velocity, constant acceleration and coordinated turn. |
 | `perception/egomotion.py` | Frame-to-frame picture shift by phase correlation. |
-| `control/tracker.py` | State machine SEARCH, VERIFY, TRACK, COAST, REACQUIRE; gating; appearance signature for identity; adaptive measurement noise. |
+| `control/tracker.py` | State machine SEARCH, VERIFY, TRACK, COAST, REACQUIRE; gating; appearance signature for identity; beacon code check; adaptive measurement noise. |
 | `control/controller.py` | Feedforward plus PID rate controller (kd 0 by default) with latency lead, deadband and anti-windup. |
 | `engine/simulation.py` | The run loop and telemetry record. |
 | `engine/metrics.py` | Metric definitions and specification pass/fail. |
@@ -198,6 +198,27 @@ strong candidate nearest the cue, and after a loss the last estimate becomes the
 appearance mode, search frames where another spot scored within 0.15 of the chosen one are
 counted as ambiguous frames and reported. Tracking every beacon at once was not built: the PS
 metrics are for one target and one camera.
+
+Coded beacon (beyond the PS; the PS asks for a user-defined shape, row 9, and is silent on
+modulation). A target may blink a bit pattern `code` at `code_rate_hz` (default 10 bits/s, at most
+half the frame rate so each bit spans two frames or more); a 0 bit dims it to 70%. When the
+designated target has a code, the tracker samples the followed spot's brightness every frame (the
+mean of its core above the median of a surrounding ring, so single salt pixels do not decide a bit;
+at the estimate when a dim bit is missed; skipped on a frame with no picture) and correlates the
+last two code cycles with the code at every phase, since the beacon's clock is unknown. VERIFY
+ends in TRACK only when the best correlation is 0.6 or more with the 0 bits at least 12% dimmer; a
+spot showing no modulation over the shortest stretch that must contain both bits (9 frames for
+10110) is turned down at once. A turned-down spot is followed through the search and not picked
+again for 3 s. In TRACK the check continues, and two failures half a window apart return to
+SEARCH, which also covers a swap onto a look-alike at a crossing. With a code the appearance audit
+is off and no search frame counts as ambiguous. Codes that differ only by rotation are the same
+code, and the scenario check warns when a look-alike blinks it. The check is not applied on the
+faint path, where one frame cannot show a bit.
+
+A 0 bit at 45% was tried first: in low light the dim bits fell below the detection threshold and
+the track alternated between TRACK and COAST until it slipped onto noise (lowlight_figure8 40.3%
+lock), and removing brightness from the appearance signature to tolerate the dim bits let noise
+clumps in near the screen edge (noisy_line 76%). At 70% with the unchanged signature both hold 100%.
 
 Scenario check. Every numeric input is clamped to its accepted range in the engine, so no front
 end can pass an impossible value (a web test had taken salt and pepper 13, meant as 13%, as a
@@ -338,9 +359,17 @@ jump: it settles into the new pattern within 1.25 times the larger peak speed.
   (15 s, seeds 0 to 2) before and after and compared run by run; no run may be worse.
 - Scenario pack (`configs/scenarios/`): the four mandatory motions in clear conditions,
   heavy noise, fog, low light, platform sway with vibration, a multi-target stress case,
-  identical decoys, mixed beacon shapes, a fast circle and hard mode: 16 scenarios plus an
-  evaluator template.
+  identical decoys, mixed beacon shapes, a fast circle, hard mode and a coded beacon among
+  look-alikes: 17 scenarios plus an evaluator template.
 - Camera effects beyond the PS table: clear line, 15 s: 10% frame loss gives 88.0% lock (every lost frame breaks lock) but 100% on the frames received, tracking error 2.59 px (2.35 without) and re-acquisition within 0.10 s; 25% loss: 71.0% lock, 3.04 px, 0.17 s. Exposure x4 clips the beacon at white and raises the centroiding error from 0.006 to 0.093 px; x0.5 changes nothing measurable.
+- Coded beacon (beyond the PS): `coded_beacon`, three identical look-alikes, designation by
+  appearance and no cue, 30 s, seeds 0 to 2: on the beacon 100% of the locked time, acquisition 0.97
+  to 1.87 s (0 to 3 look-alikes tried and turned down first), 1.9 to 2.3 px, 100% lock. Without the
+  code the same runs follow a look-alike on seeds 1 and 2. A cue placed on a look-alike is corrected
+  by the code. Coding the beacon of every other scenario (15 s, seed 0): acquisition becomes 0.97 s
+  (two code cycles) where it was 0.60 to 1.17 s, lock and error unchanged or better, except the faint
+  beacon: its dim bits break the track-before-detect chains (acquisition 12.2 s, 63.1% lock, against
+  1.40 s and 97.8%). A faint beacon should not be coded.
 - Handoff to fine pointing: measured on 15 s runs, clear line 2.20 s (lock at 1.07 s), full PS noise 1.70 s, fog 2.43 s, all held 100%; faint beacon 3.37 s, held 37.8%; platform sway plus shake, the PS maximum and full stress never reach it (the estimate does not stay within 10 px).
 - Reproducible figures: `fsoc-tracker verify <run folder>` rebuilds every metric of a run from its
   per-frame CSV alone and checks its summary JSON, so a reader can confirm the reported numbers.
@@ -457,7 +486,8 @@ the IMM lead, the gating and the identity signature each remove a failure the ba
   60 fps phone video, where the unscaled value over-led the target; at 30 Hz nothing changes.
 - Track-before-detect for a static faint beacon: the moving-target residual removes anything
   static, so a beacon that does not move must still be found by the single-frame path.
-- Beacon modulation with lock-in detection for identity in dense clutter.
+- Beacon modulation for identity is built (a blinking code, section 4.3); a lock-in detector that
+  integrates the modulation over many frames could extend it to the faint limit.
 - Hardware in the loop: the `FrameSource` and gimbal interfaces already isolate the
   simulator, so a real camera and pan-tilt unit can be substituted.
 
@@ -484,6 +514,7 @@ the IMM lead, the gating and the identity signature each remove a failure the ba
 | hardmode_line.yaml | tracker restricted to the window | line | none |
 | decoys_identical.yaml | row 8, designation start | Remote terminal plus three identical look-alikes starting apart, paths crossing | Gaussian 6, Poisson |
 | beacon_shapes.yaml | rows 9 and 10, designation appearance | 8 x 18 px rectangle among a 16 px cross, 18 px ring, 14 px diamond, 12 px custom | none |
+| coded_beacon.yaml | beyond the PS: identity by a beacon code, no cue | the decoys_identical beacons; the designated one blinks 10110 at 10 bits/s | Gaussian 6, Poisson |
 
 ## Appendix B. Metric definitions printed in every report
 

@@ -189,7 +189,9 @@ class Simulation:
         mode = self.cfg.resolved_designation()
         return {"target": names[self.di] if names else "", "index": self.di, "mode": mode + (" (auto)" if self.cfg.designation == "auto" else ""),
                 "cue": self.cfg.designation_cue if self.cfg.designation == "cue" else "",
-                "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations)}
+                "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations),
+                "code": "".join(map(str, tr.code)) if getattr(tr, "code", None) else "",
+                "code_rejections": int(getattr(tr, "code_rejections", 0))}
 
     # --------------------------------------------------------------- record
     def _record(self, frame: Frame, out: TrackOutput, cmd: RateCommand, proc_ms: float,

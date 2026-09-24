@@ -110,6 +110,7 @@ flowchart LR
 | Vibration handled as measurement noise, not motion | 🟩 | innovation-based, capped at 25 px |
 | Identity among decoys | 🟩 | one seed in five swaps in the hardest stress case |
 | Designation of the target to follow: appearance, start cue or point cue (click or typed); the designated target is the one scored; ambiguous frames counted | 🟩 | row 8; identical decoys starting apart: 1 of 5 runs acquired by appearance only, 5 of 5 with the start cue |
+| Coded beacon (beyond the PS): the designated beacon blinks a bit pattern; a spot is accepted only when it blinks it, rejected spots are set aside, the check keeps running in TRACK | 🟩 | `coded_beacon`, three identical look-alikes and no cue: on the beacon 100% of the locked time on seeds 0 to 2 (a look-alike on 2 of 3 without the code) |
 | Search re-measures candidates on the current frame (was a stale or missing picture after a loss; a crash at 50% salt and pepper) | 🟩 | regression batch unchanged: 42 of 42 runs identical |
 | Hard mode (tracker sees only the window) | 🟩 | square-spiral search; acquisition 2.83 to 11.97 s, physics-limited |
 | Coasting guard: an estimate more than 160 px outside the picture while coasting or re-acquiring sends the tracker back to a whole-scene search | 🟩 | lowlight_faint seed 2, 30 s: 158 px, 75.1% lock, re-acquisition 4.53 s before; 5.9 px, 96.2%, 0.07 s after |
@@ -140,6 +141,7 @@ flowchart LR
 | Hard mode | 2.6 to 3.7 px after acquisition | 100% | 🟩 acquisition 2.83 to 11.97 s (search, by design) |
 | Identical decoys, designation start | 3.3 to 3.5 px | 100% | 🟩 |
 | Beacon shapes: 8 x 18 px rectangle among other shapes | 2.6 to 3.1 px | 100% | 🟩 |
+| Coded beacon among identical look-alikes, no cue (30 s) | 1.9 to 2.3 px | 100% | 🟩 acquisition 0.97 to 1.87 s; beyond the PS |
 | Faint beacon at 3 to 6 sigma, 10 seeds | 2.4 to 3.5 px | 94.0 to 97.8%; seeds 7 and 8 at 94.8 and 94.0%, just above the 5% loss limit | 🟩 track-before-detect on a moving-target residual; acquisition 0.80 to 2.00 s |
 | Fast circle: 450 px at 4 deg/s, 80% of the turn rate (seeds 0 to 2) | 4.6 to 5.3 px | 100% | 🟩 acquisition 0.67 to 0.70 s; was 34.3 px at 14 to 19% lock before the turn-limited lead |
 
@@ -181,7 +183,7 @@ time (1000 / mean ms); the mean of per-frame rates is kept as `fps_inst_mean` fo
 
 ### 2.8 Tests  🟩
 
-116 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
+123 tests: geometry, gimbal limits, every motion type on screen and deterministic, centroid
 accuracy, sub-pixel refinement, IMM prediction, re-acquisition metric, closed loop clear, closed
 loop with vibration, multi-target identity, 3 and 8 decoys, video path, desktop panel (video
 runs the whole file, a loaded scenario keeps its seed), PS rows, and targets (width and height,
@@ -192,7 +194,7 @@ estimate cannot run off the screen, video ground truth gives errors, the CNN mod
 any folder), and the PS audit fixes (a still beacon centred without oscillation, platform sway
 never above the set speed, a faint track not walked off by noise), and live disturbance changes
 (timing, exact replay from the saved scenario, no platform jump, video runs refuse changes, the
-desktop panel and the web API). 116 of 116 pass locally, including the camera effects (frame loss, exposure), the baseline comparison, the handoff-to-fine-pointing indicator, `fsoc-tracker verify` (a run's summary rebuilt from its frames.csv; a
+desktop panel and the web API). 123 of 123 pass locally, including the coded beacon (code read and compared, look-alikes turned down, a wrong click corrected, a spot that stops blinking handed back, check notes), the camera effects (frame loss, exposure), the baseline comparison, the handoff-to-fine-pointing indicator, `fsoc-tracker verify` (a run's summary rebuilt from its frames.csv; a
 tampered summary is caught) and the robustness review of 2026-09-24 (start cue,
 video truth gaps, sprite centres, malformed input, launcher, record check, web input and control).
 Regression batch over the 16-scenario pack against the previous commit: 0 worse, 5 better
@@ -227,7 +229,7 @@ The model path is also looked up from the package folder, so an installed comman
 ### 2.10 Executable builds  🟩
 
 Windows and Linux are built by `.github/workflows/build.yml` (run by hand or on a tag). Each job installs the
-project, runs the 116 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and
+project, runs the 123 tests (and, on Linux, the PS audit), the web app smoke test, packages with PyInstaller and
 runs the packaged executable on a scenario before uploading the archive; `bash webapp/publish_builds.sh` puts the
 archives on the site. The macOS Intel and Apple silicon archives are built by `bash tools/build_macos.sh` on the
 team's Apple silicon Mac (Intel through Rosetta) with the same checks, and uploaded by it. The 2026-09-23 macOS

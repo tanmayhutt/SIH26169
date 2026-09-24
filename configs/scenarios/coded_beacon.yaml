@@ -1,0 +1,17 @@
+# The designated beacon blinks a code (beyond the PS table, which asks only for a user-defined shape):
+# three look-alikes of the same shape, size and brightness, and no start position or click. The
+# tracker tells the beacon from them by its code alone: a spot is accepted only when its brightness
+# follows the pattern for two cycles, and a spot that does not is set aside.
+name: coded_beacon
+seed: 3
+duration_s: 30
+designated: 0
+designation: appearance      # no cue: the code is the only thing that tells the beacon apart
+targets:
+  - {name: Remote terminal, shape: square, size_px: 10, motion: figure8, radius_px: 350, period_s: 14, start: centre, code: "10110", code_rate_hz: 10}
+  - {name: Look-alike A, shape: square, size_px: 10, motion: circular, radius_px: 300, period_s: 9, start: "1500,500"}
+  - {name: Look-alike B, shape: square, size_px: 10, motion: line, speed_px_s: 120, heading_deg: 200, start: "1600,1500"}
+  - {name: Look-alike C, shape: square, size_px: 10, motion: random, speed_px_s: 90, start: "450,1550"}
+disturbance:
+  gaussian_sigma: 6
+  poisson: true

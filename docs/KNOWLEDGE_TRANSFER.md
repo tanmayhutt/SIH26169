@@ -385,6 +385,15 @@ whole picture in case it is following a decoy, and switches back if another spot
 configured beacon clearly better. When two spots cross, it does not let its memory of the beacon
 blend with the merged spot.
 
+**Coded beacon** (beyond the PS, optional): the designated beacon can blink a bit pattern, for
+example 10110 at 10 bits per second, dimming to 70% on each 0. The tracker then takes a spot for
+the beacon only after watching it for two cycles (one second) and finding its brightness follows
+the pattern; a spot that stays steady is turned down within a third of a second and ignored for
+three seconds while the search tries the next one. It keeps checking while it tracks, so if it
+ends up on a look-alike after a crossing it lets go. Three identical look-alikes, no start
+position, no click: with the code the camera stays on the beacon 100% of the time on all three
+seeds; without it, by appearance alone, it follows a look-alike on two of three.
+
 ## B6a. Checking the scenario before it runs
 
 Every numeric input is clamped to its accepted range in the engine, for every front end. A
@@ -531,7 +540,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 116 automated tests, including one per group of PS rows that pins every default to the PS.
+- 123 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -623,6 +632,13 @@ repository has its own free minutes, so a build can also be run there and publis
   monthly reset, or a build on a teammate's fork.
 - **2026-09-24. Camera effects.** Exposure gain and frame loss added as disturbances beyond the PS table (the PS
   lists them "etc."), off by default. Measured on clear line, 15 s: 10% frame loss gives 88.0% lock (every lost frame breaks lock) but 100% on the frames received, tracking error 2.59 px (2.35 without) and re-acquisition within 0.10 s; 25% loss: 71.0% lock, 3.04 px, 0.17 s. Exposure x4 clips the beacon at white and raises the centroiding error from 0.006 to 0.093 px; x0.5 changes nothing measurable.
+- **2026-09-24. Coded beacon.** A target can blink a code (beyond the PS). New scenario `coded_beacon`:
+  three identical look-alikes, designation by appearance, no cue. 30 s, seeds 0 to 2: the beacon
+  followed 100% of the locked time, acquisition 0.97 to 1.87 s (0 to 3 look-alikes tried and turned
+  down first), 1.9 to 2.3 px; the same scenario without the code followed a look-alike on seeds 1
+  and 2 (lock on the beacon 24.6% and 14.3%). A wrong click on a look-alike is corrected by the code.
+  A 0 bit at 45% was tried first and dropped: the dim bits vanished in low light. On the faint path
+  the code costs detection (lowlight_faint 12.2 s to acquire); do not code a faint beacon.
 - **2026-09-24. Measured against a simple baseline.** `tools/compare_trackers.py` runs ARGUS and a
   brightest-spot tracker with proportional control over every scenario: ARGUS meets every PS limit in 33 of 48 runs, the baseline in 0 of 48; the baseline's tracking error is 27 to 40 px on clear skies against 2 to 6 px, it holds 1.6% lock among identical decoys and never acquires the faint beacon; it acquires faster on some clear skies (0.37 s against 1.03 s on the circle) because it has no confirmation step.
 - **2026-09-24. Handoff to fine pointing.** The PS places coarse alignment "before fine pointing
@@ -702,6 +718,7 @@ repository has its own free minutes, so a build can also be run there and publis
 | Hard mode (window only) | 2.83 to 11.97 s | 2.6 to 3.7 px | 100% | acquisition beyond 2 s by design (search) |
 | Identical decoys, designation start | 0.60 to 0.73 s | 3.3 to 3.5 px | 100% | pass |
 | Beacon shapes, 8 x 18 px rectangle among other shapes | 0.73 to 0.83 s | 2.6 to 3.1 px | 100% | pass |
+| Coded beacon among identical look-alikes, no cue (30 s) | 0.97 to 1.87 s | 1.9 to 2.3 px | 100% | pass, beyond the PS |
 
 - Centroiding error: 0.006 to 0.007 px in clear air, 0.19 px under heavy noise, 0.08 to 0.15 px in
   fog and low light.
@@ -726,6 +743,9 @@ repository has its own free minutes, so a build can also be run there and publis
 - **Look-alikes that start together.** Identical targets that start at the same point as the
   designated beacon cannot be told apart at the start; even with the start cue these runs failed
   (lock 8 to 25%). Look-alikes that start apart pass with the start cue.
+- **A coded beacon at the faint limit.** The code dims the beacon on its 0 bits, and a beacon at 3
+  to 6 sigma then breaks the frame-to-frame chains that find it (12.2 s to acquire, 63.1% lock,
+  against 1.40 s and 97.8% steady). The code is for a visible beacon among look-alikes.
 - **A faint beacon that never moves** is not covered by track-before-detect (it finds dim things by
   their motion); the PS never asks for one.
 - **The builds are not code-signed**, so Windows and macOS warn on first launch; two clicks let it
@@ -779,7 +799,8 @@ web app. Keep the report PDF ready to open.
   tracks in a simulated video stream; hard mode shows the window-only case too.
 - **Does it track multiple targets?** It detects all of them and follows the designated one, which
   is what the PS asks ("a designated moving target", row 8). The target is designated by
-  appearance, by a start cue or by a click. Tracking all at once is not required: the PS metrics
+  appearance, by a start cue or by a click, and, beyond the PS, a beacon can blink a code so
+  look-alikes are told apart with no cue at all. Tracking all at once is not required: the PS metrics
   are for one target and one camera.
 - **Is it fast enough?** 69 to 216 FPS on a laptop against the required 20, measured as frames
   over processing time (not the mean of per-frame rates, which overstates it).
