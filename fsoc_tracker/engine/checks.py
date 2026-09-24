@@ -20,7 +20,7 @@ import math
 from pathlib import Path
 
 from ..world.sprites import parse_mask
-from .config import LIMITS, RunConfig, parse_xy, target_name
+from .config import LIMITS, RunConfig, parse_code, parse_xy, same_code, target_name
 
 SHAPES = ("square", "circle", "gaussian", "cross", "ring", "diamond", "custom")
 DESIGNATIONS = ("auto", "appearance", "start", "cue")
@@ -80,6 +80,14 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
                 t.shape = "square"
             if not t.height_px:
                 t.height_px = t.size_px
+            if str(t.code or "").strip():
+                bits = parse_code(t.code)
+                if bits is None:
+                    notes.append(_note("clamped", f"target{i}.code", f"{target_name(t, i)}: code '{str(t.code)[:40]}' is not 3 to 32 zeros and ones "
+                                                                   f"with at least one of each; the beacon is steady."))
+                    t.code = ""
+                else:
+                    t.code = "".join(map(str, bits))
         lo, hi = LIMITS["duration_s"]
         if not cfg.video and not (lo <= cfg.duration_s <= hi):
             d_s = cfg.duration_s
@@ -148,6 +156,9 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
         elif t.shape == "custom" and parse_mask(t.mask) is None:
             ps.append((f"target{i}.mask", f"{target_name(t, i)}: the mask '{t.mask[:40]}' cannot be read (rows of 0 and 1 with at least one 1, "
                                           f"or an image file); a square is drawn. Example: 010;111;010."))
+        if t.code:
+            ps.append((f"target{i}.code", f"{target_name(t, i)}: blinks the code {t.code} at {t.code_rate_hz:g} bits/s, a beacon feature beyond the PS "
+                                          f"(row 9 asks for a user-defined shape); a 0 bit dims it to 70%."))
     # rows 21 to 25
     if d.salt_pepper_frac > 0.10 + 1e-9:
         ps.append(("disturbance.salt_pepper_frac", f"Salt and pepper {100 * d.salt_pepper_frac:.0f}% of pixels is above the PS 'around 10%' (row 21)."))
@@ -194,8 +205,18 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
         notes.append(_note("physical", "video_truth", f"Ground-truth file {cfg.video_truth} not found: errors cannot be computed."))
     if cfg.designation == "start" and cfg.video:
         notes.append(_note("physical", "designation", "Designation 'start' needs the simulator (a video has no configured start); click the beacon on the first frame instead."))
-    if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance" and cfg.look_alikes():
-        same = [target_name(cfg.targets[i], i) for i in cfg.look_alikes()]
+    if t0 is not None and t0.code and t0.code_rate_hz > cam.update_rate_hz / 2 + 1e-9:
+        notes.append(_note("physical", "target.code_rate_hz", f"Code rate {t0.code_rate_hz:g} bits/s gives a bit shorter than two frames at "
+                                                              f"{cam.update_rate_hz:g} Hz: the camera cannot read the code (at most {cam.update_rate_hz / 2:g} bits/s)."))
+    if t0 is not None and t0.code:
+        twins = [target_name(cfg.targets[i], i) for i, t in enumerate(cfg.targets) if i != cfg.designated_index() and same_code(t0.code, t.code)]
+        if twins:
+            notes.append(_note("physical", "target.code", f"{', '.join(twins)} blink{'s' if len(twins) == 1 else ''} the same code as the designated "
+                                                          f"{target_name(t0, cfg.designated_index())} (codes that differ only in where the cycle starts are the same): the code cannot tell them apart."))
+    # look-alikes the code tells apart are not a problem
+    alikes = [i for i in cfg.look_alikes() if not (t0.code and not same_code(t0.code, cfg.targets[i].code))] if t0 is not None else []
+    if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance" and alikes:
+        same = [target_name(cfg.targets[i], i) for i in alikes]
         notes.append(_note("physical", "designation", f"{', '.join(same)} look{'s' if len(same) == 1 else ''} the same as the designated "
                                                       f"{target_name(t0, cfg.designated_index())}: by appearance alone the tracker cannot tell them apart "
                                                       f"(designation is forced to appearance in this scenario file; auto would use the start position)."))

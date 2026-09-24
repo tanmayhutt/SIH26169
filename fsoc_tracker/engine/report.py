@@ -77,6 +77,8 @@ def write_report(cfg: RunConfig, records: list[Record], summary: Summary, path: 
             line = f"Followed {des.get('target', '')}, designation: {des.get('mode', 'appearance')}"
             if des.get("cue"):
                 line += f" at {des['cue']}"
+            if des.get("code"):
+                line += f", beacon code {des['code']} ({des.get('code_rejections', 0)} other spots turned down by it)"
             if des.get("ambiguous_frames"):
                 line += (f".  In {des['ambiguous_frames']} search frames another target looked just like it: by appearance alone the choice may be wrong "
                          f"(use designation 'start' or click the beacon)")
