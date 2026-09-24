@@ -40,7 +40,7 @@ def main() -> int:
         j = post("/api/run", {"scenario": "clear_line", "overrides": {"duration_s": 5}, "speed": 1.0, "random_seed": False})
         rid = j["run_id"]
         time.sleep(2)
-        d = post(f"/api/disturb/{rid}", {"disturbance": {"atmosphere": "fog", "jitter_px": 6}})
+        d = post(f"/api/disturb/{rid}", {"disturbance": {"atmosphere": "fog", "jitter_px": 6}, "token": j["token"]})
         if not d.get("queued"):
             print("live disturbance change refused:", d); return 1
         for _ in range(120):

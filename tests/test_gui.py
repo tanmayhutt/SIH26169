@@ -128,3 +128,48 @@ def test_disturbances_change_live_during_a_desktop_run(window, tmp_path):
     assert saved.disturbance.atmosphere == "clear" and saved.schedule and saved.schedule[0].disturbance["atmosphere"] == "fog"
     assert window.forms["camera"].isEnabled() and window.sp_dur.isEnabled()      # unlocked after the run
     assert not window.act_clear_video.isEnabled()                                   # still no video loaded
+
+
+# ------------------------------------------------------------------ review of 2026-09-24
+def test_video_click_maps_to_video_pixels_and_closing_restores_the_screen(window, tmp_path):
+    path = _write_video(tmp_path, seconds=1)
+    if path is None:
+        pytest.skip("this OpenCV build has no video encoder")
+    window.video_path = str(path); window._preview_video(str(path))
+    assert window.scene_view._geom[3:] == (160, 160)            # clicks map with the video's size
+    window.clear_video()
+    sc = window.forms["screen"].read()
+    assert (sc.width, sc.height) == (2000, 2000)                 # the video's calibration is undone
+
+
+def test_picking_a_scenario_closes_the_video_and_its_locks(window, tmp_path):
+    path = _write_video(tmp_path, seconds=1)
+    if path is None:
+        pytest.skip("this OpenCV build has no video encoder")
+    window.video_path = str(path); window._preview_video(str(path)); window._set_video_mode(True)
+    window.cmb_scn.setCurrentIndex(window.cmb_scn.findData(str(Path("configs/scenarios/clear_line.yaml"))))
+    assert window.video_path is None
+    assert window.forms["disturbance"].isEnabled() and window.sp_extra.isEnabled() and not window.act_clear_video.isEnabled()
+
+
+def test_identical_look_copies_the_designated_target_and_keeps_its_edits(window):
+    window.sp_extra.setValue(2); window.chk_identical.setChecked(True)
+    window.cmb_edit.setCurrentIndex(2); window.chk_desig.click()
+    window.forms["target"].widgets["size_px"].setValue(17)
+    cfg = window.read_cfg(for_run=False)
+    assert cfg.designated == 2 and cfg.targets[2].size_px == 17
+    assert all(t.size_px == 17 and t.shape == cfg.targets[2].shape for t in cfg.targets)
+
+
+def test_save_scenario_keeps_the_seed_and_a_scenario_cue(window, tmp_path):
+    window.chk_random.setChecked(True)
+    window.sp_seed.setValue(4)
+    before = window.forms["target"].widgets["heading_deg"].value()
+    cfg = window.read_cfg(for_run=False)                          # what Save scenario writes
+    assert cfg.seed == 4 and cfg.targets[0].heading_deg == before
+    from fsoc_tracker.engine.config import RunConfig
+    sc = RunConfig.load(ROOT / "configs" / "scenarios" / "clear_line.yaml")
+    sc.designation, sc.designation_cue = "cue", "400,1500"
+    window.apply_cfg(sc)
+    run = window.read_cfg(for_run=False)
+    assert run.designation == "cue" and run.designation_cue == "400,1500"

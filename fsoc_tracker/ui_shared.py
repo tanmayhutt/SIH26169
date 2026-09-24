@@ -162,9 +162,11 @@ def schema(cfg: RunConfig | None = None) -> list[dict]:
     return out
 
 
-def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int, identical: bool = False) -> list[TargetConfig]:
+def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, seed: int, identical: bool = False,
+                  designated: int = 0) -> list[TargetConfig]:
     """Target 1 plus `extra` more: scenario targets first, then generated decoys. With
-    `identical` the generated decoys copy target 1's shape, size and brightness, so only a
+    `identical` every target other than the designated one takes the designated target's shape,
+    size and brightness (copies: the scenario's own objects are not changed), so only a
     designation cue (start position or a click) can tell them apart."""
     rng = np.random.default_rng(seed + 99)
     motions = ["circular", "line", "figure8", "random", "sinusoidal"]
@@ -173,16 +175,18 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
         if i + 1 < len(existing):
             targets.append(existing[i + 1])
         else:
-            t = TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
-                             intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
-                             speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
-                             period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)), start="centre")
-            if identical:
-                t.shape, t.size_px, t.height_px, t.mask, t.intensity = t0.shape, t0.size_px, t0.height_px, t0.mask, t0.intensity
-                t.start = "random"
-            targets.append(t)
+            targets.append(TargetConfig(shape=["circle", "square", "gaussian"][i % 3], size_px=int(rng.integers(6, 16)),
+                                        intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
+                                        speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
+                                        period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)),
+                                        start="random" if identical else "centre"))
+    if identical and len(targets) > 1:
+        di = min(max(int(designated), 0), len(targets) - 1)
+        look = targets[di]
+        targets = [t if k == di else dataclasses.replace(t, shape=look.shape, size_px=look.size_px, height_px=look.height_px,
+                                                          mask=look.mask, intensity=look.intensity)
+                   for k, t in enumerate(targets)]
     return targets
-
 
 def target_labels(cfg: RunConfig) -> list[str]:
     """Names for the 'Designated' and 'Edit target' pickers."""
