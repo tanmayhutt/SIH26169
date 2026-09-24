@@ -467,6 +467,7 @@ def summary_text(v: dict, passed: dict, frames_path: str = "", report_path: str 
            f"Processing {f('proc_ms_mean')} ms mean, {f('proc_ms_p99')} ms p99")
     if frames_path or report_path:
         msg += f"\n\nLog: {frames_path}\nReport: {report_path}"
+        msg += "\nRecompute and check these figures from the log: fsoc-tracker verify <this run's folder>"
     if d.get("ambiguous_frames"):
         msg += (f"\n\nNote: in {d['ambiguous_frames']} search frames another target looked just like {d.get('target', 'the designated one')}; "
                 f"by appearance alone the tracker may pick the wrong one. Use designation 'start' or click the beacon.")
