@@ -215,6 +215,12 @@ def check_config(cfg: RunConfig, clamp: bool = True) -> list[dict]:
                                                           f"{target_name(t0, cfg.designated_index())} (codes that differ only in where the cycle starts are the same): the code cannot tell them apart."))
     # look-alikes the code tells apart are not a problem
     alikes = [i for i in cfg.look_alikes() if not (t0.code and not same_code(t0.code, cfg.targets[i].code))] if t0 is not None else []
+    if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "auto" and alikes and cfg.shared_start() and not cfg.video:
+        same = [target_name(cfg.targets[i], i) for i in alikes if cfg.targets[i].start == t0.start]
+        if same:
+            notes.append(_note("physical", "designation", f"{', '.join(same)} look{'s' if len(same) == 1 else ''} the same as the designated "
+                                                          f"{target_name(t0, cfg.designated_index())} and start{'s' if len(same) == 1 else ''} at the same point: "
+                                                          f"nothing tells them apart. Give the designated target its own start (x,y) or a different look."))
     if t0 is not None and len(cfg.targets) > 1 and cfg.designation == "appearance" and alikes:
         same = [target_name(cfg.targets[i], i) for i in alikes]
         notes.append(_note("physical", "designation", f"{', '.join(same)} look{'s' if len(same) == 1 else ''} the same as the designated "

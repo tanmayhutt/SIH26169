@@ -187,7 +187,7 @@ def extra_targets(t0: TargetConfig, existing: list[TargetConfig], extra: int, se
                                         intensity=int(rng.integers(150, 235)), motion=motions[i % len(motions)],
                                         speed_px_s=float(rng.uniform(60, 180)), radius_px=float(rng.uniform(200, 450)),
                                         period_s=float(rng.uniform(8, 20)), heading_deg=float(rng.uniform(0, 360)),
-                                        start="random" if identical else "centre"))
+                                        start="random"))      # apart from each other, so a start cue can single one out
     if identical and len(targets) > 1:
         di = min(max(int(designated), 0), len(targets) - 1)
         look = targets[di]
@@ -222,9 +222,10 @@ def truth_sidecar(video_path: str) -> str:
 
 RUN_TIPS = {
     "extra": "More targets besides target 1 (PS row 8: multiple optional). Generated ones get random paths.",
-    "identical": "Generated targets copy target 1's shape, size and brightness. The tracker is then told the designated one's start position as well.",
-    "designated": "The tracker follows this target and the report scores it (PS: 'a designated moving target'). It finds it by its shape, size and "
-                  "brightness; when another target looks the same, by its start position as well. On a video, click the beacon on the first frame.",
+    "identical": "Generated targets copy the designated target's shape, size and brightness, so only the start position tells them apart.",
+    "designated": "The tracker follows this target and the report scores it (PS: 'a designated moving target'). With several targets it is told "
+                  "where this one starts (as an operator or ephemeris cue would) and checks its shape, size and brightness; alone, it goes by look. "
+                  "On a video, click the beacon on the first frame.",
     "edit": "Which target this section shows and edits; * marks the designated one. Click a target on the preview to designate it.",
 }
 

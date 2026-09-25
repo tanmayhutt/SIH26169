@@ -59,6 +59,14 @@ class Simulation:
         # designation cue: where the designated beacon starts (simulator), or a point the user
         # gave (a click on the scene or on a video's first frame)
         mode = cfg.resolved_designation()
+        if mode == "start" and cfg.designation == "auto" and isinstance(self.source, SyntheticSource):
+            # the cue must single the beacon out: if another target really starts within reach
+            # of it (random starts can land close), fall back to appearance
+            sts = [t.state(0.0) for t in self.source.world.targets]
+            s0 = sts[self.di]
+            if any(math.hypot(s.x - s0.x, s.y - s0.y) < 60 for k, s in enumerate(sts) if k != self.di):
+                mode = "appearance"
+        self.designation_used = mode
         if mode == "start" and isinstance(self.source, SyntheticSource) and self.source.world.targets:
             # where the beacon really is at t = 0: for circular, figure-8 and spiral paths x0, y0 is
             # the path's centre, for waypoints the first waypoint; state(0) draws no random number
@@ -186,7 +194,7 @@ class Simulation:
         """Which target was followed and how it was designated, for the summary and the report."""
         names = self.cfg.target_names()
         tr = self.tracker
-        mode = self.cfg.resolved_designation()
+        mode = getattr(self, "designation_used", self.cfg.resolved_designation())
         return {"target": names[self.di] if names else "", "index": self.di, "mode": mode + (" (auto)" if self.cfg.designation == "auto" else ""),
                 "cue": self.cfg.designation_cue if self.cfg.designation == "cue" else "",
                 "targets": names, "ambiguous_frames": int(tr.ambiguous_frames), "redesignations": int(tr.redesignations),

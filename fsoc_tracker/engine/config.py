@@ -157,8 +157,8 @@ class RunConfig:
     disturbance: DisturbanceConfig = field(default_factory=DisturbanceConfig)
     tracker: TrackerConfig = field(default_factory=TrackerConfig)
     # which target is the beacon to follow, and how the tracker is told (PS: "a designated
-    # moving target"). auto (default): by its configured size, shape and brightness, and when
-    # another target looks the same, by its start position as well (as an operator or a
+    # moving target"). auto (default): by its configured size, shape and brightness, and, with
+    # several targets in the simulator, by its start position as well (as an operator or a
     # GPS/ephemeris cue would). appearance and start force one of those. cue: a point near
     # it, for example a click on the first frame of a video.
     designated: int = 0
@@ -186,10 +186,22 @@ class RunConfig:
                 if i != self.designated_index() and t.shape == t0.shape and t.dims == t0.dims and abs(t.intensity - t0.intensity) < 25]
 
     def resolved_designation(self) -> str:
-        """The designation mode a run uses: auto becomes start when look-alikes exist."""
+        """The designation mode a run uses. auto: with several targets in the simulator the
+        tracker is told the designated one's start position (the cue a real terminal has from
+        ephemeris or an operator); a 9 px square at 198 and a 10 px square at 235 cannot be told
+        apart by appearance, and only exact copies were caught as look-alikes before. With one
+        target, or a video, it goes by appearance (a video's beacon is designated by a click)."""
         if self.designation == "auto":
-            return "start" if (self.look_alikes() and not self.video) else "appearance"
+            return "start" if (len(self.targets) > 1 and not self.video and not self.shared_start()) else "appearance"
         return self.designation
+
+    def shared_start(self) -> bool:
+        """True when another target is configured to start where the designated one starts
+        (the same "centre" or the same x,y), so a start cue could not tell them apart."""
+        t0 = self.designated_target()
+        if t0 is None or t0.start == "random":
+            return False
+        return any(t.start == t0.start for i, t in enumerate(self.targets) if i != self.designated_index())
 
     def target_names(self) -> list[str]:
         return [target_name(t, i) for i, t in enumerate(self.targets)]

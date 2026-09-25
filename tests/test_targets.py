@@ -102,3 +102,24 @@ def test_user_defined_start():
     sim = Simulation(cfg, None, write_csv=False)
     tg = sim.source.world.targets[0]
     assert (tg.x0, tg.y0) == (400.0, 1500.0)
+
+
+def test_any_chosen_target_is_followed_among_panel_decoys():
+    # the beacon the user ticks is the one followed, whichever it is and whatever the decoys look
+    # like: a 9 px square at 198 next to a 10 px square at 235 defeated appearance alone (0 % lock)
+    for identical in (False, True):
+        for di in (1, 2):
+            cfg = RunConfig(); cfg.seed = 7
+            cfg.targets = extra_targets(cfg.targets[0], cfg.targets, 2, 7, identical, di); cfg.designated = di
+            s = _run(cfg, 6.0)
+            assert s.summary.designation["index"] == di
+            assert s.summary.values["lock_retention_pct"] > 95, (identical, di, s.summary.values["lock_retention_pct"])
+
+
+def test_targets_starting_together_fall_back_to_appearance():
+    # all three full_stress targets start at the centre: a start cue cannot single one out, so the
+    # automatic mode uses appearance there (and the identity is held, as before)
+    cfg = RunConfig.load("configs/scenarios/full_stress.yaml")
+    s = _run(cfg, 4.0)
+    assert s.summary.designation["mode"].startswith("appearance")
+    assert s.summary.values["centroid_err_mean_px"] < 5.0
