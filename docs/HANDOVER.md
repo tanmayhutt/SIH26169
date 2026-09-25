@@ -36,8 +36,12 @@ work is preparation for the event (section 13).
 14. `docs/submission/WHOLE_SCENE_SLIDE.md`: a slide and a 30-second answer on why the tracker watches the whole scene.
 13. `docs/history/CHAT_LOG.md`: every teammate's Claude Code conversation in one file, one block
     per person and session, from the first day on. `python tools/chat_history.py sync` appends
-    your own sessions (from `~/.claude/projects/<project>/` on your machine) and lists what others
-    added; Claude runs it at the start and end of every task (see `CLAUDE.md`). Secrets are
+    your own sessions (every Claude Code session on your machine that worked in this repository,
+    found by the working directory each log line records, wherever Claude Code was started and on
+    any OS) and lists what others added; Claude runs it at the start and end of every task (see
+    `CLAUDE.md`). Until 2026-09-25 it looked only in `~/.claude/projects/<repo path with / made ->`,
+    which missed Windows, paths with a dot, underscore or space, and sessions started in a parent
+    folder, so only the owner's sessions reached the file; `sync --dry-run` shows what it would add. Secrets are
     removed; exact strings to remove go in the ignored local file `.chat_redact`. Read it for the
     reasoning behind a decision; the files above state the current truth.
 
@@ -73,7 +77,7 @@ macOS or Linux:
 git clone https://github.com/tanmayhutt/SIH26169.git && cd SIH26169
 python3.12 -m venv .venv                        # or: uv venv --python 3.12 .venv
 .venv/bin/pip install -e ".[dev,web]"
-.venv/bin/python -m pytest                      # 123 tests
+.venv/bin/python -m pytest                      # 126 tests
 .venv/bin/fsoc-tracker-gui                      # the desktop application
 ```
 
@@ -319,7 +323,7 @@ files downloaded instead of opened.
 
 ## 8. How to verify a change
 
-1. `python -m pytest` must pass (123 tests; `tests/test_ps_compliance.py` pins every PS default).
+1. `python -m pytest` must pass (126 tests; `tests/test_ps_compliance.py` pins every PS default).
 2. For any change to perception, estimation or control, run the regression batch before and after
    and compare: `python tools/compare_batches.py results/before results/after` must report no run
    worse. Last recorded state (2026-09-24, PR #5 live disturbance changes, against the batch

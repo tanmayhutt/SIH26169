@@ -1,11 +1,11 @@
 {
   "title": "System design and build progress",
   "subtitle": "Read the system by responsibility, boundary and delivery gate. Open the capability inventory only when you need implementation-level evidence.",
-  "stats": "PS rows 25 · shall items 8 · deliverables 6 · scenarios 17 · tests 123 · 2 PDFs · 4 platform builds · web app",
+  "stats": "PS rows 25 · shall items 8 · deliverables 6 · scenarios 17 · tests 126 · 2 PDFs · 4 platform builds · web app",
   "updated": "2026-09-24",
   "verification": {
     "title": "Build verification: September 23, 2026",
-    "summary": "123 of 123 automated checks pass locally after the September 24 coded beacon, the camera effects, the robustness review (start cue, video truth gaps, sprite centres, malformed input, launcher, record check, web input and control) and the September 23 changes (including disturbances changed during a run: timing, exact replay from the saved scenario, no platform jump, the desktop panel and the web API) (designation, target names, shapes and sizes, scenario check, input validation), the fixes from an independent review (FPS metric, fast targets, coasting guard, faint-path speed, Benchmark 2 ground truth) and the fixes the PS audit led to (no derivative term, figure-8 sway within its setting, faint-track guards). The PS audit (tools/ps_audit.py) measures every PS item by running the code: 38 of 39 pass; Deliverable 1 fails because the check still expects macOS in the build workflow, which now builds Windows and Linux only (macOS through tools/build_macos.sh). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
+    "summary": "126 of 126 automated checks pass locally after the September 24 coded beacon, the camera effects, the robustness review (start cue, video truth gaps, sprite centres, malformed input, launcher, record check, web input and control) and the September 23 changes (including disturbances changed during a run: timing, exact replay from the saved scenario, no platform jump, the desktop panel and the web API) (designation, target names, shapes and sizes, scenario check, input validation), the fixes from an independent review (FPS metric, fast targets, coasting guard, faint-path speed, Benchmark 2 ground truth) and the fixes the PS audit led to (no derivative term, figure-8 sway within its setting, faint-track guards). The PS audit (tools/ps_audit.py) measures every PS item by running the code: 38 of 39 pass; Deliverable 1 fails because the check still expects macOS in the build workflow, which now builds Windows and Linux only (macOS through tools/build_macos.sh). The earlier suite (22 of 22) passed on Windows, Linux, macOS Intel and macOS Apple silicon runners on September 22, and each desktop archive was extracted and run on its own platform; the four-platform run will be repeated for this change. The web app ran a full scenario through the public site with report, CSV and summary downloads. Every PS row, shall item and deliverable re-read against 26169.pdf. The platform-maximum limit was re-measured at the allowed 10 deg/s and the faint beacon over ten seeds; both results are recorded as measured.",
     "note": "Statuses are from runs in the repository, on GitHub Actions runners, and on the project server. Numbers quoted are measured, not estimated. Left for the team, not for the software: a hand-driven GUI session on a Windows and a Linux machine, a rehearsal of the 10 to 15 minute demo script, and, optionally, a narrated screen recording. Evaluator-supplied files arrive at the event; the template scenario and the video path are ready.",
     "checks": [
       {
@@ -1042,7 +1042,7 @@
       "blurb": "Tests that fail if the system drifts from the problem statement.",
       "groups": [
         {
-          "caption": "tests, 123 passing",
+          "caption": "tests, 126 passing",
           "items": [
             {
               "name": "Geometry and gimbal limits",

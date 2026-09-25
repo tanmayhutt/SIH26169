@@ -540,7 +540,7 @@ repository has its own free minutes, so a build can also be run there and publis
 
 ## B14. Step 13: how we know it works
 
-- 123 automated tests, including one per group of PS rows that pins every default to the PS.
+- 126 automated tests, including one per group of PS rows that pins every default to the PS.
 - A PS audit (`tools/ps_audit.py`) that measures every PS item by running the code: rows 1 to 25,
   the eight "shall" functions, the five deliverables, Benchmark 1, and Benchmark 2 with a rendered
   noisy video and its truth CSV. It writes `docs/PS_AUDIT.md` and fails the build if any check
@@ -632,6 +632,7 @@ repository has its own free minutes, so a build can also be run there and publis
   monthly reset, or a build on a teammate's fork.
 - **2026-09-24. Camera effects.** Exposure gain and frame loss added as disturbances beyond the PS table (the PS
   lists them "etc."), off by default. Measured on clear line, 15 s: 10% frame loss gives 88.0% lock (every lost frame breaks lock) but 100% on the frames received, tracking error 2.59 px (2.35 without) and re-acquisition within 0.10 s; 25% loss: 71.0% lock, 3.04 px, 0.17 s. Exposure x4 clips the beacon at white and raises the centroiding error from 0.006 to 0.093 px; x0.5 changes nothing measurable.
+- **2026-09-25. Every teammate's chat history.** `tools/chat_history.py` looked for session logs only under the repository path with `/` made `-`, so on Windows, with a dot, underscore or space in the path, or with Claude Code started in a parent folder, it found nothing and only the owner's sessions reached `CHAT_LOG.md`. It now finds every session that worked in the repository by the working directory recorded on each log line (of a session started elsewhere, the stretch inside the repository). A union merge rule for the file was tried and dropped: git interleaved two sessions' blocks on their shared `---` lines. The conflict recipe is to take the incoming file and run `sync` again.
 - **2026-09-24. Coded beacon.** A target can blink a code (beyond the PS). New scenario `coded_beacon`:
   three identical look-alikes, designation by appearance, no cue. 30 s, seeds 0 to 2: the beacon
   followed 100% of the locked time, acquisition 0.97 to 1.87 s (0 to 3 look-alikes tried and turned

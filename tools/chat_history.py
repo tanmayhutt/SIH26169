@@ -6,8 +6,18 @@ This tool appends the sessions of this machine to docs/history/CHAT_LOG.md and t
 other people appended since you last looked, so every clone has the whole conversation.
 
     python tools/chat_history.py sync     # append my new messages; then list blocks new to me
+    python tools/chat_history.py sync --dry-run   # show what would be appended, write nothing
     python tools/chat_history.py new      # only list blocks I have not seen yet
     python tools/chat_history.py export <session.jsonl>   # append one specific log
+
+A session belongs to this repository when Claude Code worked inside it: every log line records
+the working directory, so sessions are found wherever Claude Code was started (in the repository,
+in a parent folder, on Windows, macOS or Linux). Of a session started elsewhere, the stretch from
+its first to its last message inside the repository is taken.
+
+On a merge conflict in CHAT_LOG.md, take the incoming version and run `sync` again: every message
+carries an id, so only this machine's missing messages are appended. (A union merge is not safe
+here: git shares identical lines such as `---` between the two sides and interleaves the blocks.)
 
 The file holds one block per person and session ("### Session: <name>, <first day> to <last
 day>"), each message once (a hidden id prevents duplicates), no clock times, tool calls as one
@@ -18,6 +28,7 @@ replaced. Exact strings to remove (a site password, a handle) go one per line in
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -63,12 +74,69 @@ def person() -> str:
         return "unknown"
 
 
-def project_logs() -> list[Path]:
-    """This machine's session logs for this repository, oldest first."""
-    d = Path.home() / ".claude" / "projects" / str(ROOT).replace("/", "-")
-    if not d.is_dir():
+def _norm(path: str) -> str:
+    return os.path.normcase(os.path.realpath(path))
+
+
+ROOT_N = _norm(str(ROOT))
+
+
+def in_repo(cwd: str | None) -> bool:
+    """True when a working directory is this repository or a folder inside it."""
+    if not cwd:
+        return False
+    c = _norm(cwd)
+    return c == ROOT_N or c.startswith(ROOT_N.rstrip(os.sep) + os.sep)
+
+
+def claude_dir_name(path: Path) -> str:
+    """The folder name Claude Code gives a project: every character that is not a letter or a digit
+    becomes '-' ('C:\\Users\\a.b\\SIH26169' -> 'C--Users-a-b-SIH26169'). Replacing only '/' missed
+    Windows paths and any path with a dot, underscore or space."""
+    return re.sub(r"[^A-Za-z0-9]", "-", str(path))
+
+
+def repo_span(path: Path) -> tuple[int, int] | None:
+    """(first, last) line numbers of this session's messages worked inside the repository, or None."""
+    first = last = None
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for i, line in enumerate(f):
+            if '"cwd"' not in line:
+                continue
+            try:
+                cwd = json.loads(line).get("cwd")
+            except json.JSONDecodeError:
+                continue
+            if in_repo(cwd):
+                first = i if first is None else first
+                last = i
+    return None if first is None else (first, last)
+
+
+def project_logs() -> list[tuple[Path, tuple[int, int]]]:
+    """This machine's Claude Code sessions that worked in this repository, oldest first, each with
+    the line span that belongs to it. Every project folder is searched, so a session started in a
+    parent folder (or anywhere else) is found by the working directories it records."""
+    base = Path.home() / ".claude" / "projects"
+    if not base.is_dir():
         return []
-    return sorted((p for p in d.glob("*.jsonl") if p.stat().st_size > 5000), key=lambda p: p.stat().st_mtime)
+    own = base / claude_dir_name(ROOT)
+    tag = ROOT.name.encode()
+    found = []
+    for d in base.iterdir():
+        if not d.is_dir():
+            continue
+        for p in d.glob("*.jsonl"):
+            if p.stat().st_size <= 5000:
+                continue
+            if d != own:
+                with open(p, "rb") as f:          # cheap filter before parsing: the repository's folder name must occur
+                    if tag not in f.read():
+                        continue
+            span = repo_span(p)
+            if span:
+                found.append((p, span))
+    return sorted(found, key=lambda ps: ps[0].stat().st_mtime)
 
 
 def blocks_of(msg) -> list:
@@ -76,11 +144,14 @@ def blocks_of(msg) -> list:
     return [{"type": "text", "text": c}] if isinstance(c, str) else (c or [])
 
 
-def render_session(path: Path, known: set[str], who: str) -> tuple[str, int, str, str]:
-    """Markdown for the messages of one log that are not in `known`; returns (text, count, first day, last day)."""
+def render_session(path: Path, known: set[str], who: str, span: tuple[int, int] | None = None) -> tuple[str, int, str, str]:
+    """Markdown for the messages of one log that are not in `known`; returns (text, count, first day, last day).
+    With `span`, only the lines from span[0] to span[1] (the part worked in this repository)."""
     extra = secrets()
     out, n, first, last = [], 0, "", ""
-    for line in open(path, encoding="utf-8"):
+    for i, line in enumerate(open(path, encoding="utf-8", errors="replace")):
+        if span and not (span[0] <= i <= span[1]):
+            continue
         try:
             j = json.loads(line)
         except json.JSONDecodeError:
@@ -127,16 +198,21 @@ def block_ids() -> list[tuple[str, str]]:
     return re.findall(r"<!-- s:([0-9a-f-]+) -->\n### (Session: [^\n]*)", LOG.read_text(encoding="utf-8"))
 
 
-def cmd_export(paths: list[Path]) -> int:
+def cmd_export(logs: list, dry: bool = False) -> int:
     known = known_ids()
     who = person()
-    if not LOG.is_file():
+    if not LOG.is_file() and not dry:
         LOG.parent.mkdir(parents=True, exist_ok=True); LOG.write_text(HEADER, encoding="utf-8")
     added = 0
-    for p in paths:
+    for item in logs:
+        p, span = item if isinstance(item, tuple) else (item, None)
         sid = p.stem
-        text, n, first, last = render_session(p, known, who)
+        text, n, first, last = render_session(p, known, who, span)
         if not n:
+            continue
+        if dry:
+            print(f"would append {n} messages from session {sid[:8]} ({who}, {first} to {last})")
+            added += n
             continue
         day = lambda d: datetime.fromisoformat(d).strftime("%d %B %Y") if d else "?"
         span = day(first) if first == last else f"{day(first)} to {day(last)}"
@@ -149,7 +225,9 @@ def cmd_export(paths: list[Path]) -> int:
         added += n
         print(f"appended {n} messages from session {sid[:8]} ({who}, {span})")
     if not added:
-        print("nothing new to append from this machine")
+        n_found = len(logs)
+        print("nothing new to append from this machine" + ("" if n_found else
+              " (no Claude Code session on this machine has worked in this repository yet)"))
     return added
 
 
@@ -171,7 +249,11 @@ def main(argv: list[str]) -> int:
     if cmd == "export":
         cmd_export([Path(a) for a in argv[1:]]); return 0
     if cmd == "sync":
-        cmd_export(project_logs()); cmd_new(); return 0
+        dry = "--dry-run" in argv[1:]
+        cmd_export(project_logs(), dry)
+        if not dry:
+            cmd_new()
+        return 0
     if cmd == "new":
         cmd_new(); return 0
     print(__doc__); return 1
