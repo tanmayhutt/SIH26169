@@ -75,6 +75,11 @@ only the result.
   blocks and tell the user, in a few lines, what each teammate did and decided.
 - Before the final commit of a task, run it again, so the conversation that produced the change
   travels with the change. Commit `docs/history/CHAT_LOG.md` with the work.
+- It finds every session on this machine that worked in the repository, wherever Claude Code was
+  started (the log lines record the working directory); `sync --dry-run` shows what it would add.
+- If `CHAT_LOG.md` conflicts on a pull or merge, take the incoming version
+  (`git checkout --theirs docs/history/CHAT_LOG.md`) and run `sync` again: it re-appends only this
+  machine's messages that are missing (every message carries an id). Do not merge the file by hand.
 - Never edit the file by hand and never put clock times in it. Exact strings that must not appear
   (a site password, a handle) go in the local file `.chat_redact`, one per line; it is ignored by
   git. Where the log disagrees with the handover or the knowledge transfer, those two are right.
