@@ -12,7 +12,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from scipy.optimize import least_squares
 
 from ..engine.config import TrackerConfig
 from ..world.sprites import make_sprite
@@ -70,6 +69,7 @@ def refine_centroid(img: np.ndarray, x: float, y: float, r: int = 7) -> tuple[fl
             g = a * np.exp(-((xx - mx) ** 2 + (yy - my) ** 2) / (2 * s * s))
             return (g - p).ravel()
 
+        from scipy.optimize import least_squares          # loaded on first use: 0.3 s the window need not wait for
         sol = least_squares(resid, [amp0, cx, cy, max(sig, 0.8)], max_nfev=25,
                             bounds=([0, xa, ya, 0.4], [1e4, xb, yb, 20.0]))
         if sol.success and np.isfinite(sol.x).all():

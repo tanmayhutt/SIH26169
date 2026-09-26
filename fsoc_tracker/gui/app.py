@@ -1233,6 +1233,7 @@ def main():
 
 def _load_report_writer():
     try:
+        from scipy.optimize import least_squares  # noqa: F401   the detector's sub-pixel fit, first needed on the first frame
         from ..engine import report  # noqa: F401
     except Exception:
         pass                          # a failure here shows itself, with its message, when a report is written

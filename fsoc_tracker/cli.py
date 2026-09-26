@@ -17,8 +17,8 @@ from pathlib import Path
 
 from .engine.config import RunConfig
 from .engine.naming import run_label
-from .engine.report import write_report
-from .engine.simulation import Simulation
+# The report writer (matplotlib) and the simulation engine are imported inside the commands that
+# use them: the `gui` command must reach the window without paying for them first.
 
 
 def _load(path: str | None) -> RunConfig:
@@ -26,6 +26,7 @@ def _load(path: str | None) -> RunConfig:
 
 
 def _run_one(cfg: RunConfig, out: Path, quiet: bool = False) -> dict:
+    from .engine.simulation import Simulation
     sim = Simulation(cfg, out)
     t0 = time.perf_counter()
 
@@ -36,6 +37,7 @@ def _run_one(cfg: RunConfig, out: Path, quiet: bool = False) -> dict:
     summary = sim.run(prog)
     if not quiet:
         print(file=sys.stderr)
+    from .engine.report import write_report
     write_report(cfg, sim.telemetry.records, summary, sim.files["report"])
     v = summary.values
     if not quiet:
