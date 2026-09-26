@@ -16,7 +16,6 @@ import pyqtgraph as pg
 from .. import __version__
 from ..engine.config import ATMOSPHERE_PRESETS, RunConfig
 from ..engine.naming import run_label
-from ..engine.report import write_report
 from ..engine.simulation import Simulation, StepResult
 from .theme import STYLESHEET, C, mono, ui_font
 
@@ -995,6 +994,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if sim.summary:
             self._tiles_from_summary(sim.summary.values, sim.summary.passed)
         try:
+            from ..engine.report import write_report          # loaded after the window (see main)
             report = write_report(sim.cfg, sim.telemetry.records, sim.summary, sim.files["report"])
         except Exception as e:
             report = None
@@ -1223,7 +1223,19 @@ def main():
     app.setStyle("Fusion")          # the same widget look on Windows, Linux and macOS
     app.setStyleSheet(STYLESHEET)
     w = MainWindow(); w.show()
+    # The report writer (matplotlib) is the slowest import, and on a first run it also builds
+    # its font cache, which took 17 s on a Mac. It is not needed until a run ends, so it loads
+    # in the background once the window is on screen instead of before it.
+    import threading
+    threading.Thread(target=_load_report_writer, name="load-report-writer", daemon=True).start()
     return app.exec()
+
+
+def _load_report_writer():
+    try:
+        from ..engine import report  # noqa: F401
+    except Exception:
+        pass                          # a failure here shows itself, with its message, when a report is written
 
 
 if __name__ == "__main__":
