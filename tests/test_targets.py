@@ -123,3 +123,41 @@ def test_targets_starting_together_fall_back_to_appearance():
     s = _run(cfg, 4.0)
     assert s.summary.designation["mode"].startswith("appearance")
     assert s.summary.values["centroid_err_mean_px"] < 5.0
+
+
+def test_video_beacons_are_listed_and_the_chosen_one_is_followed(tmp_path):
+    # Benchmark 2 with several beacons: the detector lists the beacons of the first frames as
+    # targets; designating the second one cues the tracker to it and it is the one scored
+    import cv2
+    from fsoc_tracker.engine.sources import SyntheticSource
+    from fsoc_tracker.ui_shared import video_beacons, video_targets
+    c = RunConfig(); c.screen.width = c.screen.height = 900; c.duration_s = 3.0; c.camera.width, c.camera.height = 320, 240
+    c.targets = [TargetConfig(name="A", start="250,300", motion="line", heading_deg=20, speed_px_s=60),
+                 TargetConfig(name="B", start="650,600", motion="line", heading_deg=200, speed_px_s=60, size_px=8, intensity=200)]
+    frames = list(SyntheticSource(c))
+    clip = None
+    for name, fourcc in (("clip.mp4", "mp4v"), ("clip.avi", "MJPG")):
+        try:
+            vw = cv2.VideoWriter(str(tmp_path / name), cv2.VideoWriter_fourcc(*fourcc), 30, (900, 900), isColor=True)
+            if not vw.isOpened():
+                continue
+            for fr in frames:
+                vw.write(cv2.cvtColor(fr.image, cv2.COLOR_GRAY2BGR))
+            vw.release(); clip = tmp_path / name; break
+        except cv2.error:
+            continue
+    if clip is None:
+        import pytest; pytest.skip("this OpenCV build has no video encoder")
+    b = video_beacons(str(clip), c.tracker)
+    assert len(b) == 2, b
+    ts = video_targets(b)
+    second = min(range(2), key=lambda i: math.hypot(b[i]["x"] - 650, b[i]["y"] - 600))    # the dimmer beacon B
+    v = RunConfig(); v.video = str(clip); v.duration_s = 0; v.targets = ts; v.designated = second
+    v.designation = "cue"; v.designation_cue = f"{b[second]['x']:.0f},{b[second]['y']:.0f}"
+    s = _run(v, 0)
+    recs = s.telemetry.records
+    bx = np.array([fr.truth.beacons[1][0] for fr in frames]); by = np.array([fr.truth.beacons[1][1] for fr in frames])
+    ex = np.array([r.est_x for r in recs]); ey = np.array([r.est_y for r in recs])
+    ok = np.isfinite(ex)
+    assert s.summary.designation["target"] == ts[second].name      # the video run keeps only the chosen beacon, by name
+    assert np.nanmean(np.hypot(ex[ok] - bx[ok], ey[ok] - by[ok])) < 5.0      # the estimate follows beacon B, not A

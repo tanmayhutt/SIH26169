@@ -153,7 +153,7 @@ const COL = { accent: "#52C4DE", signal: "#E08D4C", good: "#5CBE93", muted: "#8D
 const MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono");
 const UI = getComputedStyle(document.documentElement).getPropertyValue("--ui");
 let U = null, META = null, RUN_ID = null, WS = null, VIDEO = null, WATCHING = false, PAUSED = false, LAST = null, LIM = 5, TOTAL = 1;
-let TARGETS = [], EDIT = 0, DESIG = 0, DMODE = "auto", CUE = "", PREVIEW = null, GEOM = null, CHECK_T = null;   // targets as stored (engine units); which one the form edits
+let TARGETS = [], EDIT = 0, DESIG = 0, DMODE = "auto", CUE = "", PREVIEW = null, GEOM = null, CHECK_T = null, SIM_TARGETS = null;   // targets as stored (engine units); which one the form edits
 let SEGMENT = 0, CHANGES = [], LIVE_TIMER = null, TOKEN = null;   // TOKEN: this page started the run and may control it   // disturbance changes during the run: segment seen, change times
 const B = { t: [], terr: [], cerr: [], pan: [], tilt: [], proc: [], mode: [] };
 const TRAIL = { truth: [], win: [], cam: [] };
@@ -193,7 +193,8 @@ function buildPanel() {
   }
   $("side").addEventListener("input", scheduleCheck); $("side").addEventListener("change", scheduleCheck);
   $("edit").addEventListener("change", () => { saveTargetForm(); EDIT = $("edit").selectedIndex; loadTargetForm(EDIT); syncDesigBox(); });
-  $("desig").addEventListener("click", () => { DESIG = EDIT; refreshTargetLists(); setStatus("Designated " + nameOf(TARGETS[DESIG], DESIG) + ": the tracker follows it and the report scores it."); if (PREVIEW) drawPreview(); });
+  $("desig").addEventListener("click", () => { DESIG = EDIT; refreshTargetLists(); setStatus("Designated " + nameOf(TARGETS[DESIG], DESIG) + ": the tracker follows it and the report scores it.");
+    if (VIDEO) { applyVideoDesignation(); showVideoPreview(VIDEO); } else if (PREVIEW) drawPreview(); });
   $("target.name").addEventListener("input", () => { saveTargetForm(); refreshTargetLists(); });
 }
 const tsec = () => U.sections.find(x => x.key === "target");
@@ -209,7 +210,10 @@ function refreshTargetLists(di) {
   syncDesigBox();
 }
 // one target is always designated, so the box cannot be unticked: tick it on another target instead
-function syncDesigBox() { const on = EDIT === DESIG; $("desig").checked = on; $("desig").disabled = on || !!VIDEO; }
+function syncDesigBox() { const on = EDIT === DESIG; $("desig").checked = on; $("desig").disabled = on; }
+// a video's designated target is a detected beacon: the tracker is cued to its measured centre
+function applyVideoDesignation() { if (!VIDEO || !VIDEO.beacons || !VIDEO.beacons.length) return; const b = VIDEO.beacons[Math.min(DESIG, VIDEO.beacons.length - 1)];
+  CUE = `${Math.round(b.x)},${Math.round(b.y)}`; setStatus(`Designated ${nameOf(TARGETS[DESIG], DESIG)} at ${Math.round(b.x)},${Math.round(b.y)} (${Math.round(b.w)} x ${Math.round(b.h)} px, peak ${Math.round(b.peak)}): the tracker follows it and the report scores it.`); }
 function scheduleCheck() { if (RUN_ID) return; clearTimeout(CHECK_T); CHECK_T = setTimeout(runCheck, 300); }
 async function runCheck() {
   if (RUN_ID) return;
@@ -287,7 +291,7 @@ function liveEdited() {
 function lockForVideo(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const [key, names] of Object.entries(U.video_locked)) {
-    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); set("edit", on); syncDesigBox(); continue; }
+    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); syncDesigBox(); continue; }
     const s = U.sections.find(x => x.key === key); if (!s) continue;
     for (const f of s.fields) if (names === "*" || names.includes(f.name)) set(key + "." + f.name, on);
   }
@@ -368,8 +372,9 @@ function showVideoPreview(info) {
   const tx = text(x, 8, 16, "VIDEO LOADED", COL.good, F(12, true), pw) + 14; text(x, tx, 16, info.preview_header, COL.ink, F(11), pw - tx - 8);
   const cw = Math.min(Number($("camera.width").value), info.width), ch = Math.min(Number($("camera.height").value), info.height);
   x.strokeStyle = COL.accent; x.lineWidth = 2; x.strokeRect((info.width - cw) / 2 * s, (info.height - ch) / 2 * s, cw * s, ch * s);
-  const cue = CUE.split(",").map(Number);
-  if (CUE && cue.length === 2 && cue.every(isFinite)) { circle(x, cue[0] * s, cue[1] * s, 9, COL.signal, 1.6); text(x, cue[0] * s + 12, cue[1] * s - 8, "designated beacon", COL.signal, F(10), 300); }
+  if (info.beacons && info.beacons.length) drawBeacons(x, info.beacons.map(b => [b.x, b.y]), TARGETS.map(nameOf), DESIG, s);
+  else { const cue = CUE.split(",").map(Number);
+    if (CUE && cue.length === 2 && cue.every(isFinite)) { circle(x, cue[0] * s, cue[1] * s, 9, COL.signal, 1.6); text(x, cue[0] * s + 12, cue[1] * s - 8, "designated beacon", COL.signal, F(10), 300); } }
   x.restore(); GEOM = { ox, oy, s, w: info.width, h: info.height };
   $("v-scene").classList.add("live"); $("v-cam").classList.remove("live"); $("cam-idle").textContent = "Press Start to run the tracker on this video";
 }
@@ -479,6 +484,8 @@ async function upload(file) {
   let r; try { r = await fetch("api/video" + q, { method: "POST", body: fd }); } catch (e) { setStatus("Upload failed: server not reachable."); return; }
   if (!r.ok) { let d = "Could not read this file."; try { d = (await r.json()).detail || d; } catch (e) {} message("Video", d); setStatus(d); return; }
   VIDEO = await r.json(); CUE = ""; resetRun();
+  if (!SIM_TARGETS) SIM_TARGETS = { targets: TARGETS, desig: DESIG };      // restored when the video is closed
+  TARGETS = VIDEO.targets || TARGETS; EDIT = 0; DESIG = 0; loadTargetForm(0); refreshTargetLists(0); applyVideoDesignation();
   $("screen.width").value = VIDEO.width; $("screen.height").value = VIDEO.height; $("camera.update_rate_hz").value = Number(VIDEO.fps).toFixed(2);
   $("camera.width").value = Math.min(Number($("camera.width").value), VIDEO.width); $("camera.height").value = Math.min(Number($("camera.height").value), VIDEO.height);
   $("name").value = (VIDEO.original_name || "video").replace(/\.[^.]+$/, "");
@@ -487,7 +494,7 @@ async function upload(file) {
   $("tele").textContent = VIDEO.loaded_text; setStatus(VIDEO.status);
   sceneImg.onload = () => showVideoPreview(VIDEO); sceneImg.src = "data:image/jpeg;base64," + VIDEO.first_frame;
 }
-function clearVideo() { VIDEO = null; CUE = ""; lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); scheduleCheck(); }
+function clearVideo() { VIDEO = null; CUE = ""; if (SIM_TARGETS) { TARGETS = SIM_TARGETS.targets; DESIG = SIM_TARGETS.desig; EDIT = 0; SIM_TARGETS = null; loadTargetForm(0); refreshTargetLists(DESIG); } lockForVideo(false); resetRun(); showTiles(blankTiles()); $("tele").textContent = U.welcome; setStatus(U.status_ready); scheduleCheck(); }
 async function saveScenario() {
   const r = await fetch("api/scenario_yaml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario: $("scn").value || null, overrides: readForm() }) });
   if (!r.ok) { setStatus("Could not build the scenario file."); return; }
@@ -559,8 +566,10 @@ async function init() {
     if (RUN_ID || !GEOM) return;
     const r = $("scene").getBoundingClientRect(), px = (e.clientX - r.left - GEOM.ox) / GEOM.s, py = (e.clientY - r.top - GEOM.oy) / GEOM.s;
     if (px < 0 || py < 0 || px >= GEOM.w || py >= GEOM.h) return;
-    if (VIDEO) { CUE = `${Math.round(px)},${Math.round(py)}`; showVideoPreview(VIDEO); scheduleCheck();
-      setStatus(`Beacon marked at ${Math.round(px)},${Math.round(py)} on the first frame: the tracker takes the spot nearest this point.`); return; }
+    if (VIDEO) { const vb = VIDEO.beacons || [];
+      if (vb.length) { const d = vb.map(b => Math.hypot(b.x - px, b.y - py)); DESIG = d.indexOf(Math.min(...d)); refreshTargetLists(DESIG); applyVideoDesignation(); }
+      else { CUE = `${Math.round(px)},${Math.round(py)}`; setStatus(`Beacon marked at ${Math.round(px)},${Math.round(py)} on the first frame: the tracker takes the spot nearest this point.`); }
+      showVideoPreview(VIDEO); scheduleCheck(); return; }
     if (PREVIEW && PREVIEW.positions) { const d = PREVIEW.positions.map(b => Math.hypot(b[0] - px, b[1] - py)); const i = d.indexOf(Math.min(...d));
       refreshTargetLists(i); drawPreview(); scheduleCheck(); setStatus("Designated " + nameOf(TARGETS[i], i) + ": the tracker follows it and the report scores it."); }
   });

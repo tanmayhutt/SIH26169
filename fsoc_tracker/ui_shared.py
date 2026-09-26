@@ -242,6 +242,76 @@ def prepare_video_run(cfg: RunConfig) -> RunConfig:
     return cfg
 
 
+def video_beacons(path: str, tracker_cfg, frames: int = 30, min_frac: float = 0.5) -> list[dict]:
+    """The beacons a video shows, found by the classical detector on its first `frames` frames:
+    spots that keep appearing at about the same place in at least `min_frac` of them. Each entry
+    holds the centre (x, y) in video pixels, the measured spot width and height, the peak grey
+    level and the mean detector confidence, brightest first. This is what the Target picker
+    lists for a video, so the person can designate one of them (PS: "a designated moving
+    target") the same way as in the simulator, and the designated one's measured size becomes the
+    detector's prior."""
+    import cv2
+    from .perception.detect import ClassicalDetector
+    det = ClassicalDetector(tracker_cfg, None, "square")
+    cap = cv2.VideoCapture(str(path))
+    clusters: list[dict] = []
+    n = 0
+    try:
+        while n < frames:
+            ok, bgr = cap.read()
+            if not ok:
+                break
+            gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+            n += 1
+            for c in det.detect(gray, refine=12, limit=12):
+                if c.confidence < tracker_cfg.acquire_conf_min:      # the same floor a new track needs
+                    continue
+                if c.sigma < 0.9:                                    # a single hot pixel or a star, not a 5 to 20 px spot (the tracker's MIN_SIGMA)
+                    continue
+                bw, bh = float(c.bw or 0), float(c.bh or 0)
+                if bw <= 0 or bh <= 0:
+                    bw = bh = max(bw, bh, 2.0 * c.sigma * 1.7, 4.0)   # width from the fitted spot when no box was measured
+                for cl in clusters:
+                    # a moving beacon is matched to where it was last seen, not to its mean position
+                    if np.hypot(cl["last"][0] - c.x, cl["last"][1] - c.y) < max(40.0, 3.0 * cl["w"]):
+                        k = cl["hits"]
+                        cl["x"] = (cl["x"] * k + c.x) / (k + 1); cl["y"] = (cl["y"] * k + c.y) / (k + 1)
+                        cl["w"] = (cl["w"] * k + bw) / (k + 1); cl["h"] = (cl["h"] * k + bh) / (k + 1)
+                        cl["peak"] = max(cl["peak"], float(c.peak)); cl["conf"] += c.confidence; cl["hits"] += 1
+                        cl["last"] = (float(c.x), float(c.y))
+                        break
+                else:
+                    clusters.append({"x": float(c.x), "y": float(c.y), "w": bw, "h": bh, "peak": float(c.peak),
+                                     "conf": float(c.confidence), "hits": 1, "first": (float(c.x), float(c.y)), "last": (float(c.x), float(c.y))})
+    finally:
+        cap.release()
+    out = [dict(cl, conf=cl["conf"] / cl["hits"], frames=n) for cl in clusters if n and cl["hits"] >= min_frac * n]
+    out.sort(key=lambda b: -b["peak"])
+    if out:                                                          # dim static specks next to a bright beacon are stars, not targets
+        top = out[0]["peak"]
+        out = [b for b in out if b["peak"] >= 0.4 * top]
+    for b in out:                                                    # how far each spot moved over the scanned frames
+        b["drift"] = float(np.hypot(b["last"][0] - b["first"][0], b["last"][1] - b["first"][1]))
+        b["x"], b["y"] = b["first"]                                  # where it is on the first frame: the cue the tracker starts from
+        del b["first"], b["last"]
+    if out and max(b["drift"] for b in out) >= 3.0:                   # the PS target moves; stars in the same frames do not
+        out = [b for b in out if b["drift"] >= 1.5]
+    return out[:EXTRA_TARGETS_MAX + 1]
+
+
+def video_targets(beacons: list[dict], like: TargetConfig | None = None) -> list[TargetConfig]:
+    """One TargetConfig per detected beacon: named Target 1, Target 2, ... brightest first, with
+    the measured size as the detector's prior and the measured centre as the start point (the
+    cue the tracker is given when that one is designated)."""
+    base = like or TargetConfig()
+    out = []
+    for i, b in enumerate(beacons):
+        w = int(min(max(round(b["w"]), 2), 60)); h = int(min(max(round(b["h"]), 2), 60))
+        out.append(dataclasses.replace(base, name=f"Target {i + 1}", size_px=w, height_px=h, shape="square", mask="",
+                                       intensity=int(min(max(round(b["peak"]), 20), 255)), start=f"{b['x']:.0f},{b['y']:.0f}", motion="static"))
+    return out or [dataclasses.replace(base)]
+
+
 def new_random_seed(cfg: RunConfig) -> None:
     """'New seed each run': a fresh seed, and a fresh heading for line and sinusoidal paths."""
     cfg.seed = int(np.random.default_rng().integers(0, 10 ** 6))

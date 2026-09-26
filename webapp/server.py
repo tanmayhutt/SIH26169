@@ -21,6 +21,7 @@ One run at a time per server; a second request while one is live gets 409.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import base64
 import copy
 import json
@@ -46,7 +47,8 @@ from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.engine.sources import probe_video
 from fsoc_tracker.ui_shared import (DURATION_RANGE, SPEEDS, LiveTiles, camera_bottom, camera_crop, camera_top, extra_targets,
                                     final_tiles, front_end_bundle, new_random_seed, prepare_video_run, scene_header, status_text, summary_text,
-                                    telemetry_lines, video_loaded_lines, video_preview_header, scenario_check, target_labels)
+                                    telemetry_lines, video_loaded_lines, video_preview_header, scenario_check, target_labels,
+                                    video_beacons, video_targets)
 from fsoc_tracker.engine.checks import check_config
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,7 +100,7 @@ class Run:
             live = LiveTiles()
             ifov = self.cfg.camera.ifov_deg
             names = self.cfg.target_names()
-            following = names[sim.di] if names and not self.cfg.video else ""
+            following = names[sim.di] if names else ""
             total = getattr(sim.source, "n_frames", 0) or int(round(self.cfg.duration_s * self.cfg.camera.update_rate_hz))
             for res in sim.steps():
                 while self.pause and not self.stop.is_set() and not self.step_once:
@@ -489,6 +491,10 @@ async def upload_video(request: Request, file: UploadFile = File(...)):
                 setattr(cam, {"cam_w": "width", "cam_h": "height", "fov_w": "fov_w_deg", "fov_h": "fov_h_deg"}[k], cast(v))
             except ValueError:
                 pass
+    # the beacons the detector sees in the first frames: the page lists them as targets to designate
+    beacons = video_beacons(dest, RunConfig().tracker)
+    info["beacons"] = [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in b.items()} for b in beacons]
+    info["targets"] = [dataclasses.asdict(t) for t in video_targets(beacons)]
     info["loaded_text"] = video_loaded_lines(file.filename or name, info, cam)
     info["preview_header"] = video_preview_header(info)
     info["status"] = status_text("video", path=file.filename or name)

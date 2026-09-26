@@ -28,7 +28,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
                          new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
-                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS)  # noqa: F401
+                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS, video_beacons, video_targets)  # noqa: F401
 from ..engine.config import target_name, parse_xy
 
 
@@ -684,6 +684,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _read_targets(self):
         """The panel's target form back into the list, and the list sized to 'Extra targets'."""
         self.forms["target"].read()
+        if self.video_path:                 # a video's targets are the beacons the scan found
+            return
         seed = self.sp_seed.value()
         t0 = self.cfg.targets[0]
         self.cfg.targets = extra_targets(t0, self.cfg.targets, self.sp_extra.value(), seed, self.chk_identical.isChecked(),
@@ -735,6 +737,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.designated_idx = self.edit_idx
         self._refresh_target_lists()
         self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]}: the tracker follows it and the report scores it.")
+        if self.video_path:
+            self._preview_video(self.video_path)
 
     def _targets_changed(self, *_):
         self._read_targets()
@@ -763,9 +767,14 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.thread is not None:
             return
         if self.video_path:
-            self.designation_cue = f"{x:.0f},{y:.0f}"
-            self.lbl_status.setText(f"Beacon marked at {x:.0f},{y:.0f} on the first frame: the tracker takes the spot nearest this point.")
-            self._preview_video(self.video_path)
+            vb = getattr(self, "video_beacons", None) or []
+            if vb:
+                self.designated_idx = int(np.argmin([np.hypot(b["x"] - x, b["y"] - y) for b in vb]))
+                self._preview_video(self.video_path)
+            else:
+                self.designation_cue = f"{x:.0f},{y:.0f}"
+                self.lbl_status.setText(f"Beacon marked at {x:.0f},{y:.0f} on the first frame: the tracker takes the spot nearest this point.")
+                self._preview_video(self.video_path)
             self._schedule_check()
             return
         pos = getattr(self, "_preview_pos", None)
@@ -853,7 +862,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._buf_reset(); self.scene_view.reset(); self.cam_view.reset(); self._last_res = None
         names = cfg.target_names()
         self.scene_view.set_targets(names, self.sim.di)
-        self._following = names[self.sim.di] if names and not cfg.video else ""
+        self._following = names[self.sim.di] if names else ""
         for k, d in blank_tiles().items():
             self.tiles[k].show(d)
         self.tiles["state"].set("starting", None, "")
@@ -1077,11 +1086,43 @@ class MainWindow(QtWidgets.QMainWindow):
         self.scene_view.remember_geometry(s, pm.width(), pm.height(), w, h)
         self._preview_pos = None
         self.cam_view.setPixmap(QtGui.QPixmap())
+        # the beacons the detector sees in the first frames become the Target list (PS: "a
+        # designated moving target"): tick Designated on one, or click it on the picture
+        if getattr(self, "_sim_targets", None) is None:
+            self._sim_targets = (list(self.cfg.targets), self.designated_idx)
+        if getattr(self, "_video_scanned", None) != path:
+            self.video_beacons = video_beacons(path, self.forms["tracker"].read())
+            self.cfg.targets = video_targets(self.video_beacons, self._sim_targets[0][0])
+            self._video_scanned = path
+            self.edit_idx = 0; self.designated_idx = 0
+            self.forms["target"].write(self.cfg.targets[0])
+        self._refresh_target_lists()
+        self._apply_video_designation()
+        self._draw_video_beacons(pm, s)
+        self.scene_view.setPixmap(pm)
         self.cam_view.setText("Press Start to run the tracker on this video")
         for t in self.tiles.values():
             t.set("-")
         self.tiles["state"].set("video ready", None, "press Start")
         self.tele.setPlainText(video_loaded_lines(Path(path).name, info, self.forms["camera"].read()))
+
+    def _apply_video_designation(self):
+        """The designated target of a video is a detected beacon: the tracker is cued to its
+        measured centre, and its measured size is the detector's prior."""
+        if not self.video_path or not getattr(self, "video_beacons", None):
+            return
+        b = self.video_beacons[min(self.designated_idx, len(self.video_beacons) - 1)]
+        self.designation_cue = f"{b['x']:.0f},{b['y']:.0f}"
+        self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]} at {b['x']:.0f},{b['y']:.0f} "
+                                f"({b['w']:.0f} x {b['h']:.0f} px, peak {b['peak']:.0f}): the tracker follows it and the report scores it.")
+
+    def _draw_video_beacons(self, pm: QtGui.QPixmap, s: float):
+        if not getattr(self, "video_beacons", None):
+            return
+        p = QtGui.QPainter(pm); p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        self.scene_view.set_targets(target_labels(self.cfg), self.designated_idx)
+        self.scene_view.draw_beacons(p, [(b["x"], b["y"]) for b in self.video_beacons], s, mono(8))
+        p.end()
 
     def open_truth(self):
         p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Ground truth for this video", str(Path(self.video_path or ".").parent), "CSV (*.csv)")
@@ -1105,6 +1146,10 @@ class MainWindow(QtWidgets.QMainWindow):
             cam = self.forms["camera"].read(); cam.update_rate_hz = pre[2]; self.forms["camera"].write(cam)
             self._pre_video = None
         self._set_video_mode(False)
+        if getattr(self, "_sim_targets", None) is not None:
+            self.cfg.targets, self.designated_idx = self._sim_targets; self._sim_targets = None
+            self.edit_idx = 0; self.forms["target"].write(self.cfg.targets[0]); self._refresh_target_lists()
+        self.video_beacons = []; self._video_scanned = None
         self._placeholders()
         for t in self.tiles.values():
             t.set("\u2013")
@@ -1116,12 +1161,9 @@ class MainWindow(QtWidgets.QMainWindow):
         those sections are locked; the camera window, its FOV and rate limits still apply."""
         for key, names in VIDEO_LOCKED.items():
             if key == "run":
-                for w in (self.sp_extra, self.sp_dur, self.chk_identical, self.cmb_edit, self.chk_desig):
+                for w in (self.sp_extra, self.sp_dur, self.chk_identical):
                     w.setEnabled(not on)
-                if on:
-                    # a video run looks for the designated target's appearance: edit that one
-                    self.cmb_edit.setCurrentIndex(min(self.designated_idx, self.cmb_edit.count() - 1))
-                else:
+                if not on:
                     self.designation_cue = ""
                     self._sync_desig_box()
             elif names == "*":
