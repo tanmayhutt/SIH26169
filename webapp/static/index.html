@@ -178,6 +178,7 @@ function buildPanel() {
     <div class="row" id="row-duration"><span>Duration (s)</span><input type="number" id="duration" min="${U.duration_range[0]}" max="${U.duration_range[1]}" step="1"></div>
     <div class="row" id="row-extra"><span title="${esc(U.run_tips.extra)}">Extra targets</span><input type="number" id="extra" min="0" max="${U.extra_max}" step="1"></div>
     <div class="row" id="row-identical"><span></span><label class="chk" title="${esc(U.run_tips.identical)}"><input type="checkbox" id="identical"> Identical look</label></div>
+    <div class="row" id="row-beacon" title="${esc(U.run_tips.beacon)}" hidden><span>Beacon</span><select id="beacon"></select></div>
     <div class="hint" id="check" title="Scenario check: values beyond the problem statement, values the camera cannot physically follow, and values that were corrected."></div></div>`;
   for (const s of U.sections) {
     h += `<div class="sec" id="sec-${s.key}"><div class="h">${s.title}${s.ref ? `<span>${s.ref}</span>` : ""}</div>${s.hint ? `<div class="hint">${s.hint}</div>` : ""}`;
@@ -196,6 +197,13 @@ function buildPanel() {
   $("desig").addEventListener("click", () => { DESIG = EDIT; refreshTargetLists(); setStatus("Designated " + nameOf(TARGETS[DESIG], DESIG) + ": the tracker follows it and the report scores it.");
     if (VIDEO) { applyVideoDesignation(); showVideoPreview(VIDEO); } else if (PREVIEW) drawPreview(); });
   $("target.name").addEventListener("input", () => { saveTargetForm(); refreshTargetLists(); });
+  // the Beacon picker of the Run section: the chosen video beacon is the designated target
+  $("beacon").addEventListener("change", () => { if (RUN_ID || !VIDEO || !(VIDEO.beacons || []).length) return; EDIT = DESIG = $("beacon").selectedIndex; loadTargetForm(EDIT); refreshTargetLists(DESIG); applyVideoDesignation(); showVideoPreview(VIDEO); scheduleCheck(); });
+}
+function refreshBeaconList() {
+  const vb = VIDEO ? (VIDEO.beacons || []) : [], labels = vb.length ? (VIDEO.beacon_labels || vb.map((b, i) => `Target ${i + 1}`)) : ["none found"];
+  $("beacon").innerHTML = labels.map(l => `<option>${l.replace(/</g, "&lt;")}</option>`).join(""); $("beacon").selectedIndex = Math.min(DESIG, Math.max(vb.length - 1, 0));
+  $("beacon").disabled = !vb.length; $("row-beacon").title = vb.length ? U.run_tips.beacon : U.run_tips.beacon_none; $("row-beacon").hidden = !VIDEO;
 }
 const tsec = () => U.sections.find(x => x.key === "target");
 const nameOf = (t, i) => (t.name || "").trim() || `Target ${i + 1}`;
@@ -213,7 +221,7 @@ function refreshTargetLists(di) {
 function syncDesigBox() { const on = EDIT === DESIG; $("desig").checked = on; $("desig").disabled = on; }
 // a video's designated target is a detected beacon: the tracker is cued to its measured centre
 function applyVideoDesignation() { if (!VIDEO || !VIDEO.beacons || !VIDEO.beacons.length) return; const b = VIDEO.beacons[Math.min(DESIG, VIDEO.beacons.length - 1)];
-  CUE = `${Math.round(b.x)},${Math.round(b.y)}`; setStatus(`Designated ${nameOf(TARGETS[DESIG], DESIG)} at ${Math.round(b.x)},${Math.round(b.y)} (${Math.round(b.w)} x ${Math.round(b.h)} px, peak ${Math.round(b.peak)}): the tracker follows it and the report scores it.`); }
+  CUE = `${Math.round(b.x)},${Math.round(b.y)}`; setStatus(`Designated ${nameOf(TARGETS[DESIG], DESIG)} at ${Math.round(b.x)},${Math.round(b.y)} (${Math.round(b.w)} x ${Math.round(b.h)} px, peak ${Math.round(b.peak)}): the tracker follows it and the report scores it. Choose another beacon in the Run section.`); }
 function scheduleCheck() { if (RUN_ID) return; clearTimeout(CHECK_T); CHECK_T = setTimeout(runCheck, 300); }
 async function runCheck() {
   if (RUN_ID) return;
@@ -291,7 +299,7 @@ function liveEdited() {
 function lockForVideo(on) {
   const set = (id, off) => { const el = $(id); if (el) el.disabled = off; const row = $("row-" + id); if (row) row.classList.toggle("off", off); };
   for (const [key, names] of Object.entries(U.video_locked)) {
-    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); syncDesigBox(); continue; }
+    if (key === "run") { set("duration", on); set("extra", on); set("identical", on); syncDesigBox(); refreshBeaconList(); continue; }
     const s = U.sections.find(x => x.key === key); if (!s) continue;
     for (const f of s.fields) if (names === "*" || names.includes(f.name)) set(key + "." + f.name, on);
   }
@@ -566,10 +574,7 @@ async function init() {
     if (RUN_ID || !GEOM) return;
     const r = $("scene").getBoundingClientRect(), px = (e.clientX - r.left - GEOM.ox) / GEOM.s, py = (e.clientY - r.top - GEOM.oy) / GEOM.s;
     if (px < 0 || py < 0 || px >= GEOM.w || py >= GEOM.h) return;
-    if (VIDEO) { const vb = VIDEO.beacons || [];
-      if (vb.length) { const d = vb.map(b => Math.hypot(b.x - px, b.y - py)); DESIG = d.indexOf(Math.min(...d)); refreshTargetLists(DESIG); applyVideoDesignation(); }
-      else { CUE = `${Math.round(px)},${Math.round(py)}`; setStatus(`Beacon marked at ${Math.round(px)},${Math.round(py)} on the first frame: the tracker takes the spot nearest this point.`); }
-      showVideoPreview(VIDEO); scheduleCheck(); return; }
+    if (VIDEO) return;                       // a video's beacon is chosen in the Run section, not on the picture
     if (PREVIEW && PREVIEW.positions) { const d = PREVIEW.positions.map(b => Math.hypot(b[0] - px, b[1] - py)); const i = d.indexOf(Math.min(...d));
       refreshTargetLists(i); drawPreview(); scheduleCheck(); setStatus("Designated " + nameOf(TARGETS[i], i) + ": the tracker follows it and the report scores it."); }
   });

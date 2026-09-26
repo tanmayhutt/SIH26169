@@ -28,7 +28,7 @@ from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, D
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
                          new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
-                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS, video_beacons, video_targets)  # noqa: F401
+                         TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS, video_beacons, video_targets, beacon_labels)  # noqa: F401
 from ..engine.config import target_name, parse_xy
 
 
@@ -513,9 +513,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # targets: how many, which one is followed, how it is designated, which one the panel edits
         self.sp_extra.setToolTip(RUN_TIPS["extra"])
         self.chk_identical = QtWidgets.QCheckBox("Identical look"); self.chk_identical.setToolTip(RUN_TIPS["identical"])
+        # a video's beacons (found on load) are chosen here, in the Run section; the row shows only with a video
+        self.cmb_beacon = QtWidgets.QComboBox(); self.cmb_beacon.setToolTip(RUN_TIPS["beacon"])
         for lab, w in (("Name", self.ed_name), ("Seed", self.sp_seed), ("", self.chk_random), ("Duration (s)", self.sp_dur), ("Extra targets", self.sp_extra),
-                       ("", self.chk_identical)):
+                       ("", self.chk_identical), ("Beacon", self.cmb_beacon)):
             l = QtWidgets.QLabel(lab); l.setProperty("class", "fieldlabel"); l.setFixedWidth(LABEL_W); rl.addRow(l, w)
+        self.run_layout = rl; self.run_layout.setRowVisible(self.cmb_beacon, False)
         # the Target section: pick a target to edit, tick the one to follow
         self.cmb_edit = QtWidgets.QComboBox(); self.cmb_edit.setToolTip(RUN_TIPS["edit"])
         self.chk_desig = QtWidgets.QCheckBox("Designated"); self.chk_desig.setToolTip(RUN_TIPS["designated"])
@@ -533,6 +536,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sp_extra.valueChanged.connect(self._targets_changed); self.chk_identical.toggled.connect(self._targets_changed)
         self.cmb_edit.currentIndexChanged.connect(self._edit_changed)
         self.chk_desig.clicked.connect(self._designate_current)
+        self.cmb_beacon.activated.connect(self._beacon_chosen)
         self.sp_seed.valueChanged.connect(lambda _v: self._schedule_check())
         self.forms["target"].widgets["name"].textChanged.connect(self._name_edited)
         for f in self.forms.values():
@@ -761,21 +765,26 @@ class MainWindow(QtWidgets.QMainWindow):
             self.cmb_edit.setItemText(i, label)
             self.scene_view.set_targets(target_labels(self.cfg), self.designated_idx)
 
-    def _scene_clicked(self, x: float, y: float):
-        """A click before a run designates: on a video, the clicked point becomes the cue; on
-        the simulator preview, the target nearest the click becomes the designated one."""
-        if self.thread is not None:
+    def _beacon_chosen(self, idx: int):
+        """The Beacon picker of the Run section: the chosen video beacon is the designated target."""
+        if self.thread is not None or not self.video_path or not getattr(self, "video_beacons", None):
             return
-        if self.video_path:
-            vb = getattr(self, "video_beacons", None) or []
-            if vb:
-                self.designated_idx = int(np.argmin([np.hypot(b["x"] - x, b["y"] - y) for b in vb]))
-                self._preview_video(self.video_path)
-            else:
-                self.designation_cue = f"{x:.0f},{y:.0f}"
-                self.lbl_status.setText(f"Beacon marked at {x:.0f},{y:.0f} on the first frame: the tracker takes the spot nearest this point.")
-                self._preview_video(self.video_path)
-            self._schedule_check()
+        self.designated_idx = int(idx); self.edit_idx = int(idx)
+        self.forms["target"].write(self.cfg.targets[self.edit_idx])
+        self._preview_video(self.video_path)
+        self._schedule_check()
+
+    def _refresh_beacon_list(self):
+        vb = getattr(self, "video_beacons", None) or []
+        self.cmb_beacon.blockSignals(True); self.cmb_beacon.clear()
+        self.cmb_beacon.addItems(beacon_labels(vb) if vb else ["none found"])
+        self.cmb_beacon.setCurrentIndex(min(self.designated_idx, max(len(vb) - 1, 0))); self.cmb_beacon.setEnabled(bool(vb))
+        self.cmb_beacon.setToolTip(RUN_TIPS["beacon"] if vb else RUN_TIPS["beacon_none"]); self.cmb_beacon.blockSignals(False)
+
+    def _scene_clicked(self, x: float, y: float):
+        """A click on the simulator preview before a run designates the target nearest the
+        click. On a video the beacon is chosen in the Run section, not on the picture."""
+        if self.thread is not None or self.video_path:
             return
         pos = getattr(self, "_preview_pos", None)
         if pos:
@@ -1097,6 +1106,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.edit_idx = 0; self.designated_idx = 0
             self.forms["target"].write(self.cfg.targets[0])
         self._refresh_target_lists()
+        self._refresh_beacon_list()
         self._apply_video_designation()
         self._draw_video_beacons(pm, s)
         self.scene_view.setPixmap(pm)
@@ -1114,7 +1124,8 @@ class MainWindow(QtWidgets.QMainWindow):
         b = self.video_beacons[min(self.designated_idx, len(self.video_beacons) - 1)]
         self.designation_cue = f"{b['x']:.0f},{b['y']:.0f}"
         self.lbl_status.setText(f"Designated {target_labels(self.cfg)[self.designated_idx]} at {b['x']:.0f},{b['y']:.0f} "
-                                f"({b['w']:.0f} x {b['h']:.0f} px, peak {b['peak']:.0f}): the tracker follows it and the report scores it.")
+                                f"({b['w']:.0f} x {b['h']:.0f} px, peak {b['peak']:.0f}): the tracker follows it and the report scores it. "
+                                f"Choose another beacon in the Run section.")
 
     def _draw_video_beacons(self, pm: QtGui.QPixmap, s: float):
         if not getattr(self, "video_beacons", None):
@@ -1163,6 +1174,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if key == "run":
                 for w in (self.sp_extra, self.sp_dur, self.chk_identical):
                     w.setEnabled(not on)
+                self.run_layout.setRowVisible(self.cmb_beacon, on)
                 if not on:
                     self.designation_cue = ""
                     self._sync_desig_box()

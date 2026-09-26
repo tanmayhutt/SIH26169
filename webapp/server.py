@@ -48,7 +48,7 @@ from fsoc_tracker.engine.sources import probe_video
 from fsoc_tracker.ui_shared import (DURATION_RANGE, SPEEDS, LiveTiles, camera_bottom, camera_crop, camera_top, extra_targets,
                                     final_tiles, front_end_bundle, new_random_seed, prepare_video_run, scene_header, status_text, summary_text,
                                     telemetry_lines, video_loaded_lines, video_preview_header, scenario_check, target_labels,
-                                    video_beacons, video_targets)
+                                    video_beacons, video_targets, beacon_labels)
 from fsoc_tracker.engine.checks import check_config
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -495,6 +495,7 @@ async def upload_video(request: Request, file: UploadFile = File(...)):
     beacons = video_beacons(dest, RunConfig().tracker)
     info["beacons"] = [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in b.items()} for b in beacons]
     info["targets"] = [dataclasses.asdict(t) for t in video_targets(beacons)]
+    info["beacon_labels"] = beacon_labels(beacons)
     info["loaded_text"] = video_loaded_lines(file.filename or name, info, cam)
     info["preview_header"] = video_preview_header(info)
     info["status"] = status_text("video", path=file.filename or name)

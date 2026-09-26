@@ -225,8 +225,11 @@ RUN_TIPS = {
     "identical": "Generated targets copy the designated target's shape, size and brightness, so only the start position tells them apart.",
     "designated": "The tracker follows this target and the report scores it (PS: 'a designated moving target'). With several targets it is told "
                   "where this one starts (as an operator or ephemeris cue would) and checks its shape, size and brightness; alone, it goes by look. "
-                  "On a video, click the beacon on the first frame.",
-    "edit": "Which target this section shows and edits; * marks the designated one. Click a target on the preview to designate it.",
+                  "On a video, choose the beacon in the Run section.",
+    "edit": "Which target this section shows and edits; * marks the designated one. On the simulator, a click on the preview also designates.",
+    "beacon": "The beacons found in the video's first frames (PS row 8: one designated target, the rest optional). The chosen one is the "
+              "designated target: the tracker is cued to its first-frame position, follows it and the report scores it. The others are decoys.",
+    "beacon_none": "No beacon found in the first frames: describe the beacon in the Target section (shape, width, height, intensity).",
 }
 
 
@@ -297,6 +300,12 @@ def video_beacons(path: str, tracker_cfg, frames: int = 30, min_frac: float = 0.
     if out and max(b["drift"] for b in out) >= 3.0:                   # the PS target moves; stars in the same frames do not
         out = [b for b in out if b["drift"] >= 1.5]
     return out[:EXTRA_TARGETS_MAX + 1]
+
+
+def beacon_labels(beacons: list[dict]) -> list[str]:
+    """One line per detected beacon for the Beacon picker of the Run section, in both front ends:
+    the target name, its first-frame position, size and peak level."""
+    return [f"Target {i + 1}: at {b['x']:.0f},{b['y']:.0f}, {b['w']:.0f} x {b['h']:.0f} px, peak {b['peak']:.0f}" for i, b in enumerate(beacons)]
 
 
 def video_targets(beacons: list[dict], like: TargetConfig | None = None) -> list[TargetConfig]:
