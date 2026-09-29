@@ -50,7 +50,8 @@ need to know about is recorded in the same commit as the change, and pushed:
   and dropped (C3), measured results and limits (Part D), the Q&A (E3).
 - `PROGRESS.md` and `web/progress.json`: status, counts, measured numbers.
 - `COMPLIANCE.md` when a PS row, shall item, deliverable or benchmark is affected.
-- `docs/USER_MANUAL.md`, `docs/TECHNICAL_REPORT.md` and their PDFs (`docs/build_pdfs.py`) when the
+- `docs/USER_MANUAL.md`, `docs/TECHNICAL_REPORT.md`, the LaTeX report `docs/report/ARGUS_TECHNICAL_REPORT.tex`
+  and the PDFs (`docs/build_pdfs.py`; the report needs tectonic) when the
   user sees the change or a method or number in the report changes.
 - `docs/submission/DECK_CHECKLIST.md` when a number the deck quotes changes.
 

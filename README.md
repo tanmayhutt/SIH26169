@@ -30,7 +30,7 @@ CSV log and an automatic PDF performance report.
 | `docs/history/CHAT_LOG.md` | Every teammate's Claude Code conversation, one file, in order, secrets removed: how the work happened (the handover and knowledge-transfer files are authoritative) |
 | `docs/PS_AUDIT.md` | Every PS item checked by running the code, with the measured value (`python tools/ps_audit.py`) |
 | `COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
-| `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them) |
+| `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them; the report PDF is typeset from `docs/report/ARGUS_TECHNICAL_REPORT.tex`) |
 | `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
 | `26169.pdf` | The problem statement itself |
 | `docs/submission/ARGUS_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
@@ -84,7 +84,7 @@ fsoc_tracker/
 configs/scenarios/   scenario files (clear, noise, fog, low light, platform sway, multi-target, hard mode)
 training/            trains the CNN on frames rendered by the simulator, exports ONNX
 tests/               unit and closed-loop tests
-docs/                USER_MANUAL.md, TECHNICAL_REPORT.md, plan.html
+docs/                USER_MANUAL.md, TECHNICAL_REPORT.md, report/ (LaTeX source, charts, build.sh), plan.html
 models/              beacon_heatmap.onnx
 ```
 
@@ -100,7 +100,9 @@ cross-platform smoke test the build workflow runs.
 ## Documents
 
 - `docs/USER_MANUAL.md`: installation, GUI, parameters, Benchmark 2, output files, metric definitions.
-- `docs/TECHNICAL_REPORT.md`: problem understanding, architecture, modules, methods, tests, performance.
+- `docs/TECHNICAL_REPORT.md`: problem understanding, architecture, modules, methods, tests, performance. The
+  submitted PDF is typeset from `docs/report/ARGUS_TECHNICAL_REPORT.tex` (`bash docs/report/build.sh`, needs
+  tectonic); its charts are drawn from a regression batch by `docs/report/make_charts.py`.
 - `docs/TESTING_GUIDE.md`: how to exercise every input and configuration by hand, with expected outcomes.
 - `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
 - `ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
