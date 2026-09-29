@@ -133,17 +133,6 @@ def test_launcher_never_turns_a_number_into_a_path(tmp_path, monkeypatch):
     assert out[6] == str(tmp_path / "results2") and out[8] == str(tmp_path / "scen.yaml")
 
 
-# ------------------------------------------------------------------ record check
-def test_record_check_sees_a_code_only_commit(monkeypatch, capsys):
-    """git puts a blank line between a commit's header and its files; the check must still pair them."""
-    import tools.record_check as rc
-    log = ("\x00aaaaaaa\t2026-09-24\tme\tcode only\n\nfsoc_tracker/engine/metrics.py\n"
-           "\x00bbbbbbb\t2026-09-24\tme\tcode and record\n\nfsoc_tracker/cli.py\ndocs/HANDOVER.md\n")
-    monkeypatch.setattr(rc, "git", lambda *a: log)
-    assert rc.main(["--commits", "2"]) == 1
-    assert "aaaaaaa" in capsys.readouterr().out
-
-
 # ------------------------------------------------------------------ web server input
 def test_web_server_rejects_bad_input_and_foreign_control():
     pytest.importorskip("fastapi")

@@ -1197,7 +1197,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for cand in ("docs/USER_MANUAL.pdf", "docs/USER_MANUAL.md", "_internal/docs/USER_MANUAL.pdf", "_internal/docs/USER_MANUAL.md"):
             if Path(cand).exists():
                 _open_path(Path(cand)); return
-        QtWidgets.QMessageBox.information(self, "User manual", "The manual was not found next to the application. It is docs/USER_MANUAL.md in the repository.")
+        QtWidgets.QMessageBox.information(self, "User manual", "The manual was not found next to the application. It is on the project site's downloads page as USER_MANUAL.pdf.")
 
     def open_results(self):
         d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)

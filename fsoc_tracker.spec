@@ -6,12 +6,15 @@ import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
+import os
 root = Path(SPECPATH)
+# The user manual and the technical report are kept outside this repository (the team's records
+# folder, a sibling named SIH169-records, deliverables/; override with ARGUS_DOCS). When it is
+# present they are bundled next to the application, so the Manual button opens the PDF offline.
+docs = Path(os.environ.get("ARGUS_DOCS", root.parent / "SIH169-records" / "deliverables"))
 datas = [
     (str(root / "configs" / "scenarios"), "configs/scenarios"),
-    (str(root / "docs" / "USER_MANUAL.md"), "docs"),
-    *([(str(root / "docs" / "USER_MANUAL.pdf"), "docs")] if (root / "docs" / "USER_MANUAL.pdf").exists() else []),
-    *([(str(root / "docs" / "TECHNICAL_REPORT.pdf"), "docs")] if (root / "docs" / "TECHNICAL_REPORT.pdf").exists() else []),
+    *[(str(docs / f), "docs") for f in ("USER_MANUAL.pdf", "TECHNICAL_REPORT.pdf") if (docs / f).exists()],
 ]
 if (root / "models" / "beacon_heatmap.onnx").exists():
     datas.append((str(root / "models" / "beacon_heatmap.onnx"), "models"))

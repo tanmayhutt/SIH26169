@@ -5,7 +5,7 @@
 #   bash webapp/deploy.sh                       # full deploy
 #   HOST=ubuntu@1.2.3.4 DOMAIN=x.example.com bash webapp/deploy.sh
 #
-# Site map on $DOMAIN (everything behind one basic-auth login):
+# Site map on $DOMAIN (public, no login):
 #   /               the web app (FastAPI on 127.0.0.1:8095): /api/*, /ws/*, /runs/*, /static/*
 #   /about/         progress record and documents (static)
 #   /downloads/     desktop builds, PDFs, demo video (static, browsable)
@@ -25,20 +25,25 @@ rsync -az --delete \
   "$HERE/" "$HOST:$REPO/"
 
 echo "== 2. static site (about, downloads) -> $SITE"
+# The progress site and the documents are not in this repository: they come from the team's records
+# folder (a sibling named SIH169-records by default; override with RECORDS). Without it, only the
+# web app and the downloads already on the server are deployed.
+RECORDS=${RECORDS:-$HERE/../SIH169-records}
 STAGE=$(mktemp -d)
-mkdir -p "$STAGE/about/content/docs" "$STAGE/downloads"
-cp "$HERE/site/index.html" "$HERE/site/progress.json" "$STAGE/about/"
-cp "$HERE/site/plan.html" "$STAGE/about/plan.html"
-cp "$HERE/docs/PROGRESS.md" "$HERE/docs/COMPLIANCE.md" "$HERE/docs/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/about/content/"
-cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
-cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
-cp "$HERE/docs/submission/ARGUS_SIH2026_26169.pdf" "$STAGE/downloads/" 2>/dev/null || true
+mkdir -p "$STAGE/about/content" "$STAGE/downloads"
+if [ -d "$RECORDS/site" ]; then
+cp "$RECORDS/site/index.html" "$RECORDS/site/progress.json" "$STAGE/about/"
+cp "$RECORDS/site/plan.html" "$STAGE/about/plan.html"
+cp "$RECORDS"/record/{PROGRESS,COMPLIANCE,ARCHITECTURE,KNOWLEDGE_TRANSFER,HANDOVER,TESTING_GUIDE,DEMO_SCRIPT}.md "$RECORDS/sources/manual/USER_MANUAL.md" "$HERE/README.md" "$STAGE/about/content/"
+cp "$RECORDS"/deliverables/*.pdf "$STAGE/downloads/" 2>/dev/null || true
+else
+echo "   records folder $RECORDS not found: the progress site and documents are left as they are on the server"
+fi
 # the same deck under its earlier name, for links already shared
 [ -f "$STAGE/downloads/ARGUS_SIH2026_26169.pdf" ] && cp "$STAGE/downloads/ARGUS_SIH2026_26169.pdf" "$STAGE/downloads/LAKSHYA_SIH2026_26169.pdf"
-cp "$HERE/docs/demo/ARGUS-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
+cp "$RECORDS/deliverables/ARGUS-demo.mp4" "$STAGE/downloads/" 2>/dev/null || true
 # the same video under its earlier name, which the submitted deck links to
 [ -f "$STAGE/downloads/ARGUS-demo.mp4" ] && cp "$STAGE/downloads/ARGUS-demo.mp4" "$STAGE/downloads/FSOC-Tracker-demo.mp4"
-cp "$HERE/docs/DEMO_SCRIPT.md" "$HERE/docs/TESTING_GUIDE.md" "$HERE/docs/HANDOVER.md" "$HERE/docs/KNOWLEDGE_TRANSFER.md" "$STAGE/about/content/docs/" 2>/dev/null || true
 for z in "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz; do [ -f "$z" ] && cp "$z" "$STAGE/downloads/"; done
 cat > "$STAGE/downloads/index.html" <<'EOF'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>SIH26169 downloads</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
@@ -63,6 +68,7 @@ ssh "$HOST" "sudo mkdir -p $SITE && sudo chown -R ubuntu:ubuntu $SITE"
 # keep the archives already on the server when dist/ holds none locally (a docs-only deploy)
 KEEP=()
 ls "$HERE"/dist/*.zip "$HERE"/dist/*.tar.gz >/dev/null 2>&1 || KEEP=(--exclude '*.zip' --exclude '*.tar.gz')
+[ -d "$RECORDS/site" ] || KEEP+=(--exclude 'about/' --exclude '*.pdf' --exclude '*.mp4')
 rsync -az --delete ${KEEP[@]+"${KEEP[@]}"} --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "$STAGE/" "$HOST:$SITE/site/"
 ssh "$HOST" "chmod -R u=rwX,go=rX $SITE"   # caddy runs as its own user and must read the site
 rm -rf "$STAGE"
@@ -96,13 +102,8 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now sih26169-web >/dev/null
 sudo systemctl restart sih26169-web
-# caddy: one site block, imported by the main Caddyfile; basic auth hash is created once and kept
-HASHFILE=/etc/caddy/sih26169.progress.hash
-if ! sudo test -s "$HASHFILE"; then echo "progress basic auth hash missing: create it with  sudo bash -c 'caddy hash-password --plaintext <password> > $HASHFILE'"; exit 2; fi
-HASH=$(sudo cat "$HASHFILE")
-USERFILE=/etc/caddy/sih26169.progress.user
-if ! sudo test -s "$USERFILE"; then echo "site login user missing: create it with  echo <username> | sudo tee $USERFILE"; exit 2; fi
-USERNAME=$(sudo cat "$USERFILE")
+# caddy: one site block, imported by the main Caddyfile. The site is public (the login was removed on
+# 2026-09-29 so evaluators can open it directly).
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF
 # SIH26169 site. Managed by webapp/deploy.sh; edit there, not here.
 #   /            web app (reverse proxy)      /about/      progress record (static)
@@ -115,10 +116,6 @@ $DOMAIN {
         Referrer-Policy "no-referrer"
         X-Robots-Tag "noindex, nofollow"
     }
-    basic_auth {
-        $USERNAME $HASH
-    }
-
     # canonical addresses end with a slash
     redir /about /about/ 302
     redir /downloads /downloads/ 302

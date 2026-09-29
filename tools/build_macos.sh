@@ -19,7 +19,7 @@ build() {   # build <label> <python> [arch-prefix...]
   local label=$1 py=$2; shift 2
   echo "== $label"
   rm -rf build dist/ARGUS
-  "$@" "$py" -m PyInstaller --noconfirm --clean fsoc_tracker.spec > "out/build-$label.log" 2>&1
+  ARGUS_DOCS="${ARGUS_DOCS:-$PWD/../SIH169-records/deliverables}" "$@" "$py" -m PyInstaller --noconfirm --clean fsoc_tracker.spec > "out/build-$label.log" 2>&1
   ( cd dist/ARGUS && "$@" ./ARGUS run -s configs/scenarios/clear_line.yaml --duration 2 --seed 0 --out results/smoke > /dev/null
     ls results/smoke/FSOC_*_report.pdf > /dev/null && rm -rf results configs models docs )
   rm -f "out/ARGUS-$label.zip"; ( cd dist && zip -qry "../out/ARGUS-$label.zip" ARGUS )

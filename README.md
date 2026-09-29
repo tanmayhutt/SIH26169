@@ -1,126 +1,94 @@
-at - https://sih26169.blankpoint.club/
-
 # ARGUS
 
-Team Blank Point. **ARGUS** (Acquire, Recognise, Guide, Update, Stabilise) is the name of the
-project, the desktop application, the web app and the builds. The project was earlier called
-LAKSHYA and the software FSOC Tracker; the Python package and the `fsoc-tracker` command keep
-their original names.
+AI-based virtual camera tracking for the coarse alignment of mobile Free Space Optical
+Communication (FSOC) terminals. Smart India Hackathon 2026, problem statement 26169
+(Department of Space, ISRO Space Applications Centre). Team BlankPoint.
 
-AI-based virtual camera tracking system for coarse alignment of mobile Free Space Optical
-Communication (FSOC) terminals. Smart India Hackathon problem statement **SIH26169**,
-Department of Space / ISRO Space Applications Centre.
+ARGUS simulates a scene with one or more moving beacons, a pan-tilt camera with realistic rate
+limits and a chain of atmospheric, platform and sensor disturbances, then detects, identifies and
+tracks the designated beacon and steers the camera to keep it centred. Every run writes a per-frame
+log, a summary and a PDF report with the performance metrics the problem statement asks for
+(acquisition time, tracking error, target loss, re-acquisition time, processing speed). The same
+engine reads the evaluators' videos for Benchmark 2.
 
-The application is a software stand-in for an FSOC coarse-alignment test bench. It draws a
-scene with a moving optical beacon, adds atmospheric and platform disturbances, and runs a
-tracker that finds the beacon, measures its centre to a fraction of a pixel, predicts its
-motion and steers a rate-limited virtual pan-tilt camera to keep it centred. It also accepts
-`.mp4` files in place of the simulated scene (Benchmark 2), with an optional ground-truth CSV
-of the beacon positions for error scoring. Every run writes a per-frame
-CSV log and an automatic PDF performance report.
+## Install and run
 
-## Start here
+Python 3.11 or newer.
 
-| Document | For |
-|---|---|
-| `docs/KNOWLEDGE_TRANSFER.md` | The problem statement and our solution explained completely, in plain language |
-| `docs/HANDOVER.md` | Working on the code: setup, commands, code map, verification, release, server |
-| `CONTRIBUTING.md` | How teammates make and submit changes |
-| `CLAUDE.md` | Rules for every contributor and AI agent |
-| `docs/history/CHAT_LOG.md` | Every teammate's Claude Code conversation, one file, in order, secrets removed: how the work happened (the handover and knowledge-transfer files are authoritative) |
-| `docs/PS_AUDIT.md` | Every PS item checked by running the code, with the measured value (`python tools/ps_audit.py`) |
-| `docs/COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
-| `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them; the report PDF is typeset from `docs/report/ARGUS_TECHNICAL_REPORT.tex`) |
-| `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
-| `26169.pdf` | The problem statement itself |
-| `docs/submission/ARGUS_SIH2026_26169.pdf` | Our SIH idea-submission presentation (8 slides) |
-| `docs/submission/DECK_CHECKLIST.md` | What every new version of the deck must still say |
+```bash
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[dev,web]"
 
-## Quick start
-
-```
-uv venv --python 3.12 .venv                  # or: python3.12 -m venv .venv
-uv pip install --python .venv/bin/python -e ".[dev]"
-.venv/bin/fsoc-tracker-gui                   # desktop application
-.venv/bin/fsoc-tracker run -s configs/scenarios/clear_line.yaml
-.venv/bin/fsoc-tracker video path/to/file.mp4
-.venv/bin/fsoc-tracker batch -s configs/scenarios/*.yaml --seeds 0-9
-.venv/bin/python -m pytest
+fsoc-tracker gui                                        # desktop application
+fsoc-tracker run --scenario configs/scenarios/clear_line.yaml --seed 0
+fsoc-tracker video path/to/file.mp4 [--truth truth.csv] # Benchmark 2: the video replaces the simulated scene
+fsoc-tracker batch -s configs/scenarios/*.yaml --seeds 0-2 --duration 15
+fsoc-tracker verify results/<run folder>                # rebuild every metric from the per-frame log
+uvicorn webapp.server:app --port 8095                   # the web app, then open http://127.0.0.1:8095/
 ```
 
-Standalone executable: `.venv/bin/pyinstaller fsoc_tracker.spec` produces `dist/ARGUS/`.
-Run `ARGUS` inside it (no Python needed). With arguments it acts as the command line tool.
-`.github/workflows/build.yml` builds it for Windows x64 and Linux x64, running the tests and a
-packaged smoke test on each (`bash webapp/publish_builds.sh` puts the archives on the site).
-`bash tools/build_macos.sh` builds the macOS Intel and Apple silicon archives on an Apple silicon
-Mac (Intel through Rosetta), with the same checks, and uploads them. A macOS runner minute costs
-ten Linux minutes, which is why the Macs are built locally.
+Each run writes `results/FSOC_<sim|video>_<name>_seed<N>_<date-time>/` with `_frames.csv`,
+`_summary.json`, `_report.pdf` and `_scenario.yaml` (the exact parameters, so the run repeats).
 
-## Releases and packages
+A standalone desktop build (no Python needed) is produced by `pyinstaller fsoc_tracker.spec`, by
+the GitHub workflow for Windows and Linux, and by `tools/build_macos.sh` for macOS.
 
-The workflow runs when started by hand (Actions, Build desktop application, Run workflow) or
-when a tag is pushed, and republishes once both platform builds and their checks pass:
+## How it works
 
-| Where | What | Updated |
-|---|---|---|
-| Releases, `latest` (pre-release) | the Windows and Linux archives | every manual run on `main` |
-| Releases, `v1.0.0` etc. | the Windows and Linux archives | when a tag is pushed: `git tag v1.0.0 && git push origin v1.0.0` |
-| Packages, `argus-desktop` | the Windows and Linux archives, `oras pull ghcr.io/tanmayhutt/argus-desktop:latest` | tags `latest`, `sha-<commit>`; `<version>`, `stable` for a tag |
-| Packages, `argus-web` | the web app, `docker run -p 8095:8095 ghcr.io/tanmayhutt/argus-web:latest` | same tags, for linux/amd64 and linux/arm64 |
+- **World** (`fsoc_tracker/world/`): scene backgrounds, beacon shapes and motions (line, circular,
+  figure of 8, random, spiral, sinusoidal, waypoints), the gimbal model (rate and acceleration
+  limits, latency), and the disturbance chain (extinction, turbulence, blur, platform sway,
+  vibration, exposure, frame loss, Poisson, Gaussian and salt-and-pepper noise) applied in
+  physical order. The renderer returns the ground truth of every frame.
+- **Perception** (`fsoc_tracker/perception/`): a classical detector (median, background
+  subtraction, matched filter, adaptive threshold, connected components) with a sub-pixel centroid
+  (centre of gravity plus a 2-D Gaussian fit); a track-before-detect path for beacons at three to
+  six sigma; a small CNN heat-map detector (ONNX, `models/`) that fills gaps in degraded
+  conditions; an interacting multiple model estimator (constant velocity, constant acceleration,
+  coordinated turn); frame-to-frame ego-motion by phase correlation.
+- **Control** (`fsoc_tracker/control/`): a five-state tracker (SEARCH, VERIFY, TRACK, COAST,
+  REACQUIRE) with gating, an appearance signature that holds identity among decoys, and an
+  optional beacon blink code; a feed-forward plus PI rate controller with latency lead.
+- **Engine** (`fsoc_tracker/engine/`): the run loop, typed configuration (one field per problem
+  statement row, YAML in and out), the scenario check (values clamped, beyond the PS, near a
+  limit or physically impossible), metrics with pass or fail against the PS limits, and the report.
+- **Interfaces**: the PyQt6 desktop application (`fsoc_tracker/gui/`), the command line
+  (`fsoc_tracker/cli.py`) and the web app (`webapp/`) share one interface definition,
+  `fsoc_tracker/ui_shared.py`, so the panel, tiles and texts cannot drift apart.
 
-The repository is private, so the releases and packages are too: pulling needs repository
-access (`docker login ghcr.io` / `oras login ghcr.io` with a GitHub token that can read packages).
-
-## Layout
+## Repository layout
 
 ```
-fsoc_tracker/
-  engine/      config (one field per PS parameter row), simulation loop, telemetry, metrics, report
-  world/       scene, beacon kinematics, camera and gimbal, disturbance chain, renderer
-  perception/  classical detector and sub-pixel centroid, CNN heat-map detector, IMM estimator, ego-motion
-  control/     tracker state machine and identity, feedforward + PID controller
-  gui/         PyQt6 desktop application
-  cli.py       run | video | batch | gui
-configs/scenarios/   scenario files (clear, noise, fog, low light, platform sway, multi-target, hard mode)
-models/              beacon_heatmap.onnx (the CNN, ONNX)
-training/            trains the CNN on frames rendered by the simulator, exports ONNX
-tests/               unit and closed-loop tests (pytest)
-tools/               ps_audit, record_check, chat_history, compare_batches, compare_trackers, build_macos,
-                     build_pdfs, package_check, gui_screenshot, make_demo_video
-webapp/              the web app (FastAPI server, static page) and the server scripts (deploy, publish builds)
-site/                the progress site served at /about/: index.html, progress.json, plan.html
-docs/                the record and the deliverables:
-  HANDOVER.md, KNOWLEDGE_TRANSFER.md, PROGRESS.md, COMPLIANCE.md, ARCHITECTURE.md, TESTING_GUIDE.md,
-  DEMO_SCRIPT.md, DEMO_NARRATION.md, BASELINE_COMPARISON.md, PS_AUDIT.md (generated)
-  USER_MANUAL.md + .pdf, TECHNICAL_REPORT.md + .pdf (the submitted manual and report)
-  report/            LaTeX source of the report, team.tex, make_charts.py, build.sh, figures/
-  submission/        the presentation (.pptx and .pdf) and its checklist
-  history/           CHAT_LOG.md, every teammate's Claude conversation
-26169.pdf            the problem statement, the only source of truth
+fsoc_tracker/        the package: world/, perception/, control/, engine/, gui/, cli.py, ui_shared.py
+configs/scenarios/   17 scenario files (clear, noise, fog, low light, faint beacon, platform sway and
+                     shake, multi-target stress, identical decoys, beacon shapes, fast circle, hard mode,
+                     coded beacon) and an evaluator template
+models/              beacon_heatmap.onnx, the CNN
+training/            trains the CNN on frames rendered by the simulator and exports ONNX
+tests/               pytest suite: geometry, motions, centroiding, estimation, closed-loop specification
+                     checks, Benchmark 2, designation, robustness, the web server
+tools/               ps_audit.py (measures every PS row, shall item and benchmark by running the code),
+                     compare_batches.py and compare_trackers.py (regression and baseline comparison),
+                     package_check.py (runs a built archive), build_macos.sh, gui_screenshot.py
+webapp/              FastAPI server, static page, deploy and publish scripts
+fsoc_tracker.spec    PyInstaller build; .github/workflows/build.yml builds and tests on every platform
 ```
 
-## Web app
+## Verification
 
-The same program served to a browser (`webapp/`). The desktop window and the web page are built
-from one interface definition, `fsoc_tracker/ui_shared.py` (panel, tiles, text, summary), so they
-cannot drift apart. Run it with `.venv/bin/uvicorn webapp.server:app --port 8095`,
-then open http://127.0.0.1:8095/. `bash webapp/deploy.sh` deploys the repository, the web app (site root),
-the progress record and the downloads to the server behind Caddy. `python webapp/smoke.py` is the
-cross-platform smoke test the build workflow runs.
+```bash
+python -m pytest                                                  # the test suite
+python tools/ps_audit.py                                          # every PS item, measured; writes results/PS_AUDIT.md
+python webapp/smoke.py                                            # the web app end to end
+fsoc-tracker batch -s configs/scenarios/*.yaml --seeds 0-2 --duration 15 --out results/b
+python tools/compare_batches.py results/a results/b               # no run may be worse after a change
+```
 
-## Documents
+Nothing is tuned to a particular video or scenario: a change goes in only if it is a general fix
+within the problem statement's scope and the regression batch shows no run worse than before.
 
-- `docs/USER_MANUAL.md`: installation, GUI, parameters, Benchmark 2, output files, metric definitions.
-- `docs/TECHNICAL_REPORT.md`: problem understanding, architecture, modules, methods, tests, performance. The
-  submitted PDF is typeset from `docs/report/ARGUS_TECHNICAL_REPORT.tex` (`bash docs/report/build.sh`, needs
-  tectonic); its charts are drawn from a regression batch by `docs/report/make_charts.py`.
-- `docs/TESTING_GUIDE.md`: how to exercise every input and configuration by hand, with expected outcomes.
-- `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
-- `docs/ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
-- `docs/DEMO_NARRATION.md`: the narration for the optional 3 to 5 minute demo video.
-- `docs/submission/WHOLE_SCENE_SLIDE.md`: slide text and a spoken answer on why the tracker watches the whole scene.
-- `docs/BASELINE_COMPARISON.md`: ARGUS against a deliberately simple brightest-spot tracker on every scenario (`tools/compare_trackers.py`).
+## Deliverables
 
-## Licence
-
-Submitted for Smart India Hackathon 2026. All rights reserved by the team.
+The user manual, the technical report and the presentation are submitted separately and are
+available on the project site's downloads page. When the team's records folder sits beside this
+repository as `SIH169-records`, the packaging bundles the manual and the report next to the application.

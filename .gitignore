@@ -20,11 +20,3 @@ docs/demo/
 out/
 .chat_redact
 .history_seen
-
-# LaTeX build files of the technical report (the PDF and the chart PDFs are committed)
-docs/report/*.log
-docs/report/*.aux
-docs/report/*.xdv
-docs/report/*.out
-docs/report/*.toc
-docs/report/ARGUS_TECHNICAL_REPORT.pdf
