@@ -9,7 +9,7 @@ docs
 tests
 training
 tools
-web
+site
 **/__pycache__
 **/*.pyc
 .pytest_cache

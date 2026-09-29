@@ -23,7 +23,7 @@ build() {   # build <label> <python> [arch-prefix...]
   ( cd dist/ARGUS && "$@" ./ARGUS run -s configs/scenarios/clear_line.yaml --duration 2 --seed 0 --out results/smoke > /dev/null
     ls results/smoke/FSOC_*_report.pdf > /dev/null && rm -rf results configs models docs )
   rm -f "out/ARGUS-$label.zip"; ( cd dist && zip -qry "../out/ARGUS-$label.zip" ARGUS )
-  QT_QPA_PLATFORM=offscreen "$@" "$py" tests/package_check.py "out/ARGUS-$label.zip" | tail -1
+  QT_QPA_PLATFORM=offscreen "$@" "$py" tools/package_check.py "out/ARGUS-$label.zip" | tail -1
 }
 
 # Both environments are created once and kept (.venv and .venv-intel are ignored by git). Every

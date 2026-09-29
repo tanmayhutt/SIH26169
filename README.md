@@ -29,7 +29,7 @@ CSV log and an automatic PDF performance report.
 | `CLAUDE.md` | Rules for every contributor and AI agent |
 | `docs/history/CHAT_LOG.md` | Every teammate's Claude Code conversation, one file, in order, secrets removed: how the work happened (the handover and knowledge-transfer files are authoritative) |
 | `docs/PS_AUDIT.md` | Every PS item checked by running the code, with the measured value (`python tools/ps_audit.py`) |
-| `COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
+| `docs/COMPLIANCE.md` | Every PS row, deliverable and evaluation stage, with where and how it is met |
 | `docs/TECHNICAL_REPORT.md`, `docs/USER_MANUAL.md` | The submitted report and manual (PDFs beside them; the report PDF is typeset from `docs/report/ARGUS_TECHNICAL_REPORT.tex`) |
 | `docs/TESTING_GUIDE.md`, `docs/DEMO_SCRIPT.md` | Manual testing, and the live demonstration |
 | `26169.pdf` | The problem statement itself |
@@ -82,10 +82,21 @@ fsoc_tracker/
   gui/         PyQt6 desktop application
   cli.py       run | video | batch | gui
 configs/scenarios/   scenario files (clear, noise, fog, low light, platform sway, multi-target, hard mode)
+models/              beacon_heatmap.onnx (the CNN, ONNX)
 training/            trains the CNN on frames rendered by the simulator, exports ONNX
-tests/               unit and closed-loop tests
-docs/                USER_MANUAL.md, TECHNICAL_REPORT.md, report/ (LaTeX source, charts, build.sh), plan.html
-models/              beacon_heatmap.onnx
+tests/               unit and closed-loop tests (pytest)
+tools/               ps_audit, record_check, chat_history, compare_batches, compare_trackers, build_macos,
+                     build_pdfs, package_check, gui_screenshot, make_demo_video
+webapp/              the web app (FastAPI server, static page) and the server scripts (deploy, publish builds)
+site/                the progress site served at /about/: index.html, progress.json, plan.html
+docs/                the record and the deliverables:
+  HANDOVER.md, KNOWLEDGE_TRANSFER.md, PROGRESS.md, COMPLIANCE.md, ARCHITECTURE.md, TESTING_GUIDE.md,
+  DEMO_SCRIPT.md, DEMO_NARRATION.md, BASELINE_COMPARISON.md, PS_AUDIT.md (generated)
+  USER_MANUAL.md + .pdf, TECHNICAL_REPORT.md + .pdf (the submitted manual and report)
+  report/            LaTeX source of the report, team.tex, make_charts.py, build.sh, figures/
+  submission/        the presentation (.pptx and .pdf) and its checklist
+  history/           CHAT_LOG.md, every teammate's Claude conversation
+26169.pdf            the problem statement, the only source of truth
 ```
 
 ## Web app
@@ -105,7 +116,7 @@ cross-platform smoke test the build workflow runs.
   tectonic); its charts are drawn from a regression batch by `docs/report/make_charts.py`.
 - `docs/TESTING_GUIDE.md`: how to exercise every input and configuration by hand, with expected outcomes.
 - `docs/DEMO_SCRIPT.md`: the 10 to 15 minute live demonstration.
-- `ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
+- `docs/ARCHITECTURE.md`: design baseline and the reading of the problem statement it rests on.
 - `docs/DEMO_NARRATION.md`: the narration for the optional 3 to 5 minute demo video.
 - `docs/submission/WHOLE_SCENE_SLIDE.md`: slide text and a spoken answer on why the tracker watches the whole scene.
 - `docs/BASELINE_COMPARISON.md`: ARGUS against a deliberately simple brightest-spot tracker on every scenario (`tools/compare_trackers.py`).

@@ -27,9 +27,9 @@ rsync -az --delete \
 echo "== 2. static site (about, downloads) -> $SITE"
 STAGE=$(mktemp -d)
 mkdir -p "$STAGE/about/content/docs" "$STAGE/downloads"
-cp "$HERE/web/index.html" "$HERE/web/progress.json" "$STAGE/about/"
-cp "$HERE/docs/plan.html" "$STAGE/about/plan.html"
-cp "$HERE/PROGRESS.md" "$HERE/COMPLIANCE.md" "$HERE/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/about/content/"
+cp "$HERE/site/index.html" "$HERE/site/progress.json" "$STAGE/about/"
+cp "$HERE/site/plan.html" "$STAGE/about/plan.html"
+cp "$HERE/docs/PROGRESS.md" "$HERE/docs/COMPLIANCE.md" "$HERE/docs/ARCHITECTURE.md" "$HERE/README.md" "$STAGE/about/content/"
 cp "$HERE/docs/USER_MANUAL.md" "$HERE/docs/TECHNICAL_REPORT.md" "$STAGE/about/content/docs/"
 cp "$HERE/docs/USER_MANUAL.pdf" "$HERE/docs/TECHNICAL_REPORT.pdf" "$STAGE/downloads/" 2>/dev/null || true
 cp "$HERE/docs/submission/ARGUS_SIH2026_26169.pdf" "$STAGE/downloads/" 2>/dev/null || true

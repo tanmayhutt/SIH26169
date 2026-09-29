@@ -48,10 +48,10 @@ need to know about is recorded in the same commit as the change, and pushed:
 - `docs/HANDOVER.md`: how it works now, why, and the history paragraph (section 14).
 - `docs/KNOWLEDGE_TRANSFER.md`: the step it changes (Part B), the timeline (Part C1), ideas tried
   and dropped (C3), measured results and limits (Part D), the Q&A (E3).
-- `PROGRESS.md` and `web/progress.json`: status, counts, measured numbers.
-- `COMPLIANCE.md` when a PS row, shall item, deliverable or benchmark is affected.
+- `docs/PROGRESS.md` and `site/progress.json`: status, counts, measured numbers.
+- `docs/COMPLIANCE.md` when a PS row, shall item, deliverable or benchmark is affected.
 - `docs/USER_MANUAL.md`, `docs/TECHNICAL_REPORT.md`, the LaTeX report `docs/report/ARGUS_TECHNICAL_REPORT.tex`
-  and the PDFs (`docs/build_pdfs.py`; the report needs tectonic) when the
+  and the PDFs (`tools/build_pdfs.py`; the report needs tectonic) when the
   user sees the change or a method or number in the report changes.
 - `docs/submission/DECK_CHECKLIST.md` when a number the deck quotes changes.
 
@@ -109,6 +109,6 @@ only the result.
   `tools/compare_batches.py` (no run worse), `python webapp/smoke.py`; rebuild the archives:
   Windows and Linux through `.github/workflows/build.yml` (run it by hand; it costs Actions
   minutes) then `bash webapp/publish_builds.sh`, the two macOS ones with `bash tools/build_macos.sh`
-  on an Apple silicon Mac; redeploy with `bash webapp/deploy.sh`. Update `web/progress.json`, `PROGRESS.md`,
-  `COMPLIANCE.md`, `docs/HANDOVER.md` and the PDFs (`docs/build_pdfs.py`) so they say what the
+  on an Apple silicon Mac; redeploy with `bash webapp/deploy.sh`. Update `site/progress.json`, `docs/PROGRESS.md`,
+  `docs/COMPLIANCE.md`, `docs/HANDOVER.md` and the PDFs (`tools/build_pdfs.py`) so they say what the
   code does.

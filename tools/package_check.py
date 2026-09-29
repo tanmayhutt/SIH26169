@@ -1,7 +1,7 @@
 """End-to-end check of a packaged desktop archive, run on the platform it was built for.
 
-    python tests/package_check.py dist/ARGUS-windows-x64.zip
-    python tests/package_check.py dist/ARGUS-macos-intel.zip --arch x86_64   # Rosetta on Apple silicon
+    python tools/package_check.py dist/ARGUS-windows-x64.zip
+    python tools/package_check.py dist/ARGUS-macos-intel.zip --arch x86_64   # Rosetta on Apple silicon
 
 Extracts the archive into a fresh folder (as a user would), then:
   1. runs a clear scenario and a full-stress scenario with the executable, checks report and CSV;
