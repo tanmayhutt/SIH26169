@@ -71,6 +71,8 @@
   .status .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
   /* dialogs */
   dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(640px, calc(100vw - 32px)); }
+  #dlg { box-sizing: border-box; width: 440px; max-width: calc(100% - 32px); }
+  #dlg li { grid-template-columns: minmax(0, 1fr) auto; }
   dialog::backdrop { background: rgba(3, 8, 12, .7); }
   .dlg { padding: 18px 20px 16px; }
   .dlg h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600; }
@@ -83,12 +85,13 @@
   .dlg a { color: var(--accent); }
   .dlg .rec { border: 1px solid var(--good); background: #122E24; border-radius: 4px; padding: 12px 14px; margin-bottom: 12px; }
   .dlg .rec .k { font-size: 11.5px; color: var(--good); margin-bottom: 2px; }
-  .dlg .rec a { display: inline-block; margin-top: 6px; color: #07130E; background: var(--good); padding: 7px 12px; border-radius: 3px; text-decoration: none; }
+  .dlg .rec a { display: inline-block; color: #07130E; background: var(--good); padding: 6px 14px; border-radius: 3px; text-decoration: none; }
+  .dlg .rec .rec-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px; color: var(--ink); }
+  .dlg .rec small { display: block; color: var(--muted); margin-top: 6px; }
   .dlg ul { list-style: none; margin: 0; padding: 0; }
   .dlg li { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line2); color: var(--ink2); align-items: center; }
   .dlg li small { color: var(--faint); display: block; }
-  .dlg li a { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
-  .dlg .steps { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.45; }
+  .dlg li a { white-space: nowrap; }
   @media (max-width: 1100px) { body { overflow: auto; } .main { flex-direction: column; } .side, .tele { width: auto; max-height: none; } .views { min-height: 420px; } }
 </style>
 </head>
@@ -139,12 +142,10 @@
 
 <dialog id="dlg"><div class="dlg">
   <h2 id="dlg-title">Desktop application</h2>
-  <p id="dlg-intro" style="display:none">This project is delivered as a standalone desktop application, as the problem statement asks. Download it for your computer below, or continue in the browser: this page is the same program running on the server, with nothing to install.</p>
-  <p>The standalone executable: every parameter, real-time pacing on your own machine, keyboard control and the user manual built in. No installation and no Python. Extract the archive to a folder you can write to and run <code>ARGUS</code>.</p>
+  <p>Runs offline, no installation. Unzip and open <code>ARGUS</code>.</p>
   <div class="rec" id="rec"></div>
   <ul id="dl-all"></ul>
-  <div class="steps" id="dl-steps"></div>
-  <div class="foot"><span class="left"><a href="/downloads/">All downloads</a>&nbsp;&nbsp;<a href="/downloads/USER_MANUAL.pdf" target="_blank">User manual (PDF)</a></span><label id="dlg-remember" style="color:var(--muted);display:none"><input type="checkbox" id="dlg-skip"> do not show this again</label><button id="dlg-close">Continue in the browser</button></div>
+  <div class="foot"><span class="left"><a href="/downloads/USER_MANUAL.pdf" target="_blank">Setup help</a></span><label id="dlg-remember" style="color:var(--muted);display:none"><input type="checkbox" id="dlg-skip"> do not show this again</label><button id="dlg-close">Continue in the browser</button></div>
 </div></dialog>
 
 <script>
@@ -528,16 +529,16 @@ async function resultsDialog() {
 
 // ------------------------------------------------------------------ desktop download offer (web only)
 const BUILDS = [
-  { key: "windows", name: "Windows 10 or 11, 64-bit", file: "ARGUS-windows-x64.zip", run: "extract, run ARGUS.exe (ARGUS-cli.exe for the terminal)" },
-  { key: "linux", name: "Linux 64-bit: Ubuntu 22.04 or newer, Debian 12, BOSS, RHEL 9, Fedora", file: "ARGUS-linux-x64.tar.gz", run: "tar xzf, then ./ARGUS/ARGUS" },
-  { key: "mac-arm", name: "macOS 13 or newer, Apple silicon (M1 and later)", file: "ARGUS-macos-arm64.zip", run: "extract, run ARGUS" },
-  { key: "mac-intel", name: "macOS 13 or newer, Intel", file: "ARGUS-macos-intel.zip", run: "extract, run ARGUS" },
+  { key: "windows", name: "Windows", file: "ARGUS-windows-x64.zip" },
+  { key: "linux", name: "Linux", file: "ARGUS-linux-x64.tar.gz" },
+  { key: "mac-arm", name: "macOS, Apple silicon", file: "ARGUS-macos-arm64.zip" },
+  { key: "mac-intel", name: "macOS, Intel", file: "ARGUS-macos-intel.zip" },
 ];
 function detectPlatform() {
   const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
   if (/Windows/i.test(ua) || /Win/i.test(plat)) return { key: "windows", sure: true };
-  if (/Android/i.test(ua)) return { key: null, sure: true, note: "This is an Android device. Use the web app here, or download on a desktop computer." };
-  if (/iPhone|iPad/i.test(ua) || (/Mac/i.test(plat) && navigator.maxTouchPoints > 1)) return { key: null, sure: true, note: "This is an iPhone or iPad. Use the web app here, or download on a desktop computer." };
+  if (/Android/i.test(ua)) return { key: null, sure: true, note: "Phones cannot run it. Use the web app here." };
+  if (/iPhone|iPad/i.test(ua) || (/Mac/i.test(plat) && navigator.maxTouchPoints > 1)) return { key: null, sure: true, note: "Phones and tablets cannot run it. Use the web app here." };
   if (/Mac/i.test(plat) || /Mac OS X/i.test(ua)) {
     let arm = null;
     try { const gl = document.createElement("canvas").getContext("webgl"); const d = gl.getExtension("WEBGL_debug_renderer_info"); const r = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : ""; if (/Apple M|Apple GPU/i.test(r)) arm = true; else if (/Intel|AMD|Radeon/i.test(r)) arm = false; } catch (e) {}
@@ -547,14 +548,13 @@ function detectPlatform() {
   return { key: null, sure: false };
 }
 function openDownloads(welcome) {
-  $("dlg-title").textContent = welcome ? "Download the desktop application" : "Desktop application";
-  $("dlg-intro").style.display = welcome ? "block" : "none"; $("dlg-remember").style.display = welcome ? "inline" : "none";
-  $("dlg-close").textContent = welcome ? "Continue in the browser" : "Close";
-  const p = detectPlatform(), rec = BUILDS.find(b => b.key === p.key), link = b => `<a href="/downloads/${b.file}">Download ${b.file}</a>`;
-  $("rec").innerHTML = rec ? `<div class="k">Recommended for this computer</div><div>${rec.name}</div>${link(rec)}${p.mac && !p.sure ? `<small style="display:block;color:var(--muted);margin-top:6px">The browser does not say which chip this Mac has. Apple menu, About This Mac: "Apple M1" or later means this download, "Intel" means the Intel one below.</small>` : ""}`
-                           : `<div class="k">This device</div><div>${p.note || "Platform not recognised. Pick the matching archive below."}</div>`;
-  $("dl-all").innerHTML = BUILDS.filter(b => b !== rec).map(b => `<li><span>${b.name}<small>${b.run}</small></span>${link(b)}</li>`).join("");
-  $("dl-steps").innerHTML = `Windows: SmartScreen may show "Windows protected your PC" because the build is not code-signed; choose More info, Run anyway. macOS: if Gatekeeper objects, System Settings, Privacy and Security, Open Anyway. Linux: needs the usual desktop libraries; on a minimal image install <code>libxcb-cursor0 libxkbcommon-x11-0 libegl1</code>. Full steps in the user manual, section 2.`;
+  $("dlg-title").textContent = "Get the desktop app";
+  $("dlg-remember").style.display = welcome ? "inline" : "none";
+  $("dlg-close").textContent = welcome ? "Use in browser" : "Close";
+  const p = detectPlatform(), rec = BUILDS.find(b => b.key === p.key);
+  $("rec").innerHTML = rec ? `<div class="k">For this computer</div><div class="rec-row"><span>${rec.name}</span><a href="/downloads/${rec.file}">Download</a></div>${p.mac && !p.sure ? `<small>Intel Mac? Use the Intel build below.</small>` : ""}`
+                           : `<div class="k">This device</div><div>${p.note || "Pick your system below."}</div>`;
+  $("dl-all").innerHTML = BUILDS.filter(b => b !== rec).map(b => `<li><span>${b.name}</span><a href="/downloads/${b.file}">Download</a></li>`).join("");
   $("dlg").showModal();
 }
 
