@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 
 from ..control.controller import Controller
-from ..control.tracker import Mode, Tracker, TrackOutput
+from ..control.tracker import Tracker, TrackOutput
 from ..perception.egomotion import EgoMotion
 from ..world.camera import Gimbal, RateCommand
 from .checks import check_config
@@ -86,7 +86,6 @@ class Simulation:
         self.telemetry = Telemetry(self.files["frames"] if (out_dir and write_csv) else None)
         self.t_start = None
         self.summary: Summary | None = None
-        self.last_cmd = RateCommand()
         # disturbance changes during the run: the scenario's schedule plus requests made live
         self._scheduled = [(math.ceil(c.t_s / self.dt - 1e-6), c) for c in cfg.schedule]
         self._live: list[dict] = []
@@ -163,7 +162,6 @@ class Simulation:
             out = self.tracker.step(lum, win_rect if window_only else None)
             cmd = self.controller.step(out, ego_dx, ego_dy, window_only)
             acted = self.gimbal.apply(cmd, self.dt)
-            self.last_cmd = acted
             proc_ms = (time.perf_counter() - t0) * 1000.0
             rec = self._record(frame, out, acted, proc_ms, ego_dx, ego_dy, win_rect)
             self.telemetry.add(rec)

@@ -97,7 +97,7 @@ TIPS = {
     "faint_snr_min": "Faint beacons: weak detections are linked across frames; a chain is promoted when its mean matched-filter SNR is at least this.",
     "faint_threshold_k": "Faint beacons: detection threshold in noise sigmas for the chain search (the normal threshold is 4).",
 }
-HIDDEN = {"cnn_model", "cnn_confidence_floor", "min_area_px", "max_area_px", "verify_n", "verify_m", "coast_frames",
+HIDDEN = {"cnn_model", "min_area_px", "max_area_px", "verify_n", "verify_m", "coast_frames",
           "search_roi_px", "gate_px"}
 RANGES = LIMITS          # accepted input ranges live in the engine, so every front end clamps alike
 # fields shown in other units than they are stored: salt and pepper is a fraction in the engine

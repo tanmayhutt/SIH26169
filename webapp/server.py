@@ -35,9 +35,8 @@ import uuid
 from pathlib import Path
 
 import cv2
-import numpy as np
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from fsoc_tracker import __version__
@@ -155,7 +154,7 @@ class Run:
                 sim.finish()
             self.summary = sim.summary
             write_report(self.cfg, sim.telemetry.records, sim.summary, sim.files["report"])
-        except Exception as e:  # surface to the client
+        except Exception:  # surface to the client
             import traceback
             self.error = traceback.format_exc()
         finally:

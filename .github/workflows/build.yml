@@ -10,7 +10,7 @@
 # Nothing is published unless every platform build, test and package check passed.
 #   Triggers: manually (Actions > Build desktop application > Run workflow) or a tag v*. Not on
 #   every push: each run spends Actions minutes, so a build is a decision.
-#   Fetch the archives for the project site with:  bash webapp/fetch_builds.sh
+#   Publish the Windows and Linux archives on the project site with:  bash webapp/publish_builds.sh
 name: Build desktop application
 on:
   workflow_dispatch:

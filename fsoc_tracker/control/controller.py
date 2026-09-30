@@ -24,7 +24,6 @@ class ControlState:
     int_tilt: float = 0.0
     prev_e_pan: float = 0.0
     prev_e_tilt: float = 0.0
-    search_phase: float = 0.0
     waypoints: list = field(default_factory=list)
     wp_index: int = 0
 
@@ -138,5 +137,3 @@ class Controller:
         vmax = min(g.cfg.max_pan_rate_deg_s, g.cfg.max_tilt_rate_deg_s)
         return RateCommand(float(e_pan / dist * vmax), float(e_tilt / dist * vmax))
 
-    def reset_search(self):
-        self.s.waypoints = []

@@ -33,7 +33,6 @@ class World:
         self.rng = np.random.default_rng(cfg.seed)
         self.dt = 1.0 / cfg.camera.update_rate_hz
         self.t = 0.0
-        self.frame_idx = 0
         apply_atmosphere_preset(cfg.disturbance)
         self.background = make_background(cfg.screen, self.rng)
         self.h, self.w = self.background.shape
@@ -91,7 +90,6 @@ class World:
             img = self._colourise(img)
         truth.window = self.gimbal.window_rect()
         self.t += self.dt
-        self.frame_idx += 1
         return img, truth
 
     def _colourise(self, gray: np.ndarray) -> np.ndarray:

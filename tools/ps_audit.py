@@ -177,7 +177,6 @@ def _rate_run(limit):
     c = RunConfig.load(ROOT / "configs/scenarios/fast_circular.yaml")
     c.camera.max_pan_rate_deg_s = c.camera.max_tilt_rate_deg_s = limit
     s = run(c, 6.0)
-    g = s.gimbal
     pans = np.array([r.cam_pan_deg for r in s.telemetry.records]); tilts = np.array([r.cam_tilt_deg for r in s.telemetry.records])
     return max(np.abs(np.diff(pans)).max(), np.abs(np.diff(tilts)).max()) / s.dt
 
@@ -342,7 +341,7 @@ def _():
 
 @check("Shall 7", "Introduce disturbances: turbulence, platform vibration, camera motion, noise", "each one changes the picture or its position")
 def _():
-    out, ok = [], True
+    ok = True
     def series(**dist):
         c = RunConfig(); c.screen.background = "flat"; c.screen.background_level = 60
         for k, v in dist.items():

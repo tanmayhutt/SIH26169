@@ -22,13 +22,13 @@ from .theme import STYLESHEET, C, mono, ui_font
 SCENARIO_DIR = Path("configs/scenarios")
 LABEL_W = 140          # one label column width for every form, so all sections line up
 
-from ..ui_shared import (CHOICES, LABELS, TIPS, HIDDEN, RANGES, MODES, SPEEDS, DEFAULT_SPEED_INDEX, DURATION_RANGE,
+from ..ui_shared import (LABELS, TIPS, HIDDEN, MODES, SPEEDS, DEFAULT_SPEED_INDEX, DURATION_RANGE,
                          EXTRA_TARGETS_MAX, SECTIONS, VIDEO_LOCKED, TILES, SCENE_LEGEND, LiveTiles, blank_tiles, final_tiles,
                          field_spec, camera_crop, scene_header, camera_top, camera_bottom, telemetry_lines, welcome_text,
                          about_text, summary_text, video_loaded_lines, video_preview_header, status_text, extra_targets,
-                         new_random_seed, prepare_video_run, section_object, target_labels, scenario_check, RUN_TIPS, CHOICES as _CH,
+                         new_random_seed, prepare_video_run, target_labels, scenario_check, RUN_TIPS,
                          TRUTH_TIP, truth_sidecar, LIVE_SECTIONS, LIVE_DEBOUNCE_MS, video_beacons, video_targets, beacon_labels)  # noqa: F401
-from ..engine.config import target_name, parse_xy
+from ..engine.config import target_name
 
 
 # ----------------------------------------------------------------------------- form helpers
@@ -275,7 +275,6 @@ class SceneView(QtWidgets.QLabel):
 
     def draw_beacons(self, p: QtGui.QPainter, beacons, s: float, font):
         """Every target with its name; the designated one in the signal colour."""
-        fm = QtGui.QFontMetrics(font)
         for i, (bx, by) in enumerate(beacons):
             des = i == self.designated
             p.setPen(_pen(C["signal"] if des else C["muted"], 1.2 if des else 1.0))
@@ -361,10 +360,7 @@ class CameraView(QtWidgets.QLabel):
 
     def update_view(self, res: StepResult, ifov_deg: float, capture_px: float):
         img = res.observed
-        H, W = img.shape[:2]
         x0, y0, w, h = res.window
-        xa, ya = max(x0, 0), max(y0, 0)
-        xb, yb = min(x0 + w, W), min(y0 + h, H)
         crop = camera_crop(img, res.window)
         qi = to_qimage(crop)
         avail_w, avail_h = self.width() - 8, self.height() - 8
@@ -944,7 +940,6 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------- data flow
     def _buf_reset(self):
         self.b_t, self.b_terr, self.b_cerr, self.b_pan, self.b_tilt, self.b_proc, self.b_mode, self.b_lock = ([] for _ in range(8))
-        self._acq_t = None
         self.live = LiveTiles()
         self._segment = 0
         for pw, ln in getattr(self, "_change_lines", []):
@@ -1004,7 +999,6 @@ class MainWindow(QtWidgets.QMainWindow):
         msg = summary_text(v, p, str(sim.files["frames"]), str(report), sim.summary.designation if sim.summary else None,
                            sim.summary.checks if sim.summary else None)
         self.lbl_status.setText(status_text("finished", out=self.out_dir))
-        self.last_summary_text = msg
         if self.headless:
             return
         box = QtWidgets.QMessageBox(self); box.setWindowTitle("Run complete"); box.setText(msg)

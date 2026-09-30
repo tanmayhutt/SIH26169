@@ -83,8 +83,6 @@ class Tracker:
         self.miss_count = 0
         self.frames_in_mode = 0
         self.designated_sig: dict | None = None   # appearance signature of the target we follow
-        self._cand_hist: list[Candidate] = []
-        self._search_roi: tuple[int, int, int, int] | None = None
         # jitter statistics from the measured frame-to-frame picture shift
         self._ego_lp = np.zeros(2)
         self._ego_var = 16.0          # start assuming ~4 px of vibration; adapts within a second
@@ -106,7 +104,6 @@ class Tracker:
         # that does not is remembered for a few seconds and not picked again (a look-alike)
         self.code = parse_code(t.code) if t is not None and t.code else None
         self.code_rejections = 0          # spots turned down because they did not blink the code
-        self.code_score = float("nan")    # best correlation of the followed spot with the code
         self._code_samples: list[float] = []
         self._code_strikes = 0
         self._excluded: list[dict] = []
@@ -517,7 +514,6 @@ class Tracker:
             if hi <= 0 or (hi - lo) / hi < self.CODE_DEPTH:
                 continue
             best = max(best, float(np.corrcoef(x, e)[0, 1]))
-        self.code_score = best
         if len(s) >= self._code_window:
             return best >= self.CODE_ACCEPT
         return False if best < self.CODE_REJECT else None

@@ -29,9 +29,15 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hidden,
-    excludes=["torch", "onnx", "tkinter", "IPython", "jupyter", "pytest"],
+    excludes=["torch", "onnx", "tkinter", "IPython", "jupyter", "pytest", "PyQt6.QtNetwork", "PyQt6.QtPdf", "PyQt6.QtPdfWidgets"],
     noarchive=False,
 )
+# Drop Qt parts the application never uses: the PDF image plugin (the only thing that pulls in the
+# QtPdf library), the PDF library itself and the interface translations (the application is English
+# only). About 15 MB less on every platform; tools/package_check.py runs the result to prove it.
+_unused = ("QtPdf", "qpdf", "/translations/", "\\translations\\")
+a.binaries = [b for b in a.binaries if not any(u in b[0] or u in b[1] for u in _unused)]
+a.datas = [d for d in a.datas if not any(u in d[0] or u in d[1] for u in _unused)]
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],

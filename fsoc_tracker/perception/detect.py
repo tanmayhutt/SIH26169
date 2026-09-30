@@ -122,7 +122,6 @@ class ClassicalDetector:
             c_x, c_y = 20 + (sw - 1) / 2.0, 20 + (sh - 1) / 2.0
             patch = np.clip(20 + 200 * sp / max(sp.max(), 1e-6), 0, 255).astype(np.uint8)
             _, _, self._exp_sigma = refine_centroid(patch, float(c_x), float(c_y), r=max(6, int(max(w, h)) + 4))
-            self._exp_hm = int(np.count_nonzero(patch > 20 + 100))
         if getattr(self, "_exp_sigma", None) is None:
             n = int(s) + 40
             sp = np.zeros((n, n), np.float32)
@@ -140,15 +139,7 @@ class ClassicalDetector:
                 sp = cv2.GaussianBlur(sp, (0, 0), 0.6)
             patch = np.clip(20 + 200 * sp / sp.max(), 0, 255).astype(np.uint8)
             _, _, self._exp_sigma = refine_centroid(patch, float(c), float(c), r=max(6, int(s) + 4))
-            self._exp_hm = int(np.count_nonzero(patch > 20 + 100))
         return float(self._exp_sigma)
-
-    def expected_hm_area(self) -> float | None:
-        """Half-maximum footprint of the designated beacon's sprite, in px (see expected_sigma)."""
-        if not self.expected_size_px:
-            return None
-        self.expected_sigma()
-        return float(self._exp_hm)
 
     def detect(self, img: np.ndarray, roi: tuple[int, int, int, int] | None = None,
                k: float | None = None, mf_sigma: float | None = None, refine: int = 3, limit: int = 12) -> list[Candidate]:
