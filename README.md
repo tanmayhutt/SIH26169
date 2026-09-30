@@ -82,7 +82,8 @@ repeated. To evaluate your own scenario, copy `configs/scenarios/TEMPLATE_evalua
   links weak candidates across frames to find beacons at 3 to 6 σ.
 - **AI**: a small fully convolutional network (U-Net style, about 0.1 M parameters, ONNX) trained
   on simulator frames with exact labels. It fills gaps only when the classical detector's
-  confidence drops, so frame rate and reliability never depend on it.
+  confidence drops, so frame rate and reliability never depend on it. It can also be self-trained
+  on real footage: frames the tracker followed with high confidence become labels.
 - **Estimation**: an interacting multiple model filter (constant velocity, constant acceleration,
   coordinated turn) with measurement noise that adapts to measured vibration.
 - **Tracking**: SEARCH, VERIFY (3 of 4 frames), TRACK, COAST, REACQUIRE, with Mahalanobis gating
@@ -117,7 +118,8 @@ fsoc_tracker/
   cli.py        command line;  ui_shared.py  one interface definition for desktop and web
 configs/scenarios/   17 scenarios and an evaluator template
 models/              beacon_heatmap.onnx
-training/            CNN training on simulator frames
+training/            CNN training on simulator frames (train_heatmap.py) and self-training on
+                     footage (finetune_from_video.py)
 tests/               pytest suite
 tools/               PS audit, regression and baseline comparison, packaging check, macOS build
 webapp/              FastAPI server and the browser front end
