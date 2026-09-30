@@ -71,27 +71,19 @@
   .status .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
   /* dialogs */
   dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(640px, calc(100vw - 32px)); }
-  #dlg { box-sizing: border-box; width: 440px; max-width: calc(100% - 32px); }
-  #dlg li { grid-template-columns: minmax(0, 1fr) auto; }
-  dialog::backdrop { background: rgba(3, 8, 12, .7); }
-  .dlg { padding: 18px 20px 16px; }
-  .dlg h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600; }
-  .dlg p { color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
-  .dlg pre { font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: pre-wrap; margin: 0 0 14px; line-height: 1.4; }
-  .dlg .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .dlg .foot .left { margin-right: auto; }
-  .dlg button, .dlg a.btn { font: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 5px 14px; color: var(--ink); cursor: pointer; text-decoration: none; }
-  .dlg button:hover, .dlg a.btn:hover { border-color: var(--accent); }
-  .dlg a { color: var(--accent); }
-  .dlg .rec { border: 1px solid var(--good); background: #122E24; border-radius: 4px; padding: 12px 14px; margin-bottom: 12px; }
-  .dlg .rec .k { font-size: 11.5px; color: var(--good); margin-bottom: 2px; }
-  .dlg .rec a { display: inline-block; color: #07130E; background: var(--good); padding: 6px 14px; border-radius: 3px; text-decoration: none; }
-  .dlg .rec .rec-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px; color: var(--ink); }
-  .dlg .rec small { display: block; color: var(--muted); margin-top: 6px; }
-  .dlg ul { list-style: none; margin: 0; padding: 0; }
-  .dlg li { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line2); color: var(--ink2); align-items: center; }
-  .dlg li small { color: var(--faint); display: block; }
-  .dlg li a { white-space: nowrap; }
+  #dlg { box-sizing: border-box; width: 640px; max-width: calc(100% - 32px); }
+  #dlg .choose { display: grid; grid-template-columns: 1fr 1fr; }
+  #dlg .opt { padding: 28px 24px 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  #dlg .opt + .opt { border-left: 1px solid var(--line); }
+  #dlg .opt h2 { font-size: 17px; font-weight: 600; margin: 0; }
+  #dlg .opt p { color: var(--muted); margin: 0 0 10px; }
+  #dlg .cta { font: inherit; font-weight: 600; display: inline-block; padding: 9px 18px; border-radius: 4px; text-decoration: none; cursor: pointer;
+              color: #07130E; background: var(--good); border: 1px solid var(--good); }
+  #dlg .cta.ghost { color: var(--ink); background: transparent; border-color: var(--line); }
+  #dlg .cta.ghost:hover { border-color: var(--accent); }
+  #dlg .alt { font-size: 12px; color: var(--faint); margin-top: auto; padding-top: 10px; }
+  #dlg .alt a { color: var(--muted); }
+  @media (max-width: 560px) { #dlg .choose { grid-template-columns: 1fr; } #dlg .opt + .opt { border-left: 0; border-top: 1px solid var(--line); } }
   @media (max-width: 1100px) { body { overflow: auto; } .main { flex-direction: column; } .side, .tele { width: auto; max-height: none; } .views { min-height: 420px; } }
 </style>
 </head>
@@ -140,12 +132,19 @@
 
 <dialog id="d-msg"><div class="dlg"><h2 id="m-title"></h2><pre id="m-text"></pre><div class="foot" id="m-foot"></div></div></dialog>
 
-<dialog id="dlg"><div class="dlg">
-  <h2 id="dlg-title">Desktop application</h2>
-  <p>Runs offline, no installation. Unzip and open <code>ARGUS</code>.</p>
-  <div class="rec" id="rec"></div>
-  <ul id="dl-all"></ul>
-  <div class="foot"><span class="left"><a href="/downloads/USER_MANUAL.pdf" target="_blank">Setup help</a></span><label id="dlg-remember" style="color:var(--muted);display:none"><input type="checkbox" id="dlg-skip"> do not show this again</label><button id="dlg-close">Continue in the browser</button></div>
+<dialog id="dlg"><div class="choose">
+  <section class="opt">
+    <h2>Run ARGUS on your system</h2>
+    <p>Desktop app. Works offline.</p>
+    <a class="cta" id="dl-main" href="/downloads/">Download</a>
+    <div class="alt" id="dl-alt"></div>
+  </section>
+  <section class="opt">
+    <h2>Run in browser</h2>
+    <p>Demo. Nothing to install.</p>
+    <button class="cta ghost" id="dlg-close">Open demo</button>
+    <label class="alt" id="dlg-remember"><input type="checkbox" id="dlg-skip"> don't show again</label>
+  </section>
 </div></dialog>
 
 <script>
@@ -548,13 +547,13 @@ function detectPlatform() {
   return { key: null, sure: false };
 }
 function openDownloads(welcome) {
-  $("dlg-title").textContent = "Get the desktop app";
-  $("dlg-remember").style.display = welcome ? "inline" : "none";
-  $("dlg-close").textContent = welcome ? "Use in browser" : "Close";
-  const p = detectPlatform(), rec = BUILDS.find(b => b.key === p.key);
-  $("rec").innerHTML = rec ? `<div class="k">For this computer</div><div class="rec-row"><span>${rec.name}</span><a href="/downloads/${rec.file}">Download</a></div>${p.mac && !p.sure ? `<small>Intel Mac? Use the Intel build below.</small>` : ""}`
-                           : `<div class="k">This device</div><div>${p.note || "Pick your system below."}</div>`;
-  $("dl-all").innerHTML = BUILDS.filter(b => b !== rec).map(b => `<li><span>${b.name}</span><a href="/downloads/${b.file}">Download</a></li>`).join("");
+  $("dlg-remember").style.display = welcome ? "block" : "none";
+  const p = detectPlatform(), rec = BUILDS.find(b => b.key === p.key), main = $("dl-main");
+  if (rec) { main.href = `/downloads/${rec.file}`; main.textContent = `Download for ${rec.name}`; main.style.display = ""; }
+  else { main.style.display = "none"; }
+  $("dlg-close").classList.toggle("ghost", !!rec);          // on a phone the demo is the one thing to do: make it the primary button
+  const others = BUILDS.filter(b => b !== rec).map(b => `<a href="/downloads/${b.file}">${b.name}</a>`).join(" &middot; ");
+  $("dl-alt").innerHTML = rec ? `Other systems: ${others}` : `${p.note ? p.note + "<br>" : ""}${others}`;
   $("dlg").showModal();
 }
 
