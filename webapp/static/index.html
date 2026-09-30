@@ -71,6 +71,17 @@
   .status .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
   /* dialogs */
   dialog { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(640px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(3, 8, 12, .55); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+  dialog { box-shadow: 0 18px 48px rgba(0, 0, 0, .45); }
+  .dlg { padding: 18px 20px 16px; }
+  .dlg h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600; }
+  .dlg p { color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
+  .dlg pre { font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: pre-wrap; margin: 0 0 14px; line-height: 1.4; }
+  .dlg .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .dlg .foot .left { margin-right: auto; }
+  .dlg button, .dlg a.btn { font: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 5px 14px; color: var(--ink); cursor: pointer; text-decoration: none; }
+  .dlg button:hover, .dlg a.btn:hover { border-color: var(--accent); }
+  .dlg a { color: var(--accent); }
   #dlg { box-sizing: border-box; width: 640px; max-width: calc(100% - 32px); }
   #dlg .choose { display: grid; grid-template-columns: 1fr 1fr; }
   #dlg .opt { padding: 28px 24px 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -134,16 +145,16 @@
 
 <dialog id="dlg"><div class="choose">
   <section class="opt">
-    <h2>Run ARGUS on your system</h2>
-    <p>Desktop app. Works offline.</p>
-    <a class="cta" id="dl-main" href="/downloads/">Download</a>
-    <div class="alt" id="dl-alt"></div>
-  </section>
-  <section class="opt">
     <h2>Run in browser</h2>
     <p>Demo. Nothing to install.</p>
     <button class="cta ghost" id="dlg-close">Open demo</button>
     <label class="alt" id="dlg-remember"><input type="checkbox" id="dlg-skip"> don't show again</label>
+  </section>
+  <section class="opt">
+    <h2>Run ARGUS on your system</h2>
+    <p>Desktop app. Works offline.</p>
+    <a class="cta" id="dl-main" href="/downloads/">Download</a>
+    <div class="alt" id="dl-alt"></div>
   </section>
 </div></dialog>
 
