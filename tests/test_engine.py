@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import pytest
 
-from fsoc_tracker.engine.config import RunConfig, TargetConfig, DisturbanceConfig
+from fsoc_tracker.engine.config import RunConfig, TargetConfig
 from fsoc_tracker.engine.simulation import Simulation
 from fsoc_tracker.perception.detect import ClassicalDetector, refine_centroid
 from fsoc_tracker.perception.estimator import IMM

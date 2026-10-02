@@ -104,7 +104,10 @@ def main() -> int:
             for f in ("report.pdf", "frames.csv"):
                 if not list((folder / "results" / "t3").glob(f"FSOC_video_*_{f}")):
                     raise SystemExit(f"video: {f} not written")
-        for d in ("configs", "models", "docs"):
+        # the manual is bundled only when the build machine has the team's records folder (the
+        # macOS builds do; the GitHub runners do not), so docs is required only if it was bundled
+        bundled_docs = any((folder / "_internal" / "docs").glob("*")) if (folder / "_internal" / "docs").exists() else False
+        for d in ("configs", "models") + (("docs",) if bundled_docs else ()):
             if not (folder / d).exists():
                 raise SystemExit(f"{d} was not placed next to the executable on first start")
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")

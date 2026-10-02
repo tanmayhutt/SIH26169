@@ -1191,13 +1191,18 @@ class MainWindow(QtWidgets.QMainWindow):
         for cand in ("docs/USER_MANUAL.pdf", "docs/USER_MANUAL.md", "_internal/docs/USER_MANUAL.pdf", "_internal/docs/USER_MANUAL.md"):
             if Path(cand).exists():
                 _open_path(Path(cand)); return
-        QtWidgets.QMessageBox.information(self, "User manual", "The manual was not found next to the application. It is on the project site's downloads page as USER_MANUAL.pdf.")
+        # not bundled with this build: offer the copy on the project site (the app itself never needs it)
+        if QtWidgets.QMessageBox.question(self, "User manual", "The manual is not bundled with this build. Open it on the project site?") == QtWidgets.QMessageBox.StandardButton.Yes:
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(MANUAL_URL))
 
     def open_results(self):
         d = Path(self.cfg.output_dir); d.mkdir(parents=True, exist_ok=True); _open_path(d)
 
     def help(self):
         QtWidgets.QMessageBox.information(self, "About ARGUS", about_text())
+
+
+MANUAL_URL = "https://sih26169.blankpoint.club/downloads/USER_MANUAL.pdf"
 
 
 def _open_path(p: Path):
