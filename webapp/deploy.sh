@@ -5,7 +5,7 @@
 #   bash webapp/deploy.sh                       # full deploy
 #   HOST=ubuntu@1.2.3.4 DOMAIN=x.example.com bash webapp/deploy.sh
 #
-# Site map on $DOMAIN (everything behind one basic-auth login):
+# Site map on $DOMAIN (public, no login):
 #   /               the web app (FastAPI on 127.0.0.1:8095): /api/*, /ws/*, /runs/*, /static/*
 #   /about/         progress record and documents (static)
 #   /downloads/     desktop builds, PDFs, demo video (static, browsable)
@@ -100,14 +100,8 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now sih26169-web >/dev/null
 sudo systemctl restart sih26169-web
-# caddy: one site block, imported by the main Caddyfile. The whole site sits behind one basic-auth
-# login; the user name and the bcrypt hash are created once on the server and never stored here.
-HASHFILE=/etc/caddy/sih26169.progress.hash
-if ! sudo test -s "$HASHFILE"; then echo "site login hash missing: create it with  sudo bash -c 'caddy hash-password --plaintext <password> > $HASHFILE'"; exit 2; fi
-HASH=$(sudo cat "$HASHFILE")
-USERFILE=/etc/caddy/sih26169.progress.user
-if ! sudo test -s "$USERFILE"; then echo "site login user missing: create it with  echo <username> | sudo tee $USERFILE"; exit 2; fi
-USERNAME=$(sudo cat "$USERFILE")
+# caddy: one site block, imported by the main Caddyfile. The site is public (login removed on
+# 2026-10-06 for the submission).
 sudo tee /etc/caddy/sih26169.caddy >/dev/null <<EOF
 # SIH26169 site. Managed by webapp/deploy.sh; edit there, not here.
 #   /            web app (reverse proxy)      /about/      progress record (static)
@@ -119,9 +113,6 @@ $DOMAIN {
         X-Frame-Options "DENY"
         Referrer-Policy "no-referrer"
         X-Robots-Tag "noindex, nofollow"
-    }
-    basic_auth {
-        $USERNAME $HASH
     }
     # canonical addresses end with a slash
     redir /about /about/ 302
