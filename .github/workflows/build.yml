@@ -95,7 +95,7 @@ jobs:
         with:
           name: ARGUS-${{ matrix.label }}
           path: out/*
-          retention-days: 90
+          retention-days: 1          # a handoff only: publish_builds.sh copies the archives to the server; storage is billed per hour
 
   # which names this build is published under: a tag gives a version, main gives "latest"
   meta:
